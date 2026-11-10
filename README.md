@@ -24,6 +24,9 @@ Production uses the root-owned Compose policy; do not run it locally against rea
 | `apps/api` | Python / FastAPI API; database-aware health checks |
 | `ops` | Reviewed deployment gate, fixed runtime policy and backups |
 | `docs/PLAN.md` | Product roadmap, architecture and acceptance criteria |
+| `DESIGN.md` | Canonical brand, landing, CRM and AI-interface design contract |
+| `.agents/skills/jardines-ui` | Project-scoped UI guidance for future work |
+| `docs/DESIGN-SOURCES.md` | Requested external design sources and pending review status |
 | `docs/DEPLOY.md` | Quick deployment and recovery guide |
 | `docs/SECURITY.md` | Security boundaries, responsibilities and remaining work |
 
@@ -42,3 +45,5 @@ Pull requests never receive production credentials.
 
 No license grant is implied by public source visibility. Customer data, keys, private
 commercial information and operational evidence do not belong in this repository.
+
+Landing content, asset provenance and local checks: [LANDING.md](docs/LANDING.md).

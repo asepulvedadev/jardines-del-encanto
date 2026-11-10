@@ -16,6 +16,9 @@ Later phases are proposals, not authorization to collect customer data or activa
 - Reference: the owner's supplied marketing image, stored as `docs/brand-reference.png`.
 - Working palette sampled visually: deep forest `#062619`, leaf `#658d24`, ivory `#f6f7f1`.
   These are provisional design tokens, not an official color specification.
+- The canonical UI specification is now [`DESIGN.md`](../DESIGN.md), including a refined
+  leaf token, checked color pairs, surface-specific density and asset restrictions.
+  The landing implements these decisions with real owner-supplied media and contact.
 - Preserve the identity's palms and typography when an original transparent logo is supplied.
   The attached poster is not a vector logo; do not distort or automatically recreate it.
 - Product copy should be professional Colombian Spanish once the owner approves it.
