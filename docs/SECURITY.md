@@ -38,5 +38,7 @@ routes without server-side authorization, session security, rate limits and audi
 
 No claim is made that all existing services or the whole host have been hardened. The
 bootstrap deliberately leaves shared SSH, firewall, Docker and Nginx policies unchanged.
-Off-host disaster recovery, production domain/TLS, monitoring, data-protection policy,
+The temporary public landing preview uses a dedicated Nginx vhost and TLS certificate;
+this does not expose backend/database ports or provide authentication for a future CRM.
+Off-host disaster recovery, permanent-domain cutover, monitoring, data-protection policy,
 AI provider and autonomous actions are pending and are not represented as complete.

@@ -10,7 +10,16 @@ builds the two images and checks the database/API/web readiness chain.
 No runner is installed on the VPS. The personal administrator key is not uploaded to
 GitHub. Only the dedicated CI private key is stored in the production environment.
 
-## Preview before a domain is chosen
+## Temporary HTTPS preview
+
+Preview hostname: `jardines.2.24.111.40.sslip.io`, proxying through the project-specific
+Nginx vhost to `127.0.0.1:13400`. The application, API and database ports stay private.
+Search indexing is disabled in page metadata and the preview response header. This
+is a public test URL, not access control; do not expose private CRM data here.
+The hostname depends on the external [sslip.io DNS service](https://sslip.io/) and
+should be replaced with the owner's domain before permanent launch.
+
+### Private tunnel fallback
 
 Use the owner's explicitly authorized administrator SSH identity:
 
@@ -20,7 +29,8 @@ ssh -F /dev/null -i ~/.ssh/id_ed25519 -o IdentitiesOnly=yes -o IdentityAgent=non
 # In a browser on the same computer: http://localhost:13400
 ```
 
-Production intentionally has no public vhost yet. Do not open port 13400 to the internet.
+Do not open port 13400 to the internet. The preview uses only the existing Nginx
+listeners on 80/443, with a separate vhost; it does not replace a default/sibling vhost.
 
 ## Manual deploy or rollback
 
@@ -99,3 +109,38 @@ and atomically promoted, so failed extraction cannot poison the next retry.
 
 Never run global Docker prune, `down --volumes` on the VPS, change the shared Nginx
 configuration globally, restart Docker, or reuse another project's database/secrets.
+
+## Preview vhost installation — authorized administrator only
+
+The root-owned Nginx preview policy is intentionally separate from CI releases.
+Templates are in `ops/nginx/`; CI must not install privileged host policy.
+
+1. Record sibling container IDs, vhost checksums and HTTP status baselines. Verify
+   DNS resolves to the VPS and `nginx -t` passes before making changes.
+2. Create `/var/www/jardines-acme/.well-known/acme-challenge`. Install only
+   `jardines-preview-http.conf` as `/etc/nginx/sites-available/jardines-preview.conf`
+   and link that exact file into `sites-enabled`. Do not overwrite an existing vhost.
+3. Run `nginx -t`, then `systemctl reload nginx` (never restart it). Validate an
+   HTTP-01 test file externally before requesting the certificate.
+4. Use the installed Certbot webroot plugin, without its Nginx auto-editor:
+
+   ```sh
+   certbot certonly --webroot -w /var/www/jardines-acme \
+     --cert-name jardines-preview -d jardines.2.24.111.40.sslip.io \
+     --non-interactive --agree-tos --register-unsafely-without-email \
+     --deploy-hook '/usr/sbin/nginx -t && /usr/bin/systemctl reload nginx'
+   ```
+
+   Use a verified owner email instead of the no-email flag when one is supplied.
+   Never invent an address. The existing `certbot.timer` must remain active; inspect
+   the project certificate expiry and renewal hook without exposing account secrets.
+5. Replace only this project's bootstrap vhost with `jardines-preview.conf`. Test
+   with `nginx -t` before reloading. If the test fails, restore the previous project
+   file and do not reload. Existing workers continue serving sibling projects.
+6. Verify valid HTTPS, HTTP-to-HTTPS redirect, `/health/ready`, media/video/PDF and
+   the expected release. Recheck sibling vhost checksums, containers and statuses.
+
+To remove the preview, remove only its enabled symlink after confirming the path,
+run `nginx -t`, then reload. Do not alter sibling vhosts, shared firewall/SSH settings
+or application port bindings. Certificate removal requires a separate deliberate
+cleanup; renewal failure must not trigger broad host changes.
