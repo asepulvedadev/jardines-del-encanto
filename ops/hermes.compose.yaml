@@ -1,0 +1,15 @@
+# Optional CLI-only installation. It is deliberately not a networked gateway.
+name: jardines-hermes
+services:
+  hermes:
+    image: nousresearch/hermes-agent:stable@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
+    network_mode: none
+    volumes:
+      - /srv/jardines-del-encanto/hermes:/opt/data
+    mem_limit: 2g
+    cpus: 1
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    command: ["--version"]

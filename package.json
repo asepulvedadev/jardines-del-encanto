@@ -1,0 +1,11 @@
+{
+  "name": "jardines-del-encanto",
+  "private": true,
+  "workspaces": ["apps/web"],
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/web",
+    "build": "npm run build --workspace=apps/web",
+    "typecheck": "npm run typecheck --workspace=apps/web"
+  }
+}

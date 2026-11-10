@@ -1,0 +1,82 @@
+name: jardines
+
+x-runtime: &runtime
+  restart: unless-stopped
+  init: true
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  web:
+    <<: *runtime
+    image: jardines-web:${RELEASE:?Set RELEASE to a commit SHA}
+    user: "1000:1000"
+    ports: ["127.0.0.1:13400:3000"]
+    environment:
+      API_BASE_URL: http://api:8000
+      RELEASE_SHA: ${RELEASE}
+    networks: [ingress, app]
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    mem_limit: 512m
+    cpus: 1
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 30s
+  api:
+    <<: *runtime
+    image: jardines-api:${RELEASE}
+    user: "10001:10001"
+    environment:
+      DATABASE_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    networks: [app, data]
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    mem_limit: 384m
+    cpus: 0.75
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=4)"]
+      interval: 15s
+      timeout: 6s
+      retries: 5
+      start_period: 20s
+  db:
+    <<: *runtime
+    image: postgres:17-alpine@sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac
+    user: "70:70"
+    environment:
+      POSTGRES_USER: jardines
+      POSTGRES_DB: jardines
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes: ["postgres:/var/lib/postgresql/data"]
+    tmpfs: ["/tmp:size=32m,mode=1777", "/var/run/postgresql:size=16m,uid=70,gid=70"]
+    networks: [data]
+    mem_limit: 512m
+    cpus: 0.75
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U jardines -d jardines"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+
+networks:
+  ingress: {}
+  app: { internal: true }
+  data: { internal: true }
+volumes:
+  postgres:
+secrets:
+  db_password:
+    file: /srv/jardines-del-encanto/secrets/db_password

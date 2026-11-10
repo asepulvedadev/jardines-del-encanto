@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@theme {
+  --color-forest: #062619;
+  --color-leaf: #658d24;
+  --color-ivory: #f6f7f1;
+}
+
+body { margin: 0; background: var(--color-ivory); color: var(--color-forest); font-family: Arial, sans-serif; }

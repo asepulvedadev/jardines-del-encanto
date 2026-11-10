@@ -1,0 +1,81 @@
+name: Verify and deploy
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: '0.11.8'
+          enable-cache: true
+          cache-dependency-glob: apps/api/uv.lock
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck && npm run build
+      - run: uv sync --project apps/api --frozen
+      - run: uv run --project apps/api --frozen ruff check apps/api
+      - run: uv run --project apps/api --frozen pytest apps/api/tests -q
+      - run: python3 -m unittest discover -s tests -v
+      - name: Build production images
+        env:
+          RELEASE: ${{ github.sha }}
+        run: |
+          docker build -f apps/web/Dockerfile -t "jardines-web:$RELEASE" .
+          docker build -f apps/api/Dockerfile -t "jardines-api:$RELEASE" apps/api
+      - name: Test the complete stack on the ephemeral runner
+        env:
+          RELEASE: ${{ github.sha }}
+        run: |
+          sudo mkdir -p /srv/jardines-del-encanto/secrets
+          openssl rand -hex 32 | sudo tee /srv/jardines-del-encanto/secrets/db_password >/dev/null
+          sudo chmod 444 /srv/jardines-del-encanto/secrets/db_password
+          docker compose -p jardines-ci -f ops/compose.yaml up -d --wait --wait-timeout 150
+          curl --fail --max-time 10 http://127.0.0.1:13400/health/ready
+      - name: Clean up ephemeral runner only
+        if: always()
+        env:
+          RELEASE: ${{ github.sha }}
+        run: docker compose -p jardines-ci -f ops/compose.yaml down --volumes
+
+  deploy:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    concurrency:
+      group: jardines-production
+      cancel-in-progress: false
+    steps:
+      - name: Deploy the verified commit using the constrained SSH key
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_DEPLOY_KEY: ${{ secrets.VPS_DEPLOY_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          RELEASE: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          umask 077
+          keyfile=$(mktemp)
+          hostsfile=$(mktemp)
+          trap 'rm -f "$keyfile" "$hostsfile"' EXIT
+          printf '%s\n' "$VPS_DEPLOY_KEY" > "$keyfile"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$hostsfile"
+          ssh -F /dev/null -i "$keyfile" -o IdentitiesOnly=yes -o IdentityAgent=none \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
+            -o "UserKnownHostsFile=$hostsfile" \
+            "jardines-deploy@$VPS_HOST" "deploy $RELEASE"
