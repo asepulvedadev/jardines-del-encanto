@@ -14,7 +14,8 @@ for binary in docker git python3 sudo curl; do command -v "$binary" >/dev/null; 
 docker compose version >/dev/null
 # Never install packages, restart daemons, change firewall policy or touch other apps.
 install -d -m 0700 "$base" "$base/secrets" "$base/releases" "$base/backups" "$base/healthy"
-install -d -m 0700 -o 1000 -g 1000 "$base/hermes"
+install -d -m 0700 "$base/hermes"
+chown 1000:1000 "$base/hermes"
 if ! id jardines-deploy &>/dev/null; then
   useradd --create-home --home-dir /var/lib/jardines-deploy --shell /bin/sh jardines-deploy
 fi
