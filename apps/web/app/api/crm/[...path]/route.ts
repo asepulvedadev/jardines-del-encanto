@@ -7,6 +7,8 @@ const rules: [RegExp, string[]][] = [
   [/^workspace$/, ["GET"]],
   [/^social\/settings$/, ["GET", "POST"]],
   [/^social\/(sync|complete)$/, ["POST"]],
+  [/^social\/mcp\/status$/, ["GET"]],
+  [/^social\/mcp\/(start|complete|check|disconnect)$/, ["POST"]],
   [/^social\/connect\/(facebook|instagram|tiktok|whatsapp|telegram)$/, ["POST"]],
   [/^contacts$/, ["POST"]],
   [/^contacts\/[0-9a-f-]{36}$/, ["PATCH"]],
@@ -86,7 +88,7 @@ async function proxy(
       body: body as BodyInit | undefined,
       cache: "no-store",
       redirect: "error",
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(endpoint.startsWith("social/mcp/") ? 20000 : 8000),
     });
     const resultHeaders = new Headers({
       ...privateHeaders,

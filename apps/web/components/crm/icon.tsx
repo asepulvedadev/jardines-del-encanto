@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
 const paths = {
+  settings:
+    "M4 6h4m4 0h8M4 12h8m4 0h4M4 18h4m4 0h8M8 3v6M16 9v6M8 15v6",
   connections: "M8 8h8v8H8zM12 2v6M12 16v6M2 12h6M16 12h6",
   home: "M3 11 12 3l9 8M5 9v11h5v-6h4v6h5V9",
   board: "M3 4h5v16H3zM10 4h5v10h-5zM17 4h4v13h-4z",

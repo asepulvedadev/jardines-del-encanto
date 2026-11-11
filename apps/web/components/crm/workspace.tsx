@@ -30,7 +30,6 @@ const navigation = [
   ["pipeline", "board"],
   ["contacts", "people"],
   ["tasks", "task"],
-  ["social", "connections"],
 ] as const;
 
 export function Workspace({
@@ -140,8 +139,9 @@ export function Workspace({
     }
   }
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has("social_intent"))
-      setView("social");
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("social_intent") || params.has("zernio_callback"))
+      setView("settings");
   }, []);
 
   useEffect(() => {
@@ -309,11 +309,14 @@ export function Workspace({
           ))}
         </nav>
         <div className="crm-sidebar-bottom">
-          <a href="/" target="_blank" rel="noopener noreferrer">
-            <Icon name="arrow" size={16} />
-            Ver sitio público
-            <span className="crm-sr-only"> en otra pestaña</span>
-          </a>
+          <button
+            className={`crm-settings-link ${view === "settings" ? "is-active" : ""}`}
+            aria-current={view === "settings" ? "page" : undefined}
+            onClick={() => changeView("settings")}
+          >
+            <Icon name="settings" />
+            <span>Configuraciones</span>
+          </button>
           <div className="crm-profile">
             <span className="crm-avatar">{initials(user.username)}</span>
             <div>
@@ -363,8 +366,8 @@ export function Workspace({
                     ? "Una vista clara de cada conversación y su siguiente paso."
                     : view === "contacts"
                       ? "Solo lo importante: nombre, celular y de dónde llega cada cliente."
-                      : view === "social"
-                        ? "Tus cuentas, sus permisos y su estado real, en un solo lugar."
+                      : view === "settings"
+                        ? "Administra las conexiones y los canales de tu equipo."
                         : "Que ninguna conversación se quede sin un siguiente paso."}
               </p>
             </div>
@@ -379,10 +382,15 @@ export function Workspace({
                   Nueva tarea
                 </button>
               )}
-              <button className="crm-button" onClick={() => editContact("new")}>
-                <Icon name="plus" />
-                Nuevo cliente
-              </button>
+              {view !== "settings" && (
+                <button
+                  className="crm-button"
+                  onClick={() => editContact("new")}
+                >
+                  <Icon name="plus" />
+                  Nuevo cliente
+                </button>
+              )}
             </div>
           </div>
           {error && (
@@ -396,15 +404,21 @@ export function Workspace({
           <p className="crm-save-status" role="status">
             {pending ? "Guardando cambios…" : notice}
           </p>
-          {data.limited && (
+          {data.limited && view !== "settings" && (
             <p className="crm-limit-note">
               Esta vista muestra hasta 500 registros por sección. Los totales
               incluyen todos los registros. Se requiere paginación antes de
               superar este volumen.
             </p>
           )}
-          {view === "social" ? (
-            <SocialPanel csrf={csrf} />
+          {view === "settings" ? (
+            <section aria-labelledby="crm-connections-heading">
+              <div className="crm-settings-heading">
+                <Icon name="connections" />
+                <h2 id="crm-connections-heading">Conexiones</h2>
+              </div>
+              <SocialPanel csrf={csrf} />
+            </section>
           ) : view === "overview" ? (
             <>
               <div className="crm-stat-strip">
@@ -1088,6 +1102,12 @@ export function Workspace({
               {initials(selected.name)}
             </span>
             <h2 id="client-detail-title">{selected.name}</h2>
+            {selected.registration_code && (
+              <p>
+                Cupo de la página web:{" "}
+                <strong>{selected.registration_code}</strong>
+              </p>
+            )}
             <a href={`tel:${selected.phone}`} className="crm-detail-phone">
               {phoneLabel(selected.phone)}
             </a>

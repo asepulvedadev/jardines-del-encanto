@@ -17,7 +17,7 @@ The requested spelling [`desing.md`](desing.md) points here; keep this file auth
 | Character | Natural, clear, grounded and welcoming; not ornate luxury or generic AI software |
 | Theme | Light by default; dark forest is an accent surface, not a dark-only product |
 | UI language | Professional Colombian Spanish, `es-CO`; identifiers and technical docs remain English |
-| Typography | Manrope for interface and headings; preserve the supplied logo artwork separately |
+| Typography | Plus Jakarta Sans 500–800 for the public landing; Manrope for the CRM; preserve the supplied logo artwork separately |
 | Styling | Existing Next.js App Router, TypeScript and Tailwind CSS 4 |
 | Primary public action | Proposed: “Agendar una visita”; activate only with a real destination |
 | Primary CRM action | The next sales task; AI assists it without taking over the workspace |
@@ -100,15 +100,18 @@ alone. Do not color a legitimately sold lot red as if it were an application err
 
 ## 3. Typography and content
 
-Use [Manrope](https://fonts.google.com/specimen/Manrope), weights 400, 500, 600 and 700.
+The owner's 2026-11-11 landing revision authorizes a different, heavier typeface:
+use self-hosted **Plus Jakarta Sans**, weights 500–800, on the public landing only.
+Headlines use 800 and CTA labels use 800. Keep the private CRM on
+[Manrope](https://fonts.google.com/specimen/Manrope), weights 400, 500, 600 and 700.
 Load a reviewed, licensed font asset through `next/font` or self-hosted `@font-face`;
-no runtime font CDN. The landing self-hosts the variable Manrope font in
-`apps/web/app/fonts/`, with its SIL Open Font License. Use a system sans fallback
+no runtime font CDN. Both variable families and their SIL Open Font Licenses live in
+`apps/web/app/fonts/`. Use a system sans fallback
 while loading. The logo's existing serif/script artwork is not a second interface font.
 
 | Role | Mobile | Desktop | Notes |
 | --- | --- | --- | --- |
-| Landing H1 | 40–48px | 52–64px | Weight 600/700; short, meaningful line breaks |
+| Landing H1 | 44–65px | 58–80px | Plus Jakarta Sans 800; short, meaningful line breaks |
 | Section heading | `text-3xl` | `text-4xl` | Clear hierarchy, no repeated decorative eyebrows |
 | CRM page heading | `text-2xl` | `text-3xl` | Keep actions and current task visible |
 | Body / forms | `text-base` | `text-base` | 16px inputs, readable spacing |
@@ -123,6 +126,16 @@ Copy should be specific and helpful: “Ver disponibilidad”, “Agendar una vi
 “Guardar contacto”, “Revisar borrador”. These are proposed labels, not active services.
 Avoid inflated claims, fake scarcity, invented testimonials, unverifiable time-to-city
 claims, meaningless “AI-powered” slogans and financial promises.
+
+The owner requested a launch-price banner, “Quiero mi cupo” CTA and repeating 24-hour
+clock. Use the supplied COP 13 million starting price. Per the owner's follow-up,
+show neither the daily-cycle label nor the explanatory reset/expiration paragraph;
+keep an accessible name on the timer. Omit the location/sales eyebrow above the hero
+headline. Never label this repeating cycle as a price-expiry or stock deadline.
+“Quiero mi cupo” opens an information/visit request, never an automatic booking.
+The amenities-section modal may save explicitly consented name/phone leads and issue
+a persistent interest-registration code. It is dismissible and does not reserve
+property, collect payment, or promise availability. Other contact links use WhatsApp.
 
 ## 4. Space, shape and layout
 
@@ -148,11 +161,14 @@ wide photograph composition, not a centered SaaS hero with floating dashboard ca
 Proposed sequence, pruned to the approved information available:
 
 1. Restrained header: approved logo, essential section links and one primary CTA.
-2. Hero: clear lot-sales/location statement, concise explanation, one real visual and
-   the primary action. No fabricated availability, price badge or trust strip.
+2. Hero: clear lot-sales/location statement, concise explanation, the supplied
+   architectural video with a visible illustrative-media disclaimer, and a primary
+   action. The confirmed launch price may appear; no fabricated availability/trust strip.
 3. Project overview: a short factual explanation supported by approved media.
 4. Location: a verifiable location/map and practical access information when supplied.
-5. Lots and project features: only approved dimensions, plans, status and amenities.
+5. Lots and project features: a native SVG explorer with source-backed block/lot
+   geometry and source dimensions. No live inventory claim or inferred lot availability.
+   Source identifier anomalies must stay visible, not be silently corrected.
 6. Visit process and factual FAQ: answer genuine objections without inventing guarantees.
 7. Final contact/visit CTA and footer with working contact, privacy and legal information.
 

@@ -42,3 +42,28 @@ test("existing infrastructure health contract and security headers remain intact
   assert.equal(page.headers.get("x-frame-options"), "DENY");
   assert.equal(page.headers.get("x-content-type-options"), "nosniff");
 });
+
+test("redesigned landing exposes hero film, transparent daily cycle and an inline lot explorer", async () => {
+  const html = await (await fetch(base)).text();
+  assert.match(html, /Precio de lanzamiento/);
+  assert.match(html, /Quiero mi cupo/);
+  assert.match(html, /data-hero-film/);
+  assert.match(html, /data-launch-cycle/);
+  assert.doesNotMatch(html, /Ciclo diario/);
+  assert.doesNotMatch(html, /ACACÍAS, META/);
+  assert.match(html, /aria-label="Contador de 24 horas"/);
+  assert.doesNotMatch(html, /El contador se reinicia|No indica el vencimiento/);
+  assert.match(html, /data-plan-explorer/);
+  assert.match(html, /<svg[^>]+data-masterplan/);
+  assert.doesNotMatch(html, /Descargar plano PDF/);
+});
+
+test("the landing has a dismissible named cupo form with explicit contact consent", async () => {
+  const html = await (await fetch(base)).text();
+  assert.match(html, /lead-capture-title/);
+  assert.match(html, /Nombre completo/);
+  assert.match(html, /Número de celular/);
+  assert.match(html, /Autorizo a Jardines del Encanto/);
+  assert.match(html, /name="consent"/);
+  assert.doesNotMatch(html, /No hay formularios de captación/);
+});

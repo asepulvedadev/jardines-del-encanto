@@ -2,6 +2,12 @@
 
 ## Current delivery
 
+The preferred local connection is now **MCP with OAuth/PKCE** under
+**Configuraciones → Conexiones**. See [ZERNIO-OAUTH.md](ZERNIO-OAUTH.md) for its
+read-only scope, consent boundary and separate production activation. The API-key
+flow below remains an independent advanced REST alternative; MCP authorization
+does not activate that flow or Hermes tools.
+
 The local CRM now has a **Conexiones** workspace for Facebook, Instagram, TikTok,
 WhatsApp and Telegram. It prepares secure credentials, profile-scoped account sync,
 hosted consent/code flows and durable signed webhook receipts. It does not implement

@@ -1,0 +1,131 @@
+.lead-capture {
+  width: min(520px, calc(100% - 32px));
+  max-height: calc(100dvh - 40px);
+  margin: auto;
+  padding: 36px;
+  overflow-y: auto;
+  border: 1px solid #d9e1d5;
+  border-radius: 16px;
+  background: #f6f7f1;
+  color: #062619;
+  font-family: inherit;
+}
+.lead-capture::backdrop {
+  background: #062619a6;
+}
+.lead-capture-close {
+  display: block;
+  margin: -16px -16px 0 auto;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  font-size: 28px;
+  cursor: pointer;
+  color: #062619;
+}
+.lead-capture-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+  color: #507010;
+  margin-bottom: 12px;
+}
+.landing .lead-capture h2 {
+  font-size: clamp(27px, 4vw, 34px);
+  line-height: 1.1;
+  letter-spacing: -0.045em;
+  margin-bottom: 16px;
+}
+.lead-capture p {
+  line-height: 1.6;
+}
+.lead-capture-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 24px;
+}
+.lead-capture-form > label {
+  font-size: 14px;
+  font-weight: 700;
+}
+.lead-capture-form > input {
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 16px;
+  background: white;
+  color: #062619;
+}
+.lead-capture-hint {
+  font-size: 12px;
+  color: #526056;
+  line-height: 1.6;
+}
+.lead-capture-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 0;
+}
+.lead-capture-consent span {
+  font-size: 12px;
+  line-height: 1.6;
+  font-weight: 500;
+}
+.lead-capture-consent input {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  accent-color: #507010;
+}
+.lead-capture-trap {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.lead-capture-error {
+  padding: 12px;
+  color: #a62b35;
+  background: #fdebed;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.lead-capture-success {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+.lead-capture-success > span {
+  font-size: 13px;
+  color: #526056;
+}
+.lead-capture-code {
+  display: block;
+  padding: 20px 12px;
+  background: #062619;
+  color: white;
+  border-radius: 10px;
+  text-align: center;
+  letter-spacing: 0.06em;
+  font-size: clamp(18px, 4vw, 23px);
+  font-variant-numeric: tabular-nums;
+}
+.lead-capture-success p {
+  font-size: 13px;
+  color: #526056;
+}
+.lead-capture :disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+@media (max-width: 480px) {
+  .lead-capture {
+    padding: 24px;
+  }
+}

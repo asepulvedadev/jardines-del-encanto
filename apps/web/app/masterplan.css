@@ -1,0 +1,345 @@
+.masterplan {
+  --mp-forest: #062619;
+  --mp-leaf: #507010;
+  --mp-canvas: #f6f7f1;
+  color: var(--mp-forest);
+  margin-top: 2rem;
+}
+.masterplan-toolbar {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.3fr;
+  gap: 16px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #d9e1d5;
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+}
+.masterplan-toolbar label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.masterplan-toolbar select,
+.masterplan-toolbar input {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #7b897e;
+  border-radius: 7px;
+  background: #fff;
+  color: #062619;
+  font: inherit;
+  font-size: 16px;
+}
+.masterplan-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  border: 1px solid #d9e1d5;
+  border-radius: 0 0 12px 12px;
+  overflow: hidden;
+  background: white;
+}
+.masterplan-canvas {
+  position: relative;
+  min-width: 0;
+  background: #eef3e8;
+}
+.masterplan-canvas svg {
+  display: block;
+  width: 100%;
+  height: 650px;
+  touch-action: none;
+  cursor: grab;
+}
+.masterplan-canvas svg:active {
+  cursor: grabbing;
+}
+.masterplan-map-hint {
+  position: absolute;
+  z-index: 1;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  pointer-events: none;
+  font-size: 12px;
+  font-weight: 700;
+  background: #fffffff0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  width: fit-content;
+  max-width: calc(100% - 28px);
+}
+.masterplan-lot {
+  fill: #fbfcf7;
+  stroke: #527243;
+  stroke-width: 0.8;
+  cursor: pointer;
+  vector-effect: non-scaling-stroke;
+  transition: fill 0.15s ease;
+}
+.masterplan-lot:hover,
+.masterplan-lot:focus {
+  fill: #bad27e;
+  stroke: #062619;
+  outline: none;
+  stroke-width: 2;
+}
+.masterplan-lot.is-selected {
+  fill: #507010;
+  stroke: #062619;
+  stroke-width: 2;
+}
+.masterplan-unresolved {
+  fill: #855708;
+  stroke: #fff;
+  stroke-width: 1;
+  cursor: pointer;
+}
+.masterplan-block-target {
+  cursor: pointer;
+  outline: none;
+}
+.masterplan-block-target circle {
+  fill: #fff;
+  fill-opacity: 0.45;
+  stroke: #507010;
+  stroke-opacity: 0.55;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.masterplan-block-target text {
+  fill: #062619;
+  fill-opacity: 0.75;
+  text-anchor: middle;
+  font-family: inherit;
+  font-weight: 800;
+  pointer-events: none;
+}
+.masterplan-block-target:is(:hover, :focus-visible) circle {
+  fill: #d9ee9a;
+  fill-opacity: 1;
+  stroke: #062619;
+  stroke-opacity: 1;
+  stroke-width: 2;
+}
+.masterplan-block-target:is(:hover, :focus-visible) text {
+  fill-opacity: 1;
+}
+.masterplan-area-note {
+  display: block;
+  margin-top: 7px;
+  color: #526056;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+.masterplan-selected-label {
+  fill: #fff;
+  font-weight: 800;
+  text-anchor: middle;
+  pointer-events: none;
+  paint-order: stroke;
+  stroke: #062619;
+  stroke-width: 0.3;
+}
+.masterplan-controls {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  pointer-events: none;
+}
+.masterplan-controls button {
+  pointer-events: auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 14px;
+  background: #fff;
+  border: 1px solid #7b897e;
+  border-radius: 6px;
+  color: #062619;
+  font-weight: 800;
+  cursor: pointer;
+}
+.masterplan-controls button:hover {
+  background: #eef3e8;
+}
+.masterplan-detail {
+  padding: 30px 24px;
+  border-left: 1px solid #d9e1d5;
+}
+.masterplan-detail h3 {
+  font-size: clamp(24px, 2.8vw, 34px);
+  line-height: 1.15;
+  margin: 10px 0 16px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+.masterplan-detail p {
+  font-size: 14px;
+  line-height: 1.65;
+}
+.masterplan-step {
+  font-size: 11px !important;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: #507010;
+}
+.masterplan-detail dl {
+  margin: 24px 0;
+}
+.masterplan-detail dl > div {
+  padding: 16px 0;
+  border-bottom: 1px solid #d9e1d5;
+}
+.masterplan-detail dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #526056;
+  margin-bottom: 8px;
+}
+.masterplan-detail dd {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.5;
+  font-weight: 700;
+}
+.masterplan-notice {
+  padding: 12px;
+  background: #fff4db;
+  color: #855708;
+  border-radius: 6px;
+  font-size: 12px !important;
+  overflow-wrap: anywhere;
+}
+.masterplan-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 14px 18px;
+  background: #062619;
+  color: white !important;
+  border-radius: 7px;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 800;
+}
+.masterplan-cta:hover {
+  background: #0c3b28;
+}
+.masterplan-stat {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 0;
+  border-top: 1px solid #d9e1d5;
+  border-bottom: 1px solid #d9e1d5;
+  margin-top: 24px;
+}
+.masterplan-stat strong {
+  font-size: 48px;
+  line-height: 1;
+  font-weight: 800;
+}
+.masterplan-stat span {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.masterplan-subtle {
+  color: #526056;
+}
+.masterplan-instructions {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #526056;
+  margin: 14px 0;
+}
+.masterplan-provenance {
+  border-top: 1px solid #d9e1d5;
+  padding: 14px 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #526056;
+}
+.masterplan-provenance summary {
+  min-height: 44px;
+  display: list-item;
+  padding: 10px 0;
+  font-weight: 700;
+  cursor: pointer;
+  color: #062619;
+}
+.masterplan :is(button, select, input, a, summary):focus-visible,
+.masterplan svg:focus-visible {
+  outline: 3px solid #507010;
+  outline-offset: 3px;
+}
+.masterplan :is(button, a, select, input) {
+  scroll-margin: 120px;
+}
+@media (max-width: 900px) {
+  .masterplan-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .masterplan-detail {
+    border-left: 0;
+    border-top: 1px solid #d9e1d5;
+    padding: 24px;
+  }
+  .masterplan-canvas svg {
+    height: 600px;
+  }
+  .masterplan-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .masterplan-toolbar label:last-child {
+    grid-column: 1/-1;
+  }
+  .masterplan-stat {
+    max-width: 300px;
+  }
+}
+@media (max-width: 540px) {
+  .masterplan-toolbar {
+    grid-template-columns: 1fr;
+    padding: 14px;
+    gap: 12px;
+  }
+  .masterplan-toolbar label:last-child {
+    grid-column: auto;
+  }
+  .masterplan-canvas svg {
+    height: 520px;
+  }
+  .masterplan-map-hint {
+    font-size: 11px;
+  }
+  .masterplan-detail {
+    padding: 24px 18px;
+  }
+  .masterplan-controls {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+  }
+  .masterplan-controls button {
+    padding: 8px 11px;
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .masterplan * {
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

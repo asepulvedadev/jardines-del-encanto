@@ -74,7 +74,9 @@ def workspace(admin: Admin):
         # A consistent snapshot avoids mixing counts and rows from concurrent writes.
         db.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
         contacts = db.execute(
-            "SELECT * FROM crm.contacts ORDER BY created_at DESC, id LIMIT 501"
+            """SELECT c.*, r.code AS registration_code FROM crm.contacts c
+               LEFT JOIN crm.landing_registrations r ON r.contact_id=c.id
+               ORDER BY c.created_at DESC, c.id LIMIT 501"""
         ).fetchall()
         deals = db.execute(
             "SELECT * FROM crm.deals ORDER BY created_at DESC, id LIMIT 501"

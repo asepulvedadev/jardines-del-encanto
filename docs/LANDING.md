@@ -5,6 +5,38 @@ VPS deployment and a temporary HTTPS preview on 2026-11-10. Search indexing rema
 disabled. Deployment and preview operations are documented in `DEPLOY.md`.
 `DESIGN.md` remains the shared visual contract. UI copy uses professional `es-CO`.
 
+## Verified local redesign — 2026-11-11
+
+The current owner request moves the architectural video into the hero, uses heavier
+self-hosted Plus Jakarta Sans on the public landing only, adds a launch-price header
+and transparent repeating 24-hour clock, strengthens WhatsApp calls to action,
+recomposes the real-photo gallery and adds reduced-motion-aware entrance/reveal
+feedback. The CRM retains Manrope and its existing behavior.
+
+The clock uses one shared midnight-to-midnight Colombia cycle, without visitor
+identifiers or localStorage. The owner requested removing the explanatory paragraph;
+the daily-cycle label and the location/sales eyebrow above the hero were also
+removed in a later annotated request. The timer retains its accessible name,
+without a price-expiration or stock deadline claim. Contact links open WhatsApp;
+the amenities-section cupo button opens the registration modal described below.
+Neither path reserves property or charges the visitor.
+
+The Montecarlo reference was inspected locally for the promotion cycle and native
+SVG interactions. Its 48-hour cycle is not copied: Jardines uses the requested 24
+hours. The block/lot SVG explorer is reconstructed from this project's actual
+CAD/PDF vector data; no Montecarlo lot geometry, statuses or property claims are reused.
+The original PDF stays as a source asset, not the public interface's download action.
+All 1,568 source lot occurrences have independent SVG contours across 55 parsed
+block identifiers. Printed measurements and source anomalies are retained; this is
+not live inventory or a new survey. See `MASTERPLAN.md` for extraction evidence.
+
+Plus Jakarta Sans comes from Google Fonts' `ofl/plusjakartasans` distribution, with
+its SIL OFL license alongside the font (trailing whitespace normalized). No runtime font CDN was added.
+
+The owner subsequently authorized production deployment on 2026-11-11. Publication
+uses the existing main-branch CI/deployment gate described in `DEPLOY.md`. A local
+preview or successful push alone is not evidence of a healthy production release.
+
 ## Approved content and boundaries
 
 The owner supplied the offer and contact on 2026-11-10:
@@ -22,7 +54,9 @@ The supplied PDF is a static reference, not live inventory. Its paved-road annot
 is not repeated: current owner information describes gravel/compacted roads.
 
 Contact actions open WhatsApp with a prefilled message or the phone dialer. There is
-no lead form, database write, analytics script or AI sales assistant in this landing.
+no analytics script or AI sales assistant. The amenities-section registration modal
+now stores consented name/phone leads and a persistent registration code in the CRM;
+see `LANDING-REGISTRATION.md` for its behavior and local verification.
 The footer explains the WhatsApp handoff; it is not a substitute for a future CRM's
 privacy policy and consent implementation.
 
@@ -34,11 +68,11 @@ embedded in application code.
 
 | Public asset stem | Owner input | Use |
 | --- | --- | --- |
-| `aerial` | Photo ending `b5666ff3-8b52-4d20-b5e3-ed45328c89d6.jpg` | Hero aerial |
+| `aerial` | Photo ending `b5666ff3-8b52-4d20-b5e3-ed45328c89d6.jpg` | Lead real-photo gallery tile |
 | `neighborhood` | Photo ending `765d5ac2-c81d-4a7b-b106-51381988d6f8.jpg` | Gallery aerial |
 | `entrance` | Photo ending `0639fd29-3bdb-48dd-963b-e831a163da76.jpg` | Elevated entrance |
 | `gate` | Photo ending `e3ca2187-5867-4674-a385-8511aa7b3f76.jpg` | Entrance detail |
-| `plano-jardines-del-encanto.pdf` | `PLANO JARDINES NUEVO.pdf` | Unchanged downloadable original |
+| `plano-jardines-del-encanto.pdf` | `PLANO JARDINES NUEVO.pdf` | Unchanged vector extraction source |
 | `masterplan.webp` | First page of that PDF | Upright, rotated 270° preview |
 | `recorrido-arquitectonico.mp4` | `WhatsApp Video 2026-11-09 at 6.23.09 PM.mp4` | Architectural visualization, approximately 40 seconds |
 | `film-poster.webp` | Frame at 3 seconds of that video | Clearly labeled illustrative cover |
@@ -46,23 +80,31 @@ embedded in application code.
 Photos were auto-oriented and encoded to 960/1920 px-wide WebP variants, without
 object removal or generative alteration. The video was remuxed with fast-start metadata;
 its original audio and video streams were not re-encoded. It is **an architectural
-render**, not evidence of completed construction. Both the section and player say so.
-The player starts only on explicit interaction, is initially muted, has native controls
-and pauses when its dialog closes. No speech transcription or captions were supplied;
+render**, not evidence of completed construction. The hero caption explicitly states this.
+The player is initially muted and has native controls. Desktop autoplay is
+conditional; mobile and reduced-motion visitors start it explicitly. It pauses
+when offscreen or when the document becomes hidden. No speech transcription or captions were supplied;
 full audiovisual accessibility has not been certified.
 
 The logo poster is a visual reference, not a transparent logo asset. The header uses
 an accessible plain-text project name until approved original artwork is supplied.
-Manrope is self-hosted, with its SIL Open Font License beside the font file.
+Plus Jakarta Sans (public landing) and Manrope (CRM) are self-hosted, with their
+SIL Open Font Licenses beside the font files.
 
 ## Implementation notes
 
-- The page is server-rendered; only menu/gallery/video interactions need client state.
+- The page is server-rendered; menu/gallery/video, the daily timer and SVG explorer
+  use client state. Only the explicit registration submission persists customer data;
+  merely opening, dismissing or exploring the landing creates no lead.
 - Responsive photographs are encoded ahead of time. `ProjectPhoto` uses `picture`
   sources and unoptimized Next Image output to avoid writing an image cache inside
   the production read-only filesystem.
 - The standalone Docker image must copy `apps/web/public` as well as `.next/static`.
-- Photo and video viewers use native dialogs, named controls and Escape dismissal.
+- The photo viewer uses a native dialog with named controls and Escape dismissal.
+  The hero video uses native playback/fullscreen controls and a visible disclaimer.
+  Desktop autoplay is muted and gated by screen size, reduced motion, connection
+  hints and visibility. Mobile/data-saving/reduced-motion visitors start playback
+  themselves. Video pauses offscreen or when the document is hidden.
 - Search indexing stays disabled until a production domain and publication are approved.
 
 ## Checks
@@ -86,7 +128,7 @@ Before permanent-domain launch: obtain the original logo, confirm commercial ter
 location, review media/publication permissions, choose the domain, and explicitly
 authorize the final-domain cutover. This document does not expand remote authorization.
 
-### Observed local results — 2026-11-10
+### Historical baseline results — 2026-11-10
 
 - Baseline content test failed before implementation; all three HTTP tests pass after it.
 - Node 24 production build and TypeScript checks pass, as does the Docker image build.
@@ -103,6 +145,24 @@ authorize the final-domain cutover. This document does not expand remote authori
 - Readiness against the backend/database was not reverified: the isolated web preview
   intentionally has no backend attached. No full accessibility certification was run.
 
-Local production preview: `http://127.0.0.1:4318`, container
+Historical standalone preview: `http://127.0.0.1:4318`, container
 `jardines-landing-local`. Stop it when no longer needed with
 `docker stop jardines-landing-local`; it exposes no public-interface port.
+
+### Current observed results — 2026-11-11
+
+- Local Node 24 production Docker build and TypeScript checks pass. Only the local
+  web container was recreated; the API and PostgreSQL volumes were not changed.
+- Four HTTP landing checks and ten clock/source-geometry checks pass. Two fresh
+  source-PDF extractions produce byte-identical generated JSON and SVG.
+- Browser checks pass at 320, 390, 640, 768, 800, 900, 1024 and 1440 px without
+  horizontal overflow. Phone/tablet menus, gallery navigation/Escape/focus return,
+  local font, hydrated timer and reduced-motion presentation are verified.
+- The hero video loads only on explicit mobile playback; desktop error fallback
+  and offscreen pause are verified. No audiovisual accessibility certification
+  or new captions/transcription were performed.
+- Browser SVG checks verify 55 block groups, 1,568 actual parcel paths and no
+  unresolved markers. Block controls, lot selectors, printed data, source
+  anomalies, WhatsApp links, keyboard navigation, zoom/reset and touch pan work.
+- Current local preview: `http://127.0.0.1:4321/`, container
+  `jardines-crm-local-web-1`. This redesign has not been pushed or deployed to the VPS.

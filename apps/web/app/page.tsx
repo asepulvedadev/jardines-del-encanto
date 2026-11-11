@@ -1,19 +1,32 @@
-import Image from "next/image";
+import localFont from "next/font/local";
 import {
-  ArchitecturalFilm,
   MobileNavigation,
   PhotoGallery,
 } from "../components/landing-interactions";
-import { ProjectPhoto } from "../components/project-photo";
+import {
+  HeroFilm,
+  LandingMotion,
+  LaunchBanner,
+} from "../components/landing-experience";
+import { MasterplanExplorer } from "../components/masterplan-explorer";
+import { LeadCapture } from "../components/lead-capture";
 import {
   amenityGroups,
   project,
   questions,
   whatsappLink,
 } from "../lib/project";
+import "./landing.css";
+
+const jakarta = localFont({
+  src: "./fonts/PlusJakartaSans-Variable.ttf",
+  weight: "200 800",
+  display: "swap",
+  variable: "--font-landing",
+});
 
 function ContactLink({
-  children = "Agendar una visita",
+  children = "Quiero mi cupo",
   className = "button button-primary",
   message,
 }: {
@@ -39,10 +52,12 @@ function ContactLink({
 
 export default function Home() {
   return (
-    <>
+    <div id="jardines-landing" className={`landing ${jakarta.variable}`}>
+      <LandingMotion />
       <a href="#contenido" className="skip-link">
         Saltar al contenido
       </a>
+      <LaunchBanner />
       <header className="site-header">
         <div className="container header-inner">
           <a
@@ -61,7 +76,9 @@ export default function Home() {
             <a href="#plano">Plano</a>
             <a href="#preguntas">Preguntas</a>
           </nav>
-          <ContactLink className="header-contact">Hablemos</ContactLink>
+          <ContactLink className="button button-primary header-contact">
+            Agendar visita
+          </ContactLink>
           <MobileNavigation />
         </div>
       </header>
@@ -72,49 +89,43 @@ export default function Home() {
           aria-labelledby="hero-title"
         >
           <div className="hero-copy">
-            <p className="eyebrow">ACACÍAS, META · VENTA DE LOTES</p>
             <h1 id="hero-title">
-              Un lugar para
+              Más tierra.
               <br />
-              echar <span>raíces.</span>
+              Más vida.
+              <br />
+              <span>Tu comienzo.</span>
             </h1>
             <p className="hero-description">
-              Dale espacio a lo que viene. Tu lote en Jardines del Encanto, con
-              naturaleza, zonas para compartir y una nueva historia por empezar.
+              Tu próximo proyecto tiene lugar en el Llano. Conoce Jardines del
+              Encanto: naturaleza, espacios para compartir y un lote para lo que
+              viene.
             </p>
             <div className="hero-offer">
-              <span>Lotes desde</span>
+              <span>PRECIO DE LANZAMIENTO · LOTES DESDE</span>
               <strong>
                 $13 millones<span> COP</span>
               </strong>
             </div>
             <div className="hero-actions">
               <ContactLink />
-              <a href="#proyecto" className="text-link">
-                Conoce el proyecto <span aria-hidden="true">↓</span>
+              <a href="#plano" className="button button-outline">
+                Explorar el plano <span aria-hidden="true">↓</span>
               </a>
             </div>
             <p className="hero-footnote">
-              7 × 14 m · Financiación hasta 24 meses
+              Opción de 7 × 14 m · 98 m² · Financiación hasta 24 meses
+            </p>
+            <p className="hero-contact-note">
+              Habla con un asesor. Sin pagos ni reservas automáticas.
             </p>
           </div>
-          <figure className="hero-visual">
-            <ProjectPhoto
-              name="aerial"
-              eager
-              className="hero-image"
-              sizes="(max-width: 767px) 100vw, (max-width: 1279px) 58vw, 740px"
-              alt="Fotografía aérea real de Jardines del Encanto: lotes verdes, vías internas, portería y cancha multifuncional."
-            />
-            <figcaption>
-              <span>El lugar donde todo comienza.</span>
-              <span>Fotografía real del proyecto</span>
-            </figcaption>
-          </figure>
+          <HeroFilm />
         </section>
         <section
           className="facts-section"
           aria-label="Información principal de los lotes"
+          data-reveal
         >
           <dl className="container facts-grid">
             <div>
@@ -144,13 +155,14 @@ export default function Home() {
           id="proyecto"
           className="section container overview"
           aria-labelledby="overview-title"
+          data-reveal
         >
           <div className="section-heading">
             <p className="eyebrow">JARDINES DEL ENCANTO</p>
             <h2 id="overview-title">
-              Tu próximo capítulo,
+              No lo imagines solamente.
               <br />
-              con más espacio.
+              Mira el lugar.
             </h2>
             <p>
               No se trata solo de elegir un lote. Se trata de conocer el lugar
@@ -161,7 +173,7 @@ export default function Home() {
           <PhotoGallery />
           <div className="gallery-note">
             <p>Conoce el proyecto a través de sus fotografías reales.</p>
-            <ContactLink className="text-link">
+            <ContactLink className="button button-primary">
               Quiero conocerlo en persona
             </ContactLink>
           </div>
@@ -170,6 +182,7 @@ export default function Home() {
           id="espacios"
           className="amenities-section"
           aria-labelledby="amenities-title"
+          data-reveal
         >
           <div className="container">
             <div className="section-heading">
@@ -207,33 +220,14 @@ export default function Home() {
               Espacios informados por el proyecto. Consulta durante tu visita el
               estado de avance y las condiciones de entrega de cada zona.
             </p>
-          </div>
-        </section>
-        <section className="film-section" aria-labelledby="film-section-title">
-          <div className="container film-grid">
-            <div className="film-copy">
-              <p className="eyebrow">UNA MIRADA A LO QUE VIENE</p>
-              <h2 id="film-section-title">
-                Imagínalo.
-                <br />
-                Luego, ven a conocerlo.
-              </h2>
-              <p>
-                Explora la propuesta de los espacios en este recorrido
-                arquitectónico.
-              </p>
-              <p className="film-label">Visualización arquitectónica</p>
-              <p className="film-note">
-                Video ilustrativo. No representa el estado actual de obra.
-              </p>
-            </div>
-            <ArchitecturalFilm />
+            <LeadCapture />
           </div>
         </section>
         <section
           id="plano"
           className="section container plan-section"
           aria-labelledby="plan-title"
+          data-reveal
         >
           <div className="plan-copy">
             <p className="eyebrow">CONOCE LA DISTRIBUCIÓN</p>
@@ -243,54 +237,22 @@ export default function Home() {
               en el proyecto.
             </h2>
             <p>
-              Revisa el plano general, ubica sus vías y espacios comunes, y
-              conversa con un asesor sobre el lote que te interesa.
+              Explora las manzanas, elige un lote y revisa sus medidas
+              directamente en el plano. Luego, consulta sus condiciones con un
+              asesor.
             </p>
-            <a
-              className="button button-outline"
-              href="/media/plano-jardines-del-encanto.pdf"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Abrir plano completo <span aria-hidden="true">↗</span>
-              <span className="sr-only"> (PDF en otra pestaña)</span>
-            </a>
-            <a
-              className="download-link"
-              href="/media/plano-jardines-del-encanto.pdf"
-              download
-            >
-              Descargar plano PDF · 3,7 MB
-            </a>
             <p className="content-note">
               Plano de referencia: no refleja disponibilidad en tiempo real. Las
               medidas y condiciones del lote se confirman con el equipo
               comercial.
             </p>
           </div>
-          <a
-            className="plan-preview"
-            href="/media/plano-jardines-del-encanto.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Abrir el plano general en PDF, en otra pestaña"
-          >
-            <Image
-              src="/media/masterplan.webp"
-              unoptimized
-              width={1500}
-              height={1059}
-              alt="Vista del plano general del proyecto, con sus manzanas, vías y zonas comunes. Abre el PDF para ver los detalles."
-            />
-            <span>
-              Una vista general de tu próximo comienzo{" "}
-              <span aria-hidden="true">↗</span>
-            </span>
-          </a>
+          <MasterplanExplorer />
         </section>
         <section
           className="location-section container"
           aria-labelledby="location-title"
+          data-reveal
         >
           <div>
             <span className="location-tag">ACACÍAS · META</span>
@@ -301,7 +263,7 @@ export default function Home() {
             </p>
           </div>
           <ContactLink
-            className="button button-outline"
+            className="button button-primary"
             message="Hola, quiero la ubicación exacta de Jardines del Encanto en Acacías y las indicaciones para visitarlo."
           >
             Pedir ubicación
@@ -311,6 +273,7 @@ export default function Home() {
           id="preguntas"
           className="section container faq-section"
           aria-labelledby="faq-title"
+          data-reveal
         >
           <div className="faq-heading">
             <h2 id="faq-title">
@@ -320,7 +283,7 @@ export default function Home() {
             </h2>
             <p>Respuestas claras para empezar a conversar.</p>
             <ContactLink
-              className="text-link"
+              className="button button-outline"
               message="Hola, tengo una pregunta sobre los lotes de Jardines del Encanto."
             >
               Tengo otra pregunta
@@ -342,20 +305,21 @@ export default function Home() {
           id="contacto"
           className="contact-section"
           aria-labelledby="contact-title"
+          data-reveal
         >
           <div className="container contact-inner">
             <p className="eyebrow">TU HISTORIA PUEDE EMPEZAR AQUÍ</p>
             <h2 id="contact-title">
-              Lo mejor es
+              Tu próximo comienzo.
               <br />
-              venir a conocerlo.
+              Vamos a conocerlo.
             </h2>
             <p>
               Hablemos de tu lote, la financiación y tu próxima visita a
               Jardines del Encanto.
             </p>
-            <ContactLink className="button button-light">
-              Hablemos por WhatsApp
+            <ContactLink className="button button-lime contact-main-action">
+              Quiero mi cupo
             </ContactLink>
             <a className="contact-phone" href={`tel:+${project.whatsapp}`}>
               {project.phone}
@@ -387,10 +351,13 @@ export default function Home() {
             <details className="privacy-note">
               <summary>Privacidad de esta página</summary>
               <p>
-                Puedes explorar esta página sin registrar tus datos. No hay
-                formularios de captación ni herramientas de analítica en esta
-                versión. Si eliges escribirnos, abrirás WhatsApp, un servicio
-                externo con sus propias políticas de privacidad.
+                Puedes explorar esta página sin registrar tus datos. Si envías
+                el formulario de cupo, guardamos tu nombre, celular y
+                autorización de contacto en el CRM del proyecto. El código
+                identifica tu registro de interés, no una reserva. No usamos
+                herramientas de analítica. Si eliges escribirnos, abrirás
+                WhatsApp, un servicio externo con sus propias políticas de
+                privacidad.
               </p>
             </details>
           </div>
@@ -402,6 +369,14 @@ export default function Home() {
           </p>
         </div>
       </footer>
-    </>
+      <div className="mobile-contact-bar">
+        <span>
+          Tu lote desde<strong>$13 millones COP</strong>
+        </span>
+        <ContactLink className="button button-primary">
+          Quiero mi cupo
+        </ContactLink>
+      </div>
+    </div>
   );
 }

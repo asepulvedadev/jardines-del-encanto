@@ -156,3 +156,15 @@ test("gateway permits only the implemented social connection endpoints", async (
   assert.equal((await PATCH(request("PATCH"), context("social/settings"))).status, 404);
   assert.equal(calls.length, count);
 });
+
+test("MCP gateway allows authorization and verification, never arbitrary tools", async () => {
+  assert.equal((await GET(request("GET"), context("social/mcp/status"))).status, 200);
+  for (const action of ["start", "complete", "check", "disconnect"])
+    assert.equal((await POST(request("POST"), context(`social/mcp/${action}`))).status, 200);
+  const count = calls.length;
+  for (const action of ["call_tool", "tools/call", "tokens", "publish"])
+    assert.equal((await POST(request("POST"), context(`social/mcp/${action}`))).status, 404);
+  assert.equal((await GET(request("GET"), context("social/mcp/complete"))).status, 404);
+  assert.equal(calls.length, count);
+  assert.equal((await POST(request("POST", {}, { Origin: "https://evil.invalid" }), context("social/mcp/start"))).status, 403);
+});

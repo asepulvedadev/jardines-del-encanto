@@ -569,3 +569,26 @@ def test_credential_rotation_serializes_provider_and_state_mutations(
         assert observed[1] == "completed"
     if operation == "telegram_complete":
         assert provider_order == ["telegram_poll", "rotation"]
+
+
+def test_http_authorization_requires_admin_origin_and_csrf(client, monkeypatch):
+    from app.social import mcp
+
+    session, _ = client
+    calls = []
+    monkeypatch.setattr(mcp, "exchange", lambda *args, **kwargs: calls.append(args))
+    assert session.get("/crm/social/mcp/status").status_code == 200
+    csrf = session.headers.pop("X-CSRF-Token")
+    assert session.post("/crm/social/mcp/start", json={}).status_code == 403
+    session.headers["X-CSRF-Token"] = csrf
+    assert (
+        session.post(
+            "/crm/social/mcp/start", json={}, headers={"Origin": "https://evil.invalid"}
+        ).status_code
+        == 403
+    )
+    session.cookies.clear()
+    for action in ["start", "complete", "check", "disconnect"]:
+        assert session.post("/crm/social/mcp/" + action, json={}).status_code == 401
+    assert session.get("/crm/social/mcp/status").status_code == 401
+    assert calls == []

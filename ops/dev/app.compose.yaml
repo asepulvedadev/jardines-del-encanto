@@ -8,6 +8,7 @@ services:
     env_file: ../../.local/crm/app.env
     environment:
       ZERNIO_CONFIG_DIR: /var/lib/jardines-zernio
+      ZERNIO_MCP_OAUTH_ENABLED: "1"
     volumes:
       - social_config:/var/lib/jardines-zernio
     read_only: true

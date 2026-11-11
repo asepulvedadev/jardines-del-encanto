@@ -421,7 +421,10 @@ Sources: [MCP overview](https://docs.zernio.com/mcp),
 Direct remote MCP is convenient for an administrator sandbox, but would place broad
 operations outside our CRM's normal approval path. In particular, hiding tools from
 `tools/list` does **not** restrict generic `call_tool`, resource access or another API
-surface. OAuth connector tokens currently lack configurable resource-group scopes.
+surface. Live metadata verified on 2026-11-10 now advertises OAuth resource-group
+scopes. The local connection requests only `accounts:read`; that does not establish
+profile-level isolation. See [ZERNIO-OAUTH.md](ZERNIO-OAUTH.md) for its implemented
+boundary and updated primary sources.
 Sources: [MCP authentication](https://docs.zernio.com/mcp/setup),
 [key restrictions](https://docs.zernio.com/api-keys/create-api-key).
 

@@ -14,6 +14,16 @@ The existing public landing remains unchanged. `DESIGN.md` governs private UI de
 | Follow-ups | Customer-linked tasks with a date, complete and reopen actions |
 | Customer drawer | Phone/WhatsApp handoff, commercial stage, notes, tasks and activity history |
 
+Daily-work navigation contains Inicio, Negociaciones, Clientes and Seguimientos.
+The footer entry **Configuraciones**, beside the administrator profile, replaces the
+public-site shortcut. It contains **Conexiones** and the existing Zernio setup, channels
+and events interface. Connection authorization callbacks reopen this settings view.
+The customer-creation action stays in commercial views, not settings. Mobile navigation
+closes after selection and returns focus to the current page heading.
+The navigation placement is browser-checked with an isolated local API fixture at
+320, 390, 768 and 1440 px, including keyboard activation and the authorization-return
+path. This UI check does not connect social accounts or change authentication policy.
+
 Acquisition sources are Presencial, Campaña de redes, Página web, Referido, WhatsApp
 and Otro. No email, ID document, address, budget or additional customer field is collected.
 The API rejects unexpected input fields. Technical IDs, versions and timestamps are

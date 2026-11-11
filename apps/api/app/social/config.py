@@ -19,7 +19,9 @@ def directory():
     return Path(configured)
 
 
-def load():
+def read_private(name, maximum=16384):
+    if name not in {"credentials.json", "mcp.json"}:
+        raise ValueError("Unsupported private configuration")
     try:
         folder = directory()
         if folder.is_symlink():
@@ -28,21 +30,32 @@ def load():
             return None
         if stat.S_IMODE(folder.stat().st_mode) != 0o700:
             raise ValueError
-        fd = os.open(folder / "credentials.json", os.O_RDONLY | os.O_NOFOLLOW)
+        fd = os.open(folder / name, os.O_RDONLY | os.O_NOFOLLOW)
         with os.fdopen(fd) as file:
-            if stat.S_IMODE(os.fstat(file.fileno()).st_mode) != 0o600:
+            info = os.fstat(file.fileno())
+            if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600:
                 raise ValueError
-            data = json.loads(file.read(16385))
-        if not isinstance(data, dict) or not all(
-            isinstance(data.get(key), str) and data[key]
-            for key in ("api_key", "profile_id", "profile_name", "webhook_secret")
-        ):
-            raise ValueError
+            raw = file.read(maximum + 1)
+            if len(raw) > maximum:
+                raise ValueError
+            data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise TypeError
         return data
     except FileNotFoundError:
         return None
     except (OSError, ValueError, TypeError):
         raise HTTPException(503, "zernio_configuration_unavailable") from None
+
+
+def load():
+    data = read_private("credentials.json")
+    if data is not None and not all(
+        isinstance(data.get(key), str) and data[key]
+        for key in ("api_key", "profile_id", "profile_name", "webhook_secret")
+    ):
+        raise HTTPException(503, "zernio_configuration_unavailable")
+    return data
 
 
 def required():
@@ -70,7 +83,9 @@ def locked():
         raise HTTPException(503, "zernio_configuration_unavailable") from None
 
 
-def store(data):
+def store_private(name, data):
+    if name not in {"credentials.json", "mcp.json"}:
+        raise ValueError("Unsupported private configuration")
     folder = directory()
     path = None
     try:
@@ -79,7 +94,7 @@ def store(data):
             json.dump(data, file)
             file.flush()
             os.fsync(file.fileno())
-        os.replace(path, folder / "credentials.json")
+        os.replace(path, folder / name)
         path = None
         directory_fd = os.open(folder, os.O_RDONLY | os.O_DIRECTORY)
         try:
@@ -91,6 +106,10 @@ def store(data):
     finally:
         if path:
             os.unlink(path)
+
+
+def store(data):
+    store_private("credentials.json", data)
 
 
 def new_secret():

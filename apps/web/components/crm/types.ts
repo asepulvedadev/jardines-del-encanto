@@ -23,6 +23,7 @@ export type Contact = {
   source: Source;
   version: number;
   created_at: string;
+  registration_code?: string | null;
 };
 export type Deal = {
   id: string;
@@ -61,13 +62,13 @@ export type WorkspaceData = {
   };
   limited: boolean;
 };
-export type View = "overview" | "pipeline" | "contacts" | "tasks" | "social";
+export type View = "overview" | "pipeline" | "contacts" | "tasks" | "settings";
 export const labels: Record<View, string> = {
   overview: "Inicio",
   pipeline: "Negociaciones",
   contacts: "Clientes",
   tasks: "Seguimientos",
-  social: "Conexiones",
+  settings: "Configuraciones",
 };
 export const sourceLabel = (source: Source) =>
   sources.find(([key]) => key === source)?.[1] ?? source;

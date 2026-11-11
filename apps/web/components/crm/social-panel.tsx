@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "./icon";
+import { ZernioMcp } from "./zernio-mcp";
 import {
   socialPlatforms,
   type SocialCompletion,
@@ -406,6 +407,7 @@ export function SocialPanel({ csrf }: { csrf: string }) {
 
   return (
     <div className="crm-social" aria-busy={pending || loading}>
+      <ZernioMcp csrf={csrf} />
       <div className="social-overview">
         <div>
           <span className="social-section-label">CANALES DE LA MARCA</span>
@@ -457,13 +459,15 @@ export function SocialPanel({ csrf }: { csrf: string }) {
       ) : null}
       {settings ? (
         <>
+          <details>
+            <summary>Conexión avanzada con API key (alternativa)</summary>
           <section
             className="crm-panel social-setup"
             aria-labelledby="social-setup-heading"
           >
             <div className="social-section-heading">
               <div>
-                <h2 id="social-setup-heading">Configuración de Zernio</h2>
+                <h2 id="social-setup-heading">Perfil y conexión REST</h2>
                 <p>
                   {settings.configured
                     ? "Credencial guardada en el servidor. Nunca se devuelve al navegador."
@@ -565,6 +569,7 @@ export function SocialPanel({ csrf }: { csrf: string }) {
               </form>
             )}
           </section>
+          </details>
           {settings.sync_warning ? (
             <p className="social-warning" role="status">
               La última consulta no pudo verificar todos los canales. Actualiza

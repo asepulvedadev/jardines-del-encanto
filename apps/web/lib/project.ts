@@ -5,11 +5,16 @@ export const project = {
   whatsapp: "573008348478",
 };
 export function whatsappLink(
-  message = "Hola, quiero conocer los lotes de Jardines del Encanto y agendar una visita.",
+  message = "Hola, quiero mi cupo para conocer los lotes de Jardines del Encanto. Me interesa el precio de lanzamiento desde $13 millones COP y agendar una visita.",
 ) {
   return `https://wa.me/${project.whatsapp}?text=${encodeURIComponent(message)}`;
 }
 export const photographs = [
+  {
+    name: "aerial",
+    title: "Tu próxima historia, vista desde arriba",
+    alt: "Fotografía aérea real del proyecto Jardines del Encanto, con lotes verdes, vías internas, cancha y portería.",
+  },
   {
     name: "neighborhood",
     title: "Una mirada al proyecto",

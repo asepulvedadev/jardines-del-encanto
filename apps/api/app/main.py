@@ -7,7 +7,9 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from .crm.landing import router as landing_router
 from .crm.routes import router as crm_router
+from .social.mcp_routes import router as social_mcp_router
 from .social.routes import router as social_router
 from .social.routes import webhook_router
 
@@ -15,21 +17,23 @@ app = FastAPI(title="Jardines del Encanto API", docs_url=None, redoc_url=None, o
 
 
 app.include_router(crm_router)
+app.include_router(landing_router)
 app.include_router(social_router)
+app.include_router(social_mcp_router)
 app.include_router(webhook_router)
 
 
 @app.middleware("http")
 async def private_response_headers(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path.startswith("/crm/"):
+    if request.url.path.startswith(("/crm/", "/public/")):
         response.headers["Cache-Control"] = "no-store, private"
     return response
 
 
 @app.exception_handler(RequestValidationError)
 async def invalid_input(request, error):
-    if request.url.path.startswith("/crm/"):
+    if request.url.path.startswith(("/crm/", "/public/")):
         return JSONResponse({"detail": "invalid_input"}, status_code=422)
     return await request_validation_exception_handler(request, error)
 
