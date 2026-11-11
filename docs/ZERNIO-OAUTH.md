@@ -7,13 +7,55 @@
 and refresh-token rotation. No global MCP, CLI, browser-session import or automatic
 consent is installed. Initial scope: **`accounts:read` only**.
 
-The server verifies access with `accounts_list`, without exposing generic tool
-execution. This does not select a Jardines profile, synchronize the channel ledger,
-publish, message, spend money or grant Hermes tools. The collapsed advanced REST
-connection remains independent; MCP tokens are never substituted for API keys.
+The server verifies access and refreshes sanitized account observations with exactly
+`accounts_list({})`, without exposing generic tool execution. OAuth-only settings can
+show these observations without a REST API key. This does not establish a Jardines
+profile, write the profile-bound channel ledger, publish, message or spend money.
+The advanced REST connection remains independent; MCP tokens never become API keys.
+The existing application broker can read the same sanitized social status, but it
+never receives OAuth tokens or direct upstream MCP authority.
 
-The owner must approve consent. No real account grant or authenticated vendor MCP
-call was performed during implementation. Tests use fake issuer responses.
+The owner must approve consent or explicitly authorize migration of this project's
+existing grant. Tests use fake issuer responses and never discover or copy credentials.
+
+## Unified OAuth channel observations
+
+The social settings API preserves `configured` as **REST configured** and adds:
+
+- `oauth`: sanitized availability, authorization, reauthorization and verification state.
+- `can_sync`: a configured REST adapter or an enabled, usable OAuth grant.
+- `connect_mode`: `api`, `vendor_dashboard` or `unavailable`.
+- `dashboard_url`: the fixed, credential-free `https://zernio.com/dashboard`.
+- Channel entries identify their `source` as `rest` or `oauth`.
+
+When REST is configured, its selected-profile ledger remains authoritative and its
+existing connection/callback flows are unchanged. Without REST, `POST /social/sync`
+performs the same bounded read-only MCP probe and returns OAuth observations. Settings,
+control availability and the broker's social status use this shared state. An
+OAuth-only channel-connect request returns a labeled fixed-dashboard handoff, not a
+fake OAuth intent or permission grant. The human links accounts in Zernio, then
+refreshes observations. Desired-state pause gates still block new app/agent work.
+
+The core tool's [documented response](https://docs.zernio.com/mcp) is text, not an
+assumed structured JSON contract. The parser accepts a complete counted listing of
+at most 100 accounts, at most 32 KiB UTF-8, or the documented empty-account reply.
+It validates every row, account ID, supported vendor-platform identifier and unique
+ID before filtering to this app's five channels. Unknown, malformed, duplicate,
+partial or oversized replies fail visibly. Filtered known non-app platforms produce
+an explicit warning. Arbitrary structured envelopes are not guessed or relayed.
+
+Only sanitized identities and a successful observation timestamp are cached in the
+existing private `mcp.json`, with the same lock, atomic replacement and 0600 mode as
+the grant. The complete ASCII-escaped private JSON remains bounded to 64 KiB. The
+cache belongs to a random grant generation: successful grant replacement discards it;
+refresh rotation retains it. Failed probes retain the last identities but clear
+verification. Disabled, expired or revoked access cannot report cached rows as
+connected; they become `unverified`. Local disconnect removes the observations.
+
+Account text does **not** identify profile ownership. No OAuth observation inserts
+or updates `crm.social_connections`, creates a synthetic profile ID, or proves an
+account belongs to Jardines. These rows represent accounts visible to the owner's
+explicitly authorized grant; project-profile actions remain REST-profile-bound.
 
 ## Why MCP rather than CLI
 
@@ -47,7 +89,7 @@ Resource-group scopes do not establish profile-level isolation.
 - The API's private volume stores `mcp.json` with directory 0700/file 0600, atomic
   replacement and a shared lock, including refresh rotation. This is access-controlled
   storage, not application encryption; protect host, volume and backups accordingly.
-- Status/check never return tokens, codes, verifiers or arbitrary provider responses.
+- Status/check/settings never return tokens, codes, verifiers or arbitrary provider responses.
   Callback parameters leave browser history before completion is posted as JSON;
   no secret enters localStorage/sessionStorage. The CRM sends `no-referrer`.
 - MCP JSON/SSE replies, timeouts and allowed operations are bounded. Unexpected
@@ -78,7 +120,10 @@ Production is disabled by default. A separately authorized deployment must:
    otherwise record authorization codes; API/other-route errors remain logged.
    Validate callback privacy with an upstream failure before enabling OAuth.
 3. Give only the API controlled HTTPS egress to `zernio.com:443` and
-   `mcp.zernio.com:443`; current production internal networking does not permit it.
+   `mcp.zernio.com:443`. The optional transport setting accepts only
+   `ZERNIO_HTTPS_PROXY=http://zernio-egress:8080`; HTTPS CONNECT retains target TLS
+   verification. Without that setting local HTTPS remains direct. Keep the API on
+   app/data networks and put only the project-private fixed-target relay on egress.
    Do not expose Hermes to an unrestricted outbound network.
 4. Preserve the private config volume, exact HTTPS `CRM_ORIGIN` and secure host
    cookies. Set `ZERNIO_MCP_OAUTH_ENABLED=1` only after logging/egress are safe.

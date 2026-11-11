@@ -6,8 +6,18 @@ export const socialPlatforms = [
   ["telegram", "Telegram", "TG", "Vinculación mediante un código temporal."],
 ] as const;
 export type SocialPlatform = (typeof socialPlatforms)[number][0];
+export type SocialOAuth = {
+  available: boolean;
+  authorized: boolean;
+  needs_authorization: boolean;
+  verified_at: number | null;
+};
 export type SocialSettings = {
   configured: boolean;
+  oauth: SocialOAuth;
+  can_sync: boolean;
+  connect_mode: "api" | "vendor_dashboard" | "unavailable";
+  dashboard_url: "https://zernio.com/dashboard";
   profile: { id: string; name: string } | null;
   last_sync: string | null;
   connections: {
@@ -17,6 +27,7 @@ export type SocialSettings = {
     display_name: string | null;
     status: string;
     connected_at?: string | null;
+    source?: "rest" | "oauth";
   }[];
   events: {
     id: string;

@@ -83,3 +83,50 @@ Approval and execution are distinct: approved proposals are labeled **Aprobado**
 External `dispatch_reserved` / `external_outcome_unconfirmed` results explicitly
 remain unconfirmed, with no retry control. Refresh failure after a successful
 server response is a separate warning, never a claim that the write failed.
+
+## OAuth-only account observations
+
+`configured` continues to mean REST profile configuration; it is not the gate for
+OAuth account visibility or refresh. Settings now expose sanitized `oauth` state,
+`can_sync`, `connect_mode` and a fixed credential-free `dashboard_url`. OAuth account
+observations carry `source: oauth` and remain distinct from the REST profile ledger.
+They do not prove association with this project's brand or permission to publish.
+
+Refresh uses `can_sync` and existing connection preferences. In vendor-dashboard
+mode, channel details offer a fixed `https://zernio.com/dashboard` handoff, labeled
+Conectar/Gestionar en Zernio, then the user refreshes observations here. No REST API
+key, synthetic connect intent, broader grant or write scope is invented. Pending or
+paused work cannot open the handoff. Without authorization, the channel action
+focuses the real MCP authorization control; unavailable OAuth/paused state remains
+visible in the access panel.
+
+The single persistent MCP consumer notifies SocialPanel only after successful
+completion, check or local disconnect. SocialPanel reloads settings and the modal's
+shared control catalog. Status GET does not notify, preventing refresh loops.
+Generation checks prevent slower pre-authorization settings responses from replacing
+a newer account snapshot. Refresh errors do not imply that authorization itself failed.
+
+`node --test tests/zernio-oauth-ui.test.mjs tests/settings-ui.test.mjs` covers the
+OAuth-only regression while retaining REST credential/intent and callback-lifetime
+contracts. Live accounts, tokens, provider writes and production browsers are not
+part of the UI test scope.
+
+Failed MCP verification uses a separate invalidation notification, never a success
+notification from a status GET. OAuth observations immediately lose verified
+presentation, then sanitized settings and the shared catalog reload. If that reload
+also fails, observations remain visible as Por verificar and the verification error
+remains visible. REST profile rows are not invalidated by an OAuth failure. Failed
+OAuth-only manual refresh follows the same rule.
+
+Observed local regression checks: three source cases failed before implementation,
+then eight source/TSX-rendering cases passed, including OAuth-only refresh/WhatsApp,
+fixed dashboard handoff, pause/pending, inherited REST and unverified snapshots.
+A separate failed-check regression also failed before its correction. A loopback
+fixture verified check-triggered settings/catalog refresh exactly once, OAuth-only
+sync, local unlink removing stale state, actionable authorization focus and fixed
+vendor links. Callback completion was exchanged once, scrubbed its return URL,
+updated settings/catalog, survived tab changes and close/reopen, and left local and
+session storage empty. 390/1440 screenshots showed no horizontal modal overflow.
+A failed-check fixture retained the account observation as Por verificar, removed
+connected styling, preserved the actual error and reloaded settings/catalog once.
+These are disposable UI fixtures, not live provider/grant or deployment evidence.

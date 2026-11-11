@@ -41,6 +41,8 @@ services:
     env_file: /srv/jardines-del-encanto/secrets/crm-runtime.env
     environment:
       HERMES_BRIDGE_URL: http://hermes-bridge:8081
+      ZERNIO_HTTPS_PROXY: http://zernio-egress:8080
+      ZERNIO_MCP_OAUTH_ENABLED: "1"
     volumes: ["social_config:/var/lib/jardines-zernio"]
     networks: [app, data]
     tmpfs: ["/tmp:size=32m,mode=1777"]
@@ -54,6 +56,25 @@ services:
       timeout: 6s
       retries: 5
       start_period: 20s
+  zernio-egress:
+    <<: *runtime
+    image: jardines-api:${RELEASE}
+    user: "10001:10001"
+    command: [python, /policy/egress.py]
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - type: bind
+        source: /srv/jardines-del-encanto/zernio-policy/egress.py
+        target: /policy/egress.py
+        read_only: true
+        bind: { create_host_path: false }
+    networks: [app, zernio_egress]
+    tmpfs: ["/tmp:size=4m,mode=1777,noexec,nosuid,nodev"]
+    mem_limit: 96m
+    memswap_limit: 96m
+    cpus: 0.25
+    pids_limit: 32
   migrate:
     <<: *runtime
     image: jardines-api:${RELEASE}
@@ -90,6 +111,7 @@ networks:
   ingress: {}
   app: { internal: true }
   data: { internal: true }
+  zernio_egress: {}
 volumes:
   postgres:
   social_config:

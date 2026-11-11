@@ -134,12 +134,53 @@ class DeploymentStateTests(unittest.TestCase):
     def test_operator_refresh_follows_application_readiness(self):
         events = []
         with (
-            patch.object(module, "compose", side_effect=lambda *args: events.append("compose")),
-            patch.object(module, "run", side_effect=lambda *args: events.append("health")),
-            patch.object(module, "refresh_operator", side_effect=lambda: events.append("operator")),
+            patch.object(
+                module, "compose", side_effect=lambda *args: events.append("compose")
+            ),
+            patch.object(
+                module, "run", side_effect=lambda *args: events.append("health")
+            ),
+            patch.object(
+                module,
+                "refresh_operator",
+                side_effect=lambda: events.append("operator"),
+            ),
+            patch.object(
+                module,
+                "refresh_zernio",
+                side_effect=lambda sha: events.append("zernio"),
+            ),
         ):
             module.activate(self.target)
-        self.assertEqual(events, ["compose", "health", "operator"])
+        self.assertEqual(events, ["compose", "health", "operator", "zernio"])
+
+    def test_zernio_refresh_only_recreates_an_already_running_relay(self):
+        policy = self.root / "zernio-policy" / "egress.py"
+        policy.parent.mkdir()
+        policy.touch()
+        with patch.object(module, "compose") as compose:
+            compose.return_value.stdout = "api\nweb\n"
+            module.refresh_zernio(self.target)
+            self.assertEqual(compose.call_count, 1)
+            compose.reset_mock()
+            compose.return_value.stdout = "api\nzernio-egress\n"
+            module.refresh_zernio(self.target)
+            self.assertEqual(
+                compose.call_args.args,
+                (self.target, "up", "-d", "--no-deps", "zernio-egress"),
+            )
+
+    def test_zernio_refresh_absent_policy_has_no_effect(self):
+        with patch.object(module, "compose") as compose:
+            module.refresh_zernio(self.target)
+        compose.assert_not_called()
+
+    def test_optional_zernio_failure_does_not_fail_healthy_application(self):
+        policy = self.root / "zernio-policy" / "egress.py"
+        policy.parent.mkdir()
+        policy.touch()
+        with patch.object(module, "compose", side_effect=OSError):
+            module.refresh_zernio(self.target)
 
     def test_operator_refresh_does_not_activate_an_absent_or_stopped_profile(self):
         with patch.object(module, "run") as run:
@@ -151,7 +192,9 @@ class DeploymentStateTests(unittest.TestCase):
             run.return_value.stdout = "operator-provider\n"
             module.refresh_operator()
             self.assertEqual(run.call_count, 1)
-            self.assertEqual(run.call_args.args[0][-4:], ["ps", "--status", "running", "--services"])
+            self.assertEqual(
+                run.call_args.args[0][-4:], ["ps", "--status", "running", "--services"]
+            )
 
     def test_operator_refresh_restarts_only_running_bridge_after_api_ip_changes(self):
         policy = self.root / "hermes-operator" / "operator.compose.yaml"
@@ -161,14 +204,18 @@ class DeploymentStateTests(unittest.TestCase):
             run.return_value.stdout = "operator-provider\nhermes-bridge\n"
             module.refresh_operator()
         self.assertEqual(run.call_count, 2)
-        self.assertEqual(run.call_args.args[0][-3:], ["restart", "--no-deps", "hermes-bridge"])
+        self.assertEqual(
+            run.call_args.args[0][-3:], ["restart", "--no-deps", "hermes-bridge"]
+        )
         self.assertIn(str(policy), run.call_args.args[0])
 
     def test_optional_operator_failure_does_not_fail_healthy_application(self):
         policy = self.root / "hermes-operator" / "operator.compose.yaml"
         policy.parent.mkdir()
         policy.touch()
-        with patch.object(module, "run", side_effect=subprocess.CalledProcessError(1, "docker")):
+        with patch.object(
+            module, "run", side_effect=subprocess.CalledProcessError(1, "docker")
+        ):
             module.refresh_operator()
 
     def test_runtime_policy_is_bound_to_each_release(self):
@@ -186,10 +233,19 @@ class DeploymentStateTests(unittest.TestCase):
         with (
             patch.object(module, "run"),
             patch.object(module, "git") as git,
-            patch.object(module, "materialize", return_value=self.root / "releases" / self.target),
+            patch.object(
+                module, "materialize", return_value=self.root / "releases" / self.target
+            ),
             patch.object(module, "verify_builder"),
-            patch.object(module, "prepare_crm", create=True, side_effect=lambda sha: events.append("migrate")),
-            patch.object(module, "activate", side_effect=lambda sha: events.append("activate")),
+            patch.object(
+                module,
+                "prepare_crm",
+                create=True,
+                side_effect=lambda sha: events.append("migrate"),
+            ),
+            patch.object(
+                module, "activate", side_effect=lambda sha: events.append("activate")
+            ),
         ):
             git.return_value.stdout = self.target + "\n"
             module.deploy("deploy", self.target)
@@ -199,9 +255,16 @@ class DeploymentStateTests(unittest.TestCase):
         with (
             patch.object(module, "run"),
             patch.object(module, "git") as git,
-            patch.object(module, "materialize", return_value=self.root / "releases" / self.target),
+            patch.object(
+                module, "materialize", return_value=self.root / "releases" / self.target
+            ),
             patch.object(module, "verify_builder"),
-            patch.object(module, "prepare_crm", create=True, side_effect=RuntimeError("migration failed")),
+            patch.object(
+                module,
+                "prepare_crm",
+                create=True,
+                side_effect=RuntimeError("migration failed"),
+            ),
             patch.object(module, "activate") as activate,
         ):
             git.return_value.stdout = self.target + "\n"
