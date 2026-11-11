@@ -42,7 +42,10 @@ at most 100 accounts, at most 32 KiB UTF-8, or the documented empty-account repl
 It validates every row, account ID, supported vendor-platform identifier and unique
 ID before filtering to this app's five channels. Unknown, malformed, duplicate,
 partial or oversized replies fail visibly. Filtered known non-app platforms produce
-an explicit warning. Arbitrary structured envelopes are not guessed or relayed.
+an explicit warning. A live read-only deployment probe also returned `phone` and
+`tiktokads`; these validated non-app types are counted and filtered, not mapped to
+WhatsApp or TikTok posting. TikTok Ads is a [separate account type](https://docs.zernio.com/platforms/tiktok-ads).
+Arbitrary structured envelopes are not guessed or relayed.
 
 Only sanitized identities and a successful observation timestamp are cached in the
 existing private `mcp.json`, with the same lock, atomic replacement and 0600 mode as

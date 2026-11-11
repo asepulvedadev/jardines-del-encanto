@@ -52,6 +52,9 @@ KNOWN_PLATFORMS = PLATFORMS | frozenset(
         "microsoft",
         "email",
         "imessage",
+        # Legitimate non-social account types observed through the exact core probe.
+        "phone",
+        "tiktokads",
     }
 )
 MAX_ACCOUNTS = 100

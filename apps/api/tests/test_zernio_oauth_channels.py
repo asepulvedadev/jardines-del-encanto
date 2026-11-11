@@ -113,13 +113,14 @@ def test_structured_or_oversized_unverified_payload_is_not_guessed():
             mcp.parse_accounts(result)
 
 
-def test_supported_rows_are_filtered_only_after_complete_vendor_count_validation():
+@pytest.mark.parametrize("vendor_platform", ["linkedin", "phone", "tiktokads"])
+def test_supported_rows_are_filtered_only_after_complete_vendor_count_validation(vendor_platform):
     entries, filtered = mcp.parse_accounts(
         {
             "content": [
                 {
                     "type": "text",
-                    "text": "Found 2 connected account(s):\n- linkedin: Another brand (ID: "
+                    "text": f"Found 2 connected account(s):\n- {vendor_platform}: Fixture (ID: "
                     + "b" * 24
                     + ")\n- whatsapp: Jardines (ID: "
                     + "a" * 24
