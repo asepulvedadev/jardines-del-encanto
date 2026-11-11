@@ -1,0 +1,568 @@
+.settings-modal {
+  width: min(1000px, calc(100vw - 48px));
+  max-width: none;
+  height: min(800px, calc(100dvh - 64px));
+  max-height: none;
+  padding: 0;
+  border: 1px solid #d9e1d5;
+  border-radius: 20px;
+  color: #062619;
+  background: #fff;
+  box-shadow: 0 24px 80px #06261930;
+  font-family: var(--font-manrope), sans-serif;
+}
+.settings-modal::backdrop {
+  background: #06261966;
+  backdrop-filter: blur(3px);
+}
+.settings-modal-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 28px;
+  border-bottom: 1px solid #d9e1d5;
+}
+.settings-header h2 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+.settings-kicker {
+  font-size: 11px;
+  letter-spacing: 0.13em;
+  font-weight: 700;
+  color: #526056;
+}
+.settings-close {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 1px solid #d9e1d5;
+  border-radius: 12px;
+  background: white;
+  color: #062619;
+  cursor: pointer;
+}
+.settings-layout {
+  display: grid;
+  grid-template-columns: 205px minmax(0, 1fr);
+  min-height: 0;
+  flex: 1;
+}
+.settings-tabs {
+  padding: 20px 12px;
+  border-right: 1px solid #d9e1d5;
+  background: #f6f7f1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.settings-tabs button {
+  border: 0;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  border-radius: 10px;
+  color: #526056;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.settings-tabs button[aria-selected="true"] {
+  color: #062619;
+  background: #e9efe3;
+  font-weight: 700;
+}
+.settings-body {
+  padding: 16px 28px 28px;
+  overflow: auto;
+  min-width: 0;
+  overscroll-behavior: contain;
+}
+.settings-body [hidden] {
+  display: none !important;
+}
+.settings-body button:focus-visible,
+.settings-body input:focus-visible,
+.settings-body textarea:focus-visible,
+.settings-body select:focus-visible,
+.settings-tabs button:focus-visible,
+.settings-close:focus-visible,
+.settings-body summary:focus-visible {
+  outline: 2px solid #507010;
+  outline-offset: 3px;
+}
+.settings-body .crm-button {
+  font-size: 14px;
+  min-height: 44px;
+  padding: 10px 14px;
+}
+.settings-body .crm-panel {
+  box-shadow: none;
+}
+.settings-refresh {
+  display: block;
+  margin: 0 0 8px auto;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  color: #507010;
+  text-decoration: underline;
+  font-size: 12px;
+  cursor: pointer;
+}
+.settings-row,
+.settings-body .social-channel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 0;
+  border-bottom: 1px solid #e8ede4;
+  flex-wrap: wrap;
+}
+.settings-rows {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.settings-row-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 100px;
+}
+.settings-row-copy strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.settings-row-copy > span,
+.settings-meta {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #526056;
+}
+.settings-integration-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border: 1px solid #d9e1d5;
+  border-radius: 10px;
+  background: #f6f7f1;
+  color: #062619;
+  font-size: 14px;
+  font-weight: 800;
+}
+.integration-facebook {
+  background: #edf3ff;
+  color: #0866ff;
+  font:
+    700 28px Arial,
+    sans-serif;
+}
+.integration-instagram {
+  color: #a41e61;
+  background: #fff0f5;
+}
+.integration-whatsapp {
+  color: #146c36;
+  background: #ebf8ed;
+}
+.integration-telegram {
+  color: #125a7b;
+  background: #eaf5fc;
+}
+.integration-tiktok {
+  color: #111;
+  background: #f2f2f2;
+}
+.integration-hermes {
+  background: #eef3e8;
+  color: #507010;
+}
+.settings-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+.settings-edit {
+  min-height: 44px;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: #526056;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.settings-switch {
+  width: 42px;
+  height: 26px;
+  border: 1px solid #7b897e;
+  padding: 3px;
+  border-radius: 20px;
+  background: #d9e1d5;
+  flex: none;
+  cursor: pointer;
+  position: relative;
+}
+.settings-switch::before {
+  content: "";
+  position: absolute;
+  inset: -10px -2px;
+}
+.settings-switch > span {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 2px #06261940;
+  transition: transform 0.15s;
+}
+.settings-switch[aria-checked="true"] {
+  background: #062619;
+  border-color: #062619;
+}
+.settings-switch[aria-checked="true"] > span {
+  transform: translateX(15px);
+}
+.settings-body button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.settings-section-heading {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 0 4px;
+}
+.settings-section-heading h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.settings-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 20px;
+}
+.settings-filters button {
+  border: 1px solid #d9e1d5;
+  background: white;
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  color: #526056;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.settings-filters button[aria-pressed="true"] {
+  background: #eef3e8;
+  border-color: #507010;
+  color: #062619;
+}
+.settings-feedback:empty {
+  display: none;
+}
+.settings-feedback,
+.settings-empty {
+  font-size: 14px;
+  color: #526056;
+  line-height: 1.6;
+}
+.settings-empty {
+  padding: 24px 0;
+}
+.settings-editor,
+.settings-hermes {
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid #d9e1d5;
+  border-radius: 12px;
+  background: #fafbf7;
+}
+.settings-editor h4 {
+  margin: 0 0 16px;
+}
+.settings-body label:not(.social-check):not(.settings-action-choice) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.settings-body input:not([type="checkbox"]),
+.settings-body textarea,
+.settings-body select {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  background: white;
+  color: #062619;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  width: 100%;
+  box-sizing: border-box;
+}
+.settings-body textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+.settings-body pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.7;
+  max-height: 300px;
+  overflow: auto;
+}
+.settings-body fieldset {
+  border: 1px solid #d9e1d5;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 16px 0;
+}
+.settings-action-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.settings-action-choice input {
+  margin-top: 4px;
+  width: 18px;
+  height: 18px;
+  accent-color: #062619;
+}
+.settings-action-choice small {
+  display: block;
+  font-size: 12px;
+  color: #526056;
+  overflow-wrap: anywhere;
+}
+.settings-result {
+  padding: 12px;
+  background: #f1f3ef;
+  border-radius: 8px;
+}
+.settings-proposal {
+  margin-top: 16px;
+  border: 1px solid #7b897e;
+  padding: 16px;
+  border-radius: 10px;
+  background: white;
+}
+.settings-proposal > strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.settings-hermes-reply > p {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  font-size: 14px;
+}
+.settings-hermes form {
+  margin-top: 16px;
+}
+.settings-adapters {
+  margin: 24px 0;
+}
+.settings-body summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 36px;
+  line-height: 1.6;
+  padding: 8px 0;
+}
+.settings-social-edit {
+  flex-basis: 100%;
+  padding-left: 54px;
+}
+.settings-body .social-section-heading h2 {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.settings-body .social-section-heading p {
+  font-size: 12px;
+}
+.settings-body .social-channel-info {
+  min-width: 100px;
+}
+.settings-body .social-channel-info h3 {
+  font-size: 14px;
+}
+.settings-body .social-status {
+  font-size: 12px;
+}
+.settings-body .social-setup,
+.settings-body .social-channels {
+  padding: 16px 0;
+  border: 0;
+}
+.settings-body .social-overview {
+  padding: 12px 0;
+  gap: 12px;
+}
+.settings-body .social-channel-notes {
+  padding: 12px 0;
+}
+.settings-body .social-channel-notes p {
+  font-size: 12px;
+}
+.settings-body .crm-social {
+  gap: 12px;
+}
+.settings-body .social-help {
+  font-size: 12px;
+}
+.settings-body .social-feedback:empty {
+  display: none;
+}
+.settings-body .social-events {
+  padding: 12px 0;
+  border: 0;
+}
+.settings-body .social-form-fields {
+  grid-template-columns: 1fr;
+}
+.settings-body .crm-error {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.settings-body .settings-meta {
+  font-weight: 400;
+  margin: 8px 0 16px;
+}
+@media (max-width: 700px) {
+  .settings-modal {
+    width: calc(100vw - 16px);
+    height: calc(100dvh - 24px);
+    border-radius: 14px;
+  }
+  .settings-header {
+    padding: 18px 16px;
+  }
+  .settings-header h2 {
+    font-size: 22px;
+  }
+  .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .settings-tabs {
+    flex-direction: row;
+    padding: 8px;
+    border-right: 0;
+    border-bottom: 1px solid #d9e1d5;
+    gap: 2px;
+    overflow: auto;
+  }
+  .settings-tabs button {
+    font-size: 12px;
+    gap: 6px;
+    justify-content: center;
+    flex: 1;
+    white-space: nowrap;
+    padding: 10px 8px;
+  }
+  .settings-tabs svg {
+    display: none;
+  }
+  .settings-body {
+    padding: 12px 16px 24px;
+  }
+  .settings-editor,
+  .settings-hermes {
+    padding: 14px;
+  }
+  .settings-row,
+  .settings-body .social-channel {
+    gap: 10px;
+  }
+  .settings-row-actions {
+    gap: 8px;
+  }
+  .settings-section-heading {
+    gap: 8px;
+  }
+  .settings-section-heading .crm-button {
+    padding: 8px;
+    font-size: 12px;
+  }
+  .settings-social-edit {
+    padding-left: 0;
+  }
+  .settings-body .social-section-heading {
+    flex-wrap: wrap;
+  }
+  .settings-body .social-overview {
+    flex-wrap: wrap;
+  }
+  .settings-body .social-account-list {
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-switch > span {
+    transition: none;
+  }
+}
+/* The app reset clears native dialog margins and the CRM form defaults load later. */
+.crm-shell .settings-modal {
+  margin: auto;
+}
+.crm-shell .settings-header h2 {
+  font-size: 24px;
+  font-weight: 700;
+}
+.crm-shell .settings-body input:not([type="checkbox"]),
+.crm-shell .settings-body textarea,
+.crm-shell .settings-body select {
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.crm-shell .settings-body textarea {
+  min-height: 120px;
+}
+@media (max-width: 700px) {
+  .crm-shell .settings-header h2 {
+    font-size: 22px;
+  }
+}

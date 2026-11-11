@@ -16,8 +16,14 @@ The existing public landing remains unchanged. `DESIGN.md` governs private UI de
 
 Daily-work navigation contains Inicio, Pipeline, Clientes and Seguimientos.
 The footer entry **Configuraciones**, beside the administrator profile, replaces the
-public-site shortcut. It contains **Conexiones** and the existing Zernio setup, channels
-and events interface. Connection authorization callbacks reopen this settings view.
+public-site shortcut. It opens a modal without replacing the current CRM view, with
+**Redes sociales**, **Conexiones** and **Customizaciones** tabs. Zernio authorization
+callbacks reopen Redes sociales; their consumer survives tab switches and modal closing.
+Icon-led connection rows expose real server state, editing and pause/resume controls.
+Customizations share a typed registry with Hermes: Markdown skills, action aliases,
+action bundles and bounded workflows, not arbitrary host code. See
+[the shared contract](SETTINGS-HERMES.md), [UI details](SETTINGS-UI.md) and
+[operator runtime](HERMES-OPERATOR.md). This feature is local until separately deployed.
 The duplicated top-level “Nuevo cliente” action is removed. Customer creation remains
 available from the empty state and the Nuevo column; settings does not create customers. Mobile navigation
 closes after selection and returns focus to the current page heading.
@@ -35,9 +41,17 @@ other stages are **Contactado** and **Ganado**, in both UI, API and PostgreSQL. 
 does not create a property sale, reserve a lot or certify payment. Notes and follow-ups
 belong to commercial work, not extra mandatory customer profile fields.
 
-There is no demo customer data, fabricated activity, CRM AI response, lot inventory,
+There is no demo customer data, fabricated activity, canned CRM AI response, lot inventory,
 WhatsApp automation or outbound message sending. WhatsApp buttons only open its external
 website, with the exact validated customer number, on a deliberate user action.
+
+The optional Hermes operator uses the genuine pinned AIAgent and an authenticated
+application broker. It can read implemented CRM capabilities and propose exact changes;
+an administrator must approve mutations before the shared CRM services apply them.
+Its availability is probed, not inferred from a toggle. Provider credentials remain
+outside the web/API/agent; no filesystem, shell or sibling VPS project tools are exposed.
+Existing text-only Hermes CLI remains a separate unchanged fallback. External messaging
+or publishing capabilities that the app has not implemented are not invented by this broker.
 
 ## Local startup
 

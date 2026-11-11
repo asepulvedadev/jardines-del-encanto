@@ -246,6 +246,22 @@ Use a contextual action and an optional supporting panel, preserving the current
 
 This document does not activate Hermes, messaging, autonomous sales or privileged tools.
 
+### Shared settings and Hermes operator
+
+The owner-authorized settings surface is a native modal preserving the current CRM
+view. Use three concise tabs: **Redes sociales**, **Conexiones**, **Customizaciones**.
+Prefer application icons, short real-state labels, Edit and accessible on/off controls
+over explanatory cards. Customizations filter Skills, Tools, Plugins and Scripts;
+creation/editing stays inline and starts disabled until explicitly enabled.
+
+The app and Hermes share the same typed capability registry. Scripts are bounded app
+workflows, not arbitrary code; unknown adapters must not appear connected. Hermes
+replies, tool results and exact pending action arguments remain distinct from confirmed
+execution. Approve/reject controls must show the consequences before a write. A switch
+reflects server-confirmed preferences, never proof of provider authorization or health.
+Keep one social callback consumer mounted through completion across tabs/modal closing,
+scrub callback parameters promptly, and preserve Escape, focus return and small-screen reflow.
+
 ## 9. Motion, imagery and optional 3D
 
 Use motion for feedback or a clear state transition: approximately 120–180ms controls

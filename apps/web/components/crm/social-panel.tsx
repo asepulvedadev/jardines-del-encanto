@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "./icon";
 import { ZernioMcp } from "./zernio-mcp";
+import { IntegrationIcon, SettingsSwitch } from "./integration-icon";
+import type { Connection } from "./settings-types";
 import {
   socialPlatforms,
   type SocialCompletion,
@@ -156,8 +158,24 @@ function rememberIntent(
   }
 }
 
-export function SocialPanel({ csrf }: { csrf: string }) {
+export function SocialPanel({
+  csrf,
+  connections: preferences,
+  connectionPending,
+  onToggleConnection,
+}: {
+  csrf: string;
+  connections: Connection[];
+  connectionPending: boolean;
+  onToggleConnection: (connection: Connection) => Promise<void>;
+}) {
   const router = useRouter();
+  const [editingPlatform, setEditingPlatform] = useState<SocialPlatform | null>(
+    null,
+  );
+  const callbackIdRef = useRef<string | null>(null);
+  const callbackDuplicate = useRef(false);
+  const callbackCaptured = useRef(false);
   const [settings, setSettings] = useState<SocialSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
@@ -202,6 +220,23 @@ export function SocialPanel({ csrf }: { csrf: string }) {
     },
     [csrf, router],
   );
+
+  useEffect(() => {
+    if (callbackCaptured.current) return;
+    callbackCaptured.current = true;
+    const url = new URL(window.location.href);
+    callbackIdRef.current = url.searchParams.get("social_intent");
+    callbackDuplicate.current =
+      url.searchParams.getAll("social_intent").length > 1;
+    if (callbackIdRef.current !== null) {
+      url.searchParams.delete("social_intent");
+      window.history.replaceState(
+        null,
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    }
+  }, []);
 
   useEffect(() => {
     mounted.current = true;
@@ -284,14 +319,7 @@ export function SocialPanel({ csrf }: { csrf: string }) {
   useEffect(() => {
     if (loading || !settings || callbackHandled.current) return;
     callbackHandled.current = true;
-    const url = new URL(window.location.href);
-    const callbackId = url.searchParams.get("social_intent");
-    if (callbackId !== null) {
-      url.searchParams.delete("social_intent");
-      router.replace(`${url.pathname}${url.search}${url.hash}`, {
-        scroll: false,
-      });
-    }
+    const callbackId = callbackIdRef.current;
     let remembered: { intent_id: string; platform: SocialPlatform } | null =
       null;
     try {
@@ -314,7 +342,10 @@ export function SocialPanel({ csrf }: { csrf: string }) {
         expires_at: "",
         instructions: null,
       });
-    if (callbackId !== null && !uuidPattern.test(callbackId)) {
+    if (
+      callbackId !== null &&
+      (callbackDuplicate.current || !uuidPattern.test(callbackId))
+    ) {
       setError(
         "El identificador de autorización no es válido. Inicia una conexión nueva.",
       );
@@ -407,18 +438,22 @@ export function SocialPanel({ csrf }: { csrf: string }) {
 
   return (
     <div className="crm-social" aria-busy={pending || loading}>
-      <ZernioMcp csrf={csrf} />
+      <ZernioMcp
+        csrf={csrf}
+        enabled={
+          preferences.find((item) => item.key === "zernio")?.enabled ?? false
+        }
+      />
       <div className="social-overview">
-        <div>
-          <span className="social-section-label">CANALES DE LA MARCA</span>
-          <p>
-            Conecta tus cuentas sin salir del flujo de trabajo del CRM. Cada
-            plataforma conserva su propia autorización.
-          </p>
-        </div>
+        <strong>Canales de la marca</strong>
         <button
           className="crm-button crm-secondary"
-          disabled={pending || loading || !settings?.configured}
+          disabled={
+            pending ||
+            loading ||
+            !settings?.configured ||
+            preferences.some((item) => item.key === "zernio" && !item.enabled)
+          }
           onClick={() =>
             void perform(async () => {
               const result = await request<SocialSettings>("sync", "POST");
@@ -461,114 +496,116 @@ export function SocialPanel({ csrf }: { csrf: string }) {
         <>
           <details>
             <summary>Conexión avanzada con API key (alternativa)</summary>
-          <section
-            className="crm-panel social-setup"
-            aria-labelledby="social-setup-heading"
-          >
-            <div className="social-section-heading">
-              <div>
-                <h2 id="social-setup-heading">Perfil y conexión REST</h2>
-                <p>
-                  {settings.configured
-                    ? "Credencial guardada en el servidor. Nunca se devuelve al navegador."
-                    : "Necesitas una API key dedicada, con permisos limitados, y el perfil de la marca en Zernio."}
-                </p>
-              </div>
-              <span
-                className={`social-status ${settings.configured ? "social-status-good" : ""}`}
-              >
-                {settings.configured ? "Configurado" : "Sin configurar"}
-              </span>
-            </div>
-            {settings.configured && !replacing ? (
-              <div className="social-configured">
+            <section
+              className="crm-panel social-setup"
+              aria-labelledby="social-setup-heading"
+            >
+              <div className="social-section-heading">
                 <div>
-                  <strong>{settings.profile?.name ?? "Perfil de marca"}</strong>
-                  <span>ID: {settings.profile?.id ?? "No disponible"}</span>
-                  <span>
-                    Última sincronización: {dateLabel(settings.last_sync)} ·
-                    hora de Colombia
-                  </span>
+                  <h2 id="social-setup-heading">Perfil y conexión REST</h2>
+                  <p>
+                    {settings.configured
+                      ? "Credencial guardada en el servidor. Nunca se devuelve al navegador."
+                      : "Necesitas una API key dedicada, con permisos limitados, y el perfil de la marca en Zernio."}
+                  </p>
                 </div>
-                <button
-                  className="crm-button crm-secondary"
-                  disabled={pending}
-                  onClick={() => setReplacing(true)}
+                <span
+                  className={`social-status ${settings.configured ? "social-status-good" : ""}`}
                 >
-                  Reemplazar credencial
-                </button>
+                  {settings.configured ? "Configurado" : "Sin configurar"}
+                </span>
               </div>
-            ) : (
-              <form onSubmit={saveSettings} className="social-config-form">
-                <div className="social-form-fields">
-                  <label htmlFor="social-api-key">
-                    API key de Zernio
-                    <input
-                      ref={keyInput}
-                      id="social-api-key"
-                      name="api_key"
-                      type="password"
-                      required
-                      autoComplete="off"
-                      spellCheck={false}
-                      disabled={pending}
-                      aria-describedby="social-key-hint"
-                    />
-                  </label>
-                  <label htmlFor="social-profile-id">
-                    ID del perfil de marca
-                    <input
-                      id="social-profile-id"
-                      name="profile_id"
-                      required
-                      pattern="[a-fA-F0-9]{24}"
-                      maxLength={24}
-                      minLength={24}
-                      defaultValue={settings.profile?.id ?? ""}
-                      autoComplete="off"
-                      spellCheck={false}
-                      disabled={pending}
-                      aria-describedby="social-profile-hint"
-                    />
-                  </label>
-                </div>
-                <p id="social-key-hint" className="social-help">
-                  Usa una credencial exclusiva para este CRM, no una llave
-                  general de tu cuenta. Solo se envía al pulsar Verificar y
-                  guardar.
-                </p>
-                <p id="social-profile-hint" className="social-help">
-                  El ID del perfil tiene 24 caracteres hexadecimales. No es el
-                  nombre ni el ID de una red social.
-                </p>
-                {replacing ? (
-                  <label className="social-check">
-                    <input type="checkbox" required disabled={pending} />
-                    Confirmo que quiero reemplazar la credencial y verificar de
-                    nuevo el perfil de la marca.
-                  </label>
-                ) : null}
-                <div className="social-actions">
-                  <button className="crm-button" disabled={pending}>
-                    Verificar y guardar
+              {settings.configured && !replacing ? (
+                <div className="social-configured">
+                  <div>
+                    <strong>
+                      {settings.profile?.name ?? "Perfil de marca"}
+                    </strong>
+                    <span>ID: {settings.profile?.id ?? "No disponible"}</span>
+                    <span>
+                      Última sincronización: {dateLabel(settings.last_sync)} ·
+                      hora de Colombia
+                    </span>
+                  </div>
+                  <button
+                    className="crm-button crm-secondary"
+                    disabled={pending}
+                    onClick={() => setReplacing(true)}
+                  >
+                    Reemplazar credencial
                   </button>
-                  {replacing ? (
-                    <button
-                      type="button"
-                      className="crm-button crm-secondary"
-                      disabled={pending}
-                      onClick={() => {
-                        if (keyInput.current) keyInput.current.value = "";
-                        setReplacing(false);
-                      }}
-                    >
-                      Cancelar reemplazo
-                    </button>
-                  ) : null}
                 </div>
-              </form>
-            )}
-          </section>
+              ) : (
+                <form onSubmit={saveSettings} className="social-config-form">
+                  <div className="social-form-fields">
+                    <label htmlFor="social-api-key">
+                      API key de Zernio
+                      <input
+                        ref={keyInput}
+                        id="social-api-key"
+                        name="api_key"
+                        type="password"
+                        required
+                        autoComplete="off"
+                        spellCheck={false}
+                        disabled={pending}
+                        aria-describedby="social-key-hint"
+                      />
+                    </label>
+                    <label htmlFor="social-profile-id">
+                      ID del perfil de marca
+                      <input
+                        id="social-profile-id"
+                        name="profile_id"
+                        required
+                        pattern="[a-fA-F0-9]{24}"
+                        maxLength={24}
+                        minLength={24}
+                        defaultValue={settings.profile?.id ?? ""}
+                        autoComplete="off"
+                        spellCheck={false}
+                        disabled={pending}
+                        aria-describedby="social-profile-hint"
+                      />
+                    </label>
+                  </div>
+                  <p id="social-key-hint" className="social-help">
+                    Usa una credencial exclusiva para este CRM, no una llave
+                    general de tu cuenta. Solo se envía al pulsar Verificar y
+                    guardar.
+                  </p>
+                  <p id="social-profile-hint" className="social-help">
+                    El ID del perfil tiene 24 caracteres hexadecimales. No es el
+                    nombre ni el ID de una red social.
+                  </p>
+                  {replacing ? (
+                    <label className="social-check">
+                      <input type="checkbox" required disabled={pending} />
+                      Confirmo que quiero reemplazar la credencial y verificar
+                      de nuevo el perfil de la marca.
+                    </label>
+                  ) : null}
+                  <div className="social-actions">
+                    <button className="crm-button" disabled={pending}>
+                      Verificar y guardar
+                    </button>
+                    {replacing ? (
+                      <button
+                        type="button"
+                        className="crm-button crm-secondary"
+                        disabled={pending}
+                        onClick={() => {
+                          if (keyInput.current) keyInput.current.value = "";
+                          setReplacing(false);
+                        }}
+                      >
+                        Cancelar reemplazo
+                      </button>
+                    ) : null}
+                  </div>
+                </form>
+              )}
+            </section>
           </details>
           {settings.sync_warning ? (
             <p className="social-warning" role="status">
@@ -655,18 +692,22 @@ export function SocialPanel({ csrf }: { csrf: string }) {
               </div>
             </div>
             <ul>
-              {socialPlatforms.map(([platform, name, mark, description]) => {
+              {socialPlatforms.map(([platform, name, , description]) => {
+                const preference = preferences.find(
+                  (item) => item.key === platform,
+                );
                 const connections = settings.connections.filter(
                   (connection) => connection.platform === platform,
                 );
                 return (
                   <li className="social-channel" key={platform}>
-                    <span className="social-channel-mark" aria-hidden="true">
-                      {mark}
-                    </span>
+                    <IntegrationIcon name={platform} />
                     <div className="social-channel-info">
                       <h3>{name}</h3>
-                      <p>{description}</p>
+                      {editingPlatform === platform && <p>{description}</p>}
+                      {preference && !preference.enabled && (
+                        <span className="social-status">Pausado</span>
+                      )}
                       {connections.length ? (
                         <ul className="social-account-list">
                           {connections.map((connection) => (
@@ -690,19 +731,58 @@ export function SocialPanel({ csrf }: { csrf: string }) {
                         </span>
                       )}
                     </div>
-                    <button
-                      className="crm-button crm-secondary"
-                      disabled={pending || !settings.configured}
-                      onClick={() => void connect(platform)}
-                      aria-label={`${connections.length ? "Volver a conectar" : "Conectar"} ${name}`}
-                    >
-                      {connections.length ? "Volver a conectar" : "Conectar"}
-                    </button>
+                    <div className="settings-row-actions">
+                      <button
+                        className="settings-edit"
+                        aria-expanded={editingPlatform === platform}
+                        onClick={() =>
+                          setEditingPlatform((old) =>
+                            old === platform ? null : platform,
+                          )
+                        }
+                      >
+                        Editar<span className="crm-sr-only"> {name}</span>
+                      </button>
+                      {preference && (
+                        <SettingsSwitch
+                          name={`Activar ${name}`}
+                          checked={preference.enabled}
+                          disabled={connectionPending || pending}
+                          onChange={() => void onToggleConnection(preference)}
+                        />
+                      )}
+                    </div>
+                    {editingPlatform === platform && (
+                      <div className="settings-social-edit">
+                        <button
+                          className="crm-button crm-secondary"
+                          disabled={
+                            pending ||
+                            !settings.configured ||
+                            !preference?.enabled ||
+                            preferences.some(
+                              (item) => item.key === "zernio" && !item.enabled,
+                            )
+                          }
+                          onClick={() => void connect(platform)}
+                          aria-label={`${connections.length ? "Volver a conectar" : "Conectar"} ${name}`}
+                        >
+                          {connections.length
+                            ? "Volver a conectar"
+                            : "Conectar"}
+                        </button>
+                        <p className="settings-meta">
+                          La vinculación requiere autorización real del
+                          proveedor.
+                        </p>
+                      </div>
+                    )}
                   </li>
                 );
               })}
             </ul>
-            <div className="social-channel-notes">
+            <details className="social-channel-notes">
+              <summary>Permisos de Telegram y TikTok</summary>
               <p>
                 <strong>Telegram.</strong> La vinculación requiere un código
                 temporal; solo se confirma después de verificarla.
@@ -711,78 +791,64 @@ export function SocialPanel({ csrf }: { csrf: string }) {
                 <strong>TikTok.</strong> Las capacidades dependen de los
                 permisos y la aprobación de la plataforma.
               </p>
-            </div>
+            </details>
           </section>
-          <section
-            className="crm-panel social-events"
-            aria-labelledby="social-events-heading"
-          >
-            <div className="social-section-heading">
-              <div>
-                <h2 id="social-events-heading">Eventos recibidos</h2>
-                <p>
-                  {settings.webhook.configured
-                    ? "Recepción de webhooks configurada. Verifica eventos reales para confirmar su funcionamiento."
-                    : "La recepción de webhooks aún no está configurada en el servidor."}
-                </p>
+          <details className="settings-events">
+            <summary>Eventos recibidos</summary>
+            <section
+              className="crm-panel social-events"
+              aria-labelledby="social-events-heading"
+            >
+              <div className="social-section-heading">
+                <div>
+                  <h2 id="social-events-heading">Eventos recibidos</h2>
+                  <p>
+                    {settings.webhook.configured
+                      ? "Recepción de webhooks configurada. Verifica eventos reales para confirmar su funcionamiento."
+                      : "La recepción de webhooks aún no está configurada en el servidor."}
+                  </p>
+                </div>
+                <span className="social-status">
+                  {settings.webhook.configured ? "Configurado" : "Pendiente"}
+                </span>
               </div>
-              <span className="social-status">
-                {settings.webhook.configured ? "Configurado" : "Pendiente"}
-              </span>
-            </div>
-            {settings.events.length ? (
-              <ul className="social-event-list">
-                {settings.events.map((event) => (
-                  <li key={event.id}>
-                    <div>
-                      <strong>{event.event}</strong>
-                      <span>
-                        {socialPlatforms.find(
-                          ([key]) => key === event.platform,
-                        )?.[1] ?? "Canal no identificado"}{" "}
-                        · {statusLabel(event.status)}
-                      </span>
-                    </div>
-                    <time dateTime={event.received_at}>
-                      {dateLabel(event.received_at)}
-                    </time>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="social-empty">
-                <Icon name="message" size={22} />
-                <h3>Aún no se han recibido eventos.</h3>
-                <p>
-                  Los eventos recibidos aparecerán aquí como un resumen. No se
-                  importan conversaciones ni se crean clientes automáticamente.
-                </p>
-              </div>
-            )}
-          </section>
-          <section
-            className="social-readiness"
-            aria-labelledby="social-readiness-heading"
-          >
-            <div>
-              <h2 id="social-readiness-heading">Una base para lo que sigue</h2>
-              <p>Hermes: manual, sin acceso a canales.</p>
-            </div>
-            <ul>
-              {["Bandeja", "Contenido", "Ads", "Automatizaciones"].map(
-                (module) => (
-                  <li key={module}>
-                    <span>{module}</span>
-                    <span className="social-status">Pendiente</span>
-                  </li>
-                ),
+              {settings.events.length ? (
+                <ul className="social-event-list">
+                  {settings.events.map((event) => (
+                    <li key={event.id}>
+                      <div>
+                        <strong>{event.event}</strong>
+                        <span>
+                          {socialPlatforms.find(
+                            ([key]) => key === event.platform,
+                          )?.[1] ?? "Canal no identificado"}{" "}
+                          · {statusLabel(event.status)}
+                        </span>
+                      </div>
+                      <time dateTime={event.received_at}>
+                        {dateLabel(event.received_at)}
+                      </time>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="social-empty">
+                  <Icon name="message" size={22} />
+                  <h3>Aún no se han recibido eventos.</h3>
+                  <p>
+                    Los eventos recibidos aparecerán aquí como un resumen. No se
+                    importan conversaciones ni se crean clientes
+                    automáticamente.
+                  </p>
+                </div>
               )}
-            </ul>
-            <p className="social-help">
-              Conectar una cuenta no activa publicaciones, campañas, respuestas
-              automáticas ni acciones de Hermes.
-            </p>
-          </section>
+            </section>
+          </details>
+          <p className="settings-meta">
+            Conectar no habilita publicaciones, campañas ni respuestas
+            automáticas. Hermes usa solo las acciones disponibles en el
+            catálogo.
+          </p>
         </>
       ) : null}
     </div>

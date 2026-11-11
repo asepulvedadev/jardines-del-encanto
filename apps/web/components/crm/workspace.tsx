@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "./icon";
-import { SocialPanel } from "./social-panel";
+import { SettingsModal } from "./settings-modal";
 import { Empty, StageSelect, TaskRow } from "./workspace-parts";
 import {
   errorMessage,
@@ -44,6 +44,8 @@ export function Workspace({
   const router = useRouter();
   const [data, setData] = useState(initialData);
   const [view, setView] = useState<View>("overview");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [socialCallback, setSocialCallback] = useState(false);
   const [query, setQuery] = useState("");
   const [list, setList] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -109,9 +111,9 @@ export function Workspace({
     [csrf, router],
   );
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     setData(await request<WorkspaceData>("workspace"));
-  }
+  }, [request]);
   async function mutate(
     action: () => Promise<unknown>,
     success: string,
@@ -140,8 +142,10 @@ export function Workspace({
   }
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.has("social_intent") || params.has("zernio_callback"))
-      setView("settings");
+    if (params.has("social_intent") || params.has("zernio_callback")) {
+      setSocialCallback(true);
+      setSettingsOpen(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -275,6 +279,13 @@ export function Workspace({
   const pendingTasks = data.tasks.filter((task) => !task.completed);
   return (
     <div className="crm-shell">
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        csrf={csrf}
+        onWorkspaceChanged={refresh}
+        initialSocial={socialCallback}
+      />
       <a href="#crm-content" className="skip-link">
         Saltar al contenido
       </a>
@@ -310,9 +321,14 @@ export function Workspace({
         </nav>
         <div className="crm-sidebar-bottom">
           <button
-            className={`crm-settings-link ${view === "settings" ? "is-active" : ""}`}
-            aria-current={view === "settings" ? "page" : undefined}
-            onClick={() => changeView("settings")}
+            className="crm-settings-link"
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+            onClick={() => {
+              setMobileMenu(false);
+              setSocialCallback(false);
+              setSettingsOpen(true);
+            }}
           >
             <Icon name="settings" />
             <span>Configuraciones</span>
@@ -366,9 +382,7 @@ export function Workspace({
                     ? "Una vista clara de cada conversación y su siguiente paso."
                     : view === "contacts"
                       ? "Solo lo importante: nombre, celular y de dónde llega cada cliente."
-                      : view === "settings"
-                        ? "Administra las conexiones y los canales de tu equipo."
-                        : "Que ninguna conversación se quede sin un siguiente paso."}
+                      : "Que ninguna conversación se quede sin un siguiente paso."}
               </p>
             </div>
             <div className="crm-heading-actions">
@@ -395,22 +409,14 @@ export function Workspace({
           <p className="crm-save-status" role="status">
             {pending ? "Guardando cambios…" : notice}
           </p>
-          {data.limited && view !== "settings" && (
+          {data.limited && (
             <p className="crm-limit-note">
               Esta vista muestra hasta 500 registros por sección. Los totales
               incluyen todos los registros. Se requiere paginación antes de
               superar este volumen.
             </p>
           )}
-          {view === "settings" ? (
-            <section aria-labelledby="crm-connections-heading">
-              <div className="crm-settings-heading">
-                <Icon name="connections" />
-                <h2 id="crm-connections-heading">Conexiones</h2>
-              </div>
-              <SocialPanel csrf={csrf} />
-            </section>
-          ) : view === "overview" ? (
+          {view === "overview" ? (
             <>
               <div className="crm-stat-strip">
                 <div>

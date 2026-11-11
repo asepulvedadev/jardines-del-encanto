@@ -59,13 +59,12 @@ export type WorkspaceData = {
   };
   limited: boolean;
 };
-export type View = "overview" | "pipeline" | "contacts" | "tasks" | "settings";
+export type View = "overview" | "pipeline" | "contacts" | "tasks";
 export const labels: Record<View, string> = {
   overview: "Inicio",
   pipeline: "Pipeline",
   contacts: "Clientes",
   tasks: "Seguimientos",
-  settings: "Configuraciones",
 };
 export const sourceLabel = (source: Source) =>
   sources.find(([key]) => key === source)?.[1] ?? source;
