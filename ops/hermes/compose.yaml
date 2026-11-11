@@ -1,0 +1,55 @@
+# Explicit administrator activation; independent from the application's deployment.
+name: jardines-hermes-active
+x-runtime: &runtime
+  image: nousresearch/hermes-agent:stable@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
+  user: "1000:1000"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  cpus: 1
+  mem_limit: 1g
+  memswap_limit: 1g
+  environment:
+    PYTHONDONTWRITEBYTECODE: "1"
+    HOME: /tmp
+    HERMES_HOME: /tmp/hermes
+    HERMES_KANBAN_DISPATCH_IN_GATEWAY: "false"
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=128m,uid=1000,gid=1000,mode=1770
+    - /opt/data:rw,noexec,nosuid,size=16m,uid=1000,gid=1000,mode=0700
+  logging:
+    driver: json-file
+    options: { max-size: "2m", max-file: "2" }
+services:
+  provider:
+    <<: *runtime
+    entrypoint: ["/opt/hermes/.venv/bin/python", "/policy/provider.py"]
+    command: []
+    restart: unless-stopped
+    volumes:
+      - /srv/jardines-del-encanto/hermes-policy/provider.py:/policy/provider.py:ro
+    secrets: [openai_api_key]
+    networks: [assistant, egress]
+    healthcheck:
+      test: ["CMD", "/opt/hermes/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  hermes:
+    <<: *runtime
+    profiles: [cli]
+    entrypoint: ["/opt/hermes/.venv/bin/python", "/policy/assistant.py"]
+    command: []
+    stdin_open: true
+    volumes:
+      - /srv/jardines-del-encanto/hermes-policy/assistant.py:/policy/assistant.py:ro
+    networks: [assistant]
+    depends_on:
+      provider: { condition: service_healthy }
+networks:
+  assistant: { internal: true }
+  egress: {}
+secrets:
+  openai_api_key:
+    file: /srv/jardines-del-encanto/secrets/hermes-openai.key
