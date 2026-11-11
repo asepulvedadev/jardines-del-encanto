@@ -80,6 +80,83 @@ test("public responses deliver the complete HTML and exact hero assets", async (
   }
 });
 
+test("every cupo CTA is a button associated with the single registration dialog", async () => {
+  const html = await (await fetch(base)).text();
+  assert.equal((html.match(/data-lead-capture-trigger/g) ?? []).length, 5);
+  assert.equal((html.match(/<dialog[^>]*class="lead-capture"/g) ?? []).length, 1);
+  for (const anchor of html.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/g)) {
+    assert.doesNotMatch(anchor[0], /Quiero mi cupo/);
+  }
+  assert.match(html, /Agendar visita/);
+  assert.match(html, /https:\/\/wa\.me\/573008348478/);
+});
+
+test(
+  "all cupo buttons reuse the modal, preserve fields and focus, and never redirect or submit on opening",
+  { skip: !browserModule },
+  async () => {
+    await withBrowser(async (browser) => {
+      for (const width of [1440, 390]) {
+        const context = await browser.newContext({ viewport: { width, height: 1000 } });
+        await context.addInitScript(() => sessionStorage.setItem("jardines-capture-seen-v1", "1"));
+        const page = await context.newPage();
+        let popups = 0;
+        let submissions = 0;
+        page.on("popup", () => popups++);
+        page.on("request", (request) => {
+          if (request.url().includes("/api/landing/registrations") && request.method() === "POST") submissions++;
+        });
+        await page.goto(base);
+        const initialUrl = page.url();
+        const buttons = page.locator("[data-lead-capture-trigger]");
+        assert.equal(await buttons.count(), 5);
+        const dialog = page.locator("dialog.lead-capture");
+        assert.equal(await dialog.count(), 1);
+        for (let index = 0; index < 5; index++) {
+          const button = buttons.nth(index);
+          if (!(await button.isVisible())) continue;
+          await button.click();
+          await dialog.waitFor({ state: "visible" });
+          assert.equal(await page.locator("dialog[open]").count(), 1);
+          assert.equal(await page.getByLabel("Nombre completo", { exact: true }).evaluate(input => input === document.activeElement), true);
+          if (index === 0) await page.getByLabel("Nombre completo", { exact: true }).fill("Prueba de interfaz");
+          assert.equal(await page.getByLabel("Nombre completo", { exact: true }).inputValue(), "Prueba de interfaz");
+          assert.equal(await page.locator('input[name="consent"]').isChecked(), false);
+          await page.keyboard.press("Escape");
+          await dialog.waitFor({ state: "hidden" });
+          assert.equal(await button.evaluate(element => element === document.activeElement), true);
+          assert.equal(page.url(), initialUrl);
+        }
+        assert.equal(popups, 0);
+        assert.equal(submissions, 0);
+        await context.close();
+      }
+      const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+      await page.goto(base);
+      await page.locator("#amenities-title").scrollIntoViewIfNeeded();
+      await page.locator("dialog.lead-capture").waitFor({ state: "visible" });
+      await page.keyboard.press("Escape");
+      await page.locator(".hero-actions [data-lead-capture-trigger]").click();
+      await page.locator("dialog.lead-capture").waitFor({ state: "visible" });
+      await page.close();
+
+      const receiptContext = await browser.newContext();
+      await receiptContext.addInitScript(() => {
+        sessionStorage.setItem("jardines-capture-seen-v1", "1");
+        sessionStorage.setItem("jardines-capture-code-v1", "JDE-ABCDEF123456");
+      });
+      const receiptPage = await receiptContext.newPage();
+      await receiptPage.goto(base);
+      await receiptPage.locator(".hero-actions [data-lead-capture-trigger]").getByText("Ver mi cupo").waitFor();
+      const labels = await receiptPage.locator("[data-lead-capture-trigger]").allTextContents();
+      assert.ok(labels.every(label => label.includes("Ver mi cupo")));
+      await receiptPage.locator(".hero-actions [data-lead-capture-trigger]").click();
+      await receiptPage.getByText("JDE-ABCDEF123456", { exact: true }).waitFor();
+      await receiptContext.close();
+    });
+  },
+);
+
 test(
   "3D loads only on demand, supports selection and keyboard, and disposes on exit",
   { skip: !browserModule },
@@ -100,6 +177,10 @@ test(
       await page
         .getByRole("button", { name: "Pausar recorrido", exact: true })
         .waitFor();
+      // The play event can precede loaded metadata, especially in development.
+      await page.waitForFunction(
+        () => (document.querySelector("[data-hero-film] video")?.readyState ?? 0) >= 1,
+      );
       const duration = await page
         .locator("[data-hero-film] video")
         .evaluate((video) => video.duration);

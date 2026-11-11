@@ -133,7 +133,9 @@ show neither the daily-cycle label nor the explanatory reset/expiration paragrap
 keep an accessible name on the timer. Omit the location/sales eyebrow above the hero
 headline. Never label this repeating cycle as a price-expiry or stock deadline.
 “Quiero mi cupo” opens an information/visit request, never an automatic booking.
-The amenities-section modal may save explicitly consented name/phone leads and issue
+All “Quiero mi cupo” buttons (launch banner, hero, amenities, final CTA and mobile
+bar) open the same registration modal, never an immediate WhatsApp redirect. The
+modal may save explicitly consented name/phone leads and issue
 a persistent interest-registration code. It is dismissible and does not reserve
 property, collect payment, or promise availability. Other contact links use WhatsApp.
 

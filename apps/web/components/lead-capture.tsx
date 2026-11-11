@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { whatsappLink } from "../lib/project";
 import "../app/lead-capture.css";
 
@@ -14,9 +22,40 @@ function remember(key: string, value: string) {
   }
 }
 
-export function LeadCapture() {
+const LeadCaptureContext = createContext<{
+  show: () => void;
+  registered: boolean;
+} | null>(null);
+
+export function LeadCaptureButton({
+  className = "button button-primary",
+  id,
+}: {
+  className?: string;
+  id?: string;
+}) {
+  const capture = useContext(LeadCaptureContext);
+  if (!capture) throw new Error("LeadCaptureButton requires LeadCaptureProvider");
+  return (
+    <button
+      id={id}
+      type="button"
+      className={className}
+      data-lead-capture-trigger
+      aria-haspopup="dialog"
+      aria-controls="lead-capture-dialog"
+      onClick={capture.show}
+    >
+      {capture.registered ? "Ver mi cupo" : "Quiero mi cupo"}{" "}
+      <span className="button-arrow" aria-hidden="true">
+        ↗
+      </span>
+    </button>
+  );
+}
+
+export function LeadCaptureProvider({ children }: { children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const trigger = useRef<HTMLButtonElement>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
   const attempted = useRef(false);
   const submitting = useRef(false);
@@ -26,6 +65,7 @@ export function LeadCapture() {
   const [error, setError] = useState("");
 
   function show() {
+    attempted.current = true;
     previousFocus.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -126,17 +166,10 @@ export function LeadCapture() {
   }
 
   return (
-    <>
-      <button
-        ref={trigger}
-        type="button"
-        className="button button-primary amenities-cta"
-        onClick={show}
-      >
-        {code ? "Ver mi cupo" : "Quiero mi cupo"}{" "}
-        <span aria-hidden="true">↗</span>
-      </button>
+    <LeadCaptureContext.Provider value={{ show, registered: Boolean(code) }}>
+      {children}
       <dialog
+        id="lead-capture-dialog"
         className="lead-capture"
         ref={dialog}
         aria-labelledby="lead-capture-title"
@@ -149,7 +182,10 @@ export function LeadCapture() {
           const target = previousFocus.current;
           if (target && target !== document.body && target.isConnected)
             target.focus({ preventScroll: true });
-          else trigger.current?.focus({ preventScroll: true });
+          else
+            document
+              .getElementById("lead-capture-amenities")
+              ?.focus({ preventScroll: true });
         }}
       >
         <button
@@ -265,6 +301,6 @@ export function LeadCapture() {
           </form>
         )}
       </dialog>
-    </>
+    </LeadCaptureContext.Provider>
   );
 }
