@@ -37,8 +37,24 @@ jobs:
         env:
           RELEASE: ${{ github.sha }}
         run: |
-          docker build -f apps/web/Dockerfile -t "jardines-web:$RELEASE" .
-          docker build -f apps/api/Dockerfile -t "jardines-api:$RELEASE" apps/api
+          release_context=$(mktemp -d)
+          git archive --format=tar "$RELEASE" > "$release_context/source.tar"
+          python3 - "$release_context" <<'PY'
+          import os, pathlib, sys, tarfile
+          os.umask(0o077)
+          root = pathlib.Path(sys.argv[1])
+          with tarfile.open(root / 'source.tar') as archive:
+              archive.extractall(root / 'source', filter='data')
+          # Exercise the private directory permissions of the root-owned VPS gate.
+          for folder in (root / 'source/apps/api/app').rglob('*'):
+              if folder.is_dir():
+                  folder.chmod(0o700)
+          PY
+          docker build -f "$release_context/source/apps/web/Dockerfile" -t "jardines-web:$RELEASE" "$release_context/source"
+          docker build -f "$release_context/source/apps/api/Dockerfile" -t "jardines-api:$RELEASE" "$release_context/source/apps/api"
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+            --memory 384m --pids-limit 128 "jardines-api:$RELEASE" \
+            python -c 'import app.main; import app.crm.manage; import app.social.routes'
       - name: Test the complete stack on the ephemeral runner
         env:
           RELEASE: ${{ github.sha }}

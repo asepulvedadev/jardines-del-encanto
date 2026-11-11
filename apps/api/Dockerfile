@@ -9,7 +9,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 COPY --from=build /install /usr/local
 COPY app ./app
 COPY migrations ./migrations
-RUN mkdir -p /var/lib/jardines-zernio \
+# Root-owned release extraction uses umask 077. COPY preserves private nested
+# directory modes; make application code readable (not writable) by the runtime UID.
+RUN chmod -R a=rX /app/app /app/migrations \
+    && mkdir -p /var/lib/jardines-zernio \
     && chown 10001:10001 /var/lib/jardines-zernio \
     && chmod 700 /var/lib/jardines-zernio
 USER 10001:10001
