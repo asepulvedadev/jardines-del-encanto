@@ -6,7 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 Source = Literal["in_person", "social_campaign", "web", "referral", "whatsapp", "other"]
-Stage = Literal["new", "contacted", "visit", "negotiation", "won", "lost"]
+Stage = Literal["new", "contacted", "won"]
 
 
 class Input(BaseModel):

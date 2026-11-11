@@ -187,12 +187,14 @@ density. No full-bleed photographs, oversized promotional typography or decorati
 
 - Desktop shell: approximately 224px quiet navigation, a 64px header, and a flexible
   content area. Active navigation uses label weight and a clear selected surface.
-- Proposed navigation: “Inicio”, “Contactos”, “Negociaciones”, “Lotes”, “Visitas”,
+- Proposed navigation: “Inicio”, “Contactos”, “Pipeline”, “Lotes”, “Visitas”,
   “Actividad”, “Configuración”. Show only authorized, implemented modules.
 - The home view prioritizes next actions and overdue follow-ups. Metrics must answer
   real questions, not occupy a decorative four-card dashboard row.
 - Contact detail: identity, assignment, next action and a readable activity timeline.
   Put editing in a focused panel; keep the user's position after saving.
+- Pipeline stages are Nuevo, Contactado and Ganado only. The page heading has no
+  duplicate “Nuevo cliente” action; retain the empty-state and Nuevo-column entry points.
 - Pipeline: list/table remains usable without drag-and-drop. Any board movement must
   have a keyboard-accessible equivalent and obey server-side workflow rules.
 - Inventory: provide a list fallback for plans/maps. Lot selection must expose a textual

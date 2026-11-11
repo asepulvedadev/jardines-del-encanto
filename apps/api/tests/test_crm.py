@@ -100,9 +100,9 @@ def test_pipeline_move_is_persisted_and_conflicts_preserve_data(authenticated):
     customer(client)
     deal = client.get("/crm/workspace").json()["deals"][0]
     path = f"/crm/deals/{deal['id']}"
-    moved = client.patch(path, json={"stage": "visit", "version": deal["version"]})
+    moved = client.patch(path, json={"stage": "contacted", "version": deal["version"]})
     assert moved.status_code == 200
-    assert moved.json()["stage"] == "visit"
+    assert moved.json()["stage"] == "contacted"
     before = client.get("/crm/workspace").json()
     assert client.patch(path, json={"stage": "won", "version": deal["version"]}).status_code == 409
     assert client.get("/crm/workspace").json() == before
@@ -285,7 +285,7 @@ def test_concurrent_updates_accept_only_one_version(authenticated):
             ).status_code
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        results = list(pool.map(move, ["visit", "won"]))
+        results = list(pool.map(move, ["contacted", "won"]))
     assert sorted(results) == [200, 409]
     after = client.get("/crm/workspace").json()
     assert after["deals"][0]["version"] == 2
@@ -331,3 +331,49 @@ def test_activity_failure_rolls_back_customer_and_deal(authenticated, monkeypatc
     assert response.status_code == 503
     assert "fault" not in response.text
     assert client.get("/crm/workspace").json() == before
+
+
+@pytest.mark.parametrize("removed_stage", ["visit", "negotiation", "lost"])
+def test_pipeline_rejects_removed_stages_without_changing_state(authenticated, removed_stage):
+    client, _, _ = authenticated
+    customer(client)
+    before = client.get("/crm/workspace").json()
+    deal = before["deals"][0]
+    response = client.patch(
+        f"/crm/deals/{deal['id']}", json={"stage": removed_stage, "version": deal["version"]}
+    )
+    assert response.status_code == 422
+    assert client.get("/crm/workspace").json() == before
+
+
+def test_database_rejects_removed_pipeline_stages(authenticated):
+    client, url, _ = authenticated
+    customer(client)
+    deal = client.get("/crm/workspace").json()["deals"][0]
+    for stage in ("visit", "negotiation", "lost"):
+        with pytest.raises(psycopg.errors.CheckViolation), psycopg.connect(url) as db:
+            db.execute("UPDATE crm.deals SET stage=%s WHERE id=%s", (stage, deal["id"]))
+
+
+def test_three_stage_migration_refuses_to_reclassify_legacy_records(authenticated):
+    from pathlib import Path
+
+    client, url, _ = authenticated
+    customer(client)
+    deal = client.get("/crm/workspace").json()["deals"][0]
+    migration = (Path(__file__).parents[1] / "migrations/004_three_pipeline_stages.sql").read_text()
+    with psycopg.connect(url) as db:
+        try:
+            db.execute("ALTER TABLE crm.deals DROP CONSTRAINT deals_stage_check")
+            db.execute("UPDATE crm.deals SET stage='visit' WHERE id=%s", (deal["id"],))
+            db.execute("SAVEPOINT before_reduction")
+            with pytest.raises(psycopg.errors.RaiseException):
+                db.execute(migration)
+            db.execute("ROLLBACK TO SAVEPOINT before_reduction")
+            assert (
+                db.execute("SELECT stage FROM crm.deals WHERE id=%s", (deal["id"],)).fetchone()[0]
+                == "visit"
+            )
+        finally:
+            db.rollback()
+    assert client.get("/crm/workspace").json()["deals"][0]["stage"] == "new"

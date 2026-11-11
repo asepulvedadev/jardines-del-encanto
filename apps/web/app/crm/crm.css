@@ -618,17 +618,8 @@
 .crm-stage-dot.stage-contacted {
   background: #7493a0;
 }
-.crm-stage-dot.stage-visit {
-  background: #b49657;
-}
-.crm-stage-dot.stage-negotiation {
-  background: #828967;
-}
 .crm-stage-dot.stage-won {
   background: #467745;
-}
-.crm-stage-dot.stage-lost {
-  background: #9b8e8b;
 }
 .crm-recent {
   margin-top: 20px;

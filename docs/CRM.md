@@ -14,11 +14,12 @@ The existing public landing remains unchanged. `DESIGN.md` governs private UI de
 | Follow-ups | Customer-linked tasks with a date, complete and reopen actions |
 | Customer drawer | Phone/WhatsApp handoff, commercial stage, notes, tasks and activity history |
 
-Daily-work navigation contains Inicio, Negociaciones, Clientes and Seguimientos.
+Daily-work navigation contains Inicio, Pipeline, Clientes and Seguimientos.
 The footer entry **Configuraciones**, beside the administrator profile, replaces the
 public-site shortcut. It contains **Conexiones** and the existing Zernio setup, channels
 and events interface. Connection authorization callbacks reopen this settings view.
-The customer-creation action stays in commercial views, not settings. Mobile navigation
+The duplicated top-level “Nuevo cliente” action is removed. Customer creation remains
+available from the empty state and the Nuevo column; settings does not create customers. Mobile navigation
 closes after selection and returns focus to the current page heading.
 The navigation placement is browser-checked with an isolated local API fixture at
 320, 390, 768 and 1440 px, including keyboard activation and the authorization-return
@@ -29,8 +30,8 @@ and Otro. No email, ID document, address, budget or additional customer field is
 The API rejects unexpected input fields. Technical IDs, versions and timestamps are
 not additional business form fields. A normalized mobile number is unique.
 
-Creating a customer atomically creates its opportunity in **Nuevo**. The remaining
-stages are Contactado, Visita, Negociación, Ganado and Descartado. Closing an opportunity
+Creating a customer atomically creates its opportunity in **Nuevo**. The only
+other stages are **Contactado** and **Ganado**, in both UI, API and PostgreSQL. Closing an opportunity
 does not create a property sale, reserve a lot or certify payment. Notes and follow-ups
 belong to commercial work, not extra mandatory customer profile fields.
 
@@ -178,3 +179,30 @@ UI fixtures and their temporary administrator were removed from the working data
 only the requested administrator remains and customer/opportunity/task counts are zero.
 HTML5 drag/drop and the list fallback also passed a PostgreSQL reload-persistence check.
 Session memory registration was unavailable; source and this guide preserve the work.
+
+## Three-stage pipeline refinement — 2026-11-11
+
+The owner requested removing the heading's duplicate customer button, renaming the
+navigation/page to Pipeline and allowing only Nuevo, Contactado and Ganado. Shared
+UI stage definitions drive the board, list, summary and customer stage selectors.
+API validation rejects removed stages without changing records; active counts
+include only new/contacted opportunities.
+
+Migration `004_three_pipeline_stages.sql` changes the stage constraint without
+rewriting any customer or deal. It explicitly refuses to run when an existing
+record still has visit/negotiation/lost, rather than hiding or silently reclassifying
+it. If that guard fires in another environment, obtain the owner's explicit
+classification before release. Do not edit old migrations or bypass the guard.
+
+The local preflight found no deals in removed stages. The owner authorized production publication of these annotated changes on
+2026-11-11, using the existing verified main-branch deployment gate. Application-image
+rollback does not restore the six-stage constraint; keep an older API from writing
+removed values after this migration.
+
+Observed local checks for this refinement: 73 API tests, 14 gateway/UI-contract
+checks and 15 landing/clock/masterplan checks passed; TypeScript and Ruff passed.
+An independent verifier reran the API, gateway and TypeScript checks with no blockers.
+A disposable loopback-only API fixture verified the rendered Pipeline navigation,
+three board/list stage choices, stage movement, removed heading action, retained
+empty-state creation and 390/893/1440 px reflow without page errors. No real CRM
+records or production session were used for that browser check.

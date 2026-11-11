@@ -9,10 +9,7 @@ export const sources = [
 export const stages = [
   ["new", "Nuevo"],
   ["contacted", "Contactado"],
-  ["visit", "Visita"],
-  ["negotiation", "Negociación"],
   ["won", "Ganado"],
-  ["lost", "Descartado"],
 ] as const;
 export type Stage = (typeof stages)[number][0];
 export type Source = (typeof sources)[number][0];
@@ -65,7 +62,7 @@ export type WorkspaceData = {
 export type View = "overview" | "pipeline" | "contacts" | "tasks" | "settings";
 export const labels: Record<View, string> = {
   overview: "Inicio",
-  pipeline: "Negociaciones",
+  pipeline: "Pipeline",
   contacts: "Clientes",
   tasks: "Seguimientos",
   settings: "Configuraciones",

@@ -382,15 +382,6 @@ export function Workspace({
                   Nueva tarea
                 </button>
               )}
-              {view !== "settings" && (
-                <button
-                  className="crm-button"
-                  onClick={() => editContact("new")}
-                >
-                  <Icon name="plus" />
-                  Nuevo cliente
-                </button>
-              )}
             </div>
           </div>
           {error && (
@@ -427,7 +418,7 @@ export function Workspace({
                   <strong>{data.counts.contacts}</strong>
                 </div>
                 <div>
-                  <span>Negociaciones en curso</span>
+                  <span>Oportunidades en curso</span>
                   <strong>{data.counts.active}</strong>
                 </div>
                 <div>
@@ -615,7 +606,7 @@ export function Workspace({
                   <div
                     className="crm-board"
                     role="region"
-                    aria-label="Pipeline de negociaciones, desplazamiento horizontal"
+                    aria-label="Pipeline, desplazamiento horizontal"
                     tabIndex={0}
                   >
                     {stages.map(([key, label]) => {

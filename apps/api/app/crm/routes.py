@@ -12,10 +12,7 @@ Admin = Annotated[dict, Depends(security.session)]
 STAGES = {
     "new": "Nuevo",
     "contacted": "Contactado",
-    "visit": "Visita",
-    "negotiation": "Negociación",
     "won": "Ganado",
-    "lost": "Descartado",
 }
 
 
@@ -89,7 +86,7 @@ def workspace(admin: Admin):
         ).fetchall()
         counts = db.execute(
             """SELECT (SELECT count(*) FROM crm.contacts) AS contacts,
-               (SELECT count(*) FROM crm.deals WHERE stage NOT IN ('won','lost')) AS active,
+               (SELECT count(*) FROM crm.deals WHERE stage IN ('new','contacted')) AS active,
                (SELECT count(*) FROM crm.deals WHERE stage = 'won') AS won,
                (SELECT count(*) FROM crm.tasks WHERE NOT completed) AS pending,
                (SELECT count(*) FROM crm.tasks WHERE NOT completed
