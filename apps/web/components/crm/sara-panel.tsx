@@ -259,9 +259,18 @@ export function SaraMessageView({
       {message.attachments.map((attachment) => (
         <SaraFile key={attachment.id} attachment={attachment} csrf={csrf} />
       ))}
-      {message.results.map((result, index) => (
-        <ActionResultDetails key={index} result={result} />
-      ))}
+      {message.results.length > 0 && (
+        <details className="sara-activity">
+          <summary>
+            Actividad de Sara <span>{message.results.length}</span>
+          </summary>
+          <div>
+            {message.results.map((result, index) => (
+              <ActionResultDetails key={index} result={result} />
+            ))}
+          </div>
+        </details>
+      )}
       {available.length > 0 && (
         <ActionProposals
           proposals={available.filter(
@@ -312,9 +321,7 @@ export function SaraPanel({
   const selectedRef = useRef<string | null>(null);
   selectedRef.current = selectedId;
   const [search, setSearch] = useState("");
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
+  const historyDialog = useRef<HTMLDialogElement>(null);
   const [createPending, setCreatePending] = useState(false);
   const createLock = useRef(false);
   const [renaming, setRenaming] = useState(false);
@@ -339,7 +346,6 @@ export function SaraPanel({
   const composer = useRef<HTMLTextAreaElement>(null);
   const log = useRef<HTMLDivElement>(null);
   const docInput = useRef<HTMLInputElement>(null);
-  const audioInput = useRef<HTMLInputElement>(null);
   const alive = useRef(true);
   const scrollOlder = useRef(false);
   const [skills, setSkills] = useState<SaraSkill[]>([]);
@@ -498,6 +504,33 @@ export function SaraPanel({
       active = false;
     };
   }, [request]);
+  const createConversation = useCallback(async () => {
+    if (createLock.current || !alive.current) return;
+    createLock.current = true;
+    setCreatePending(true);
+    setListError("");
+    try {
+      const value = await request<SaraConversation>(
+        "sara/conversations",
+        "POST",
+        {},
+      );
+      if (!alive.current) return;
+      setConversations((old) => [
+        value,
+        ...old.filter((item) => item.id !== value.id),
+      ]);
+      setSelectedId(value.id);
+      historyDialog.current?.close();
+      requestAnimationFrame(() => composer.current?.focus());
+      return value;
+    } catch (cause) {
+      if (alive.current) setListError(feedback(cause));
+    } finally {
+      createLock.current = false;
+      if (alive.current) setCreatePending(false);
+    }
+  }, [request]);
   const loadConversations = useCallback(
     async (before?: string) => {
       if (listLock.current) return;
@@ -518,6 +551,8 @@ export function SaraPanel({
         setListCursor(value.next_cursor);
         if (!before)
           setSelectedId((old) => old ?? value.conversations[0]?.id ?? null);
+        if (!before && !value.conversations.length && !selectedRef.current)
+          await createConversation();
       } catch (cause) {
         if (alive.current) setListError(feedback(cause));
       } finally {
@@ -525,7 +560,7 @@ export function SaraPanel({
         if (alive.current) setListLoading(false);
       }
     },
-    [getPage],
+    [getPage, createConversation],
   );
   useEffect(() => {
     void loadConversations();
@@ -598,35 +633,13 @@ export function SaraPanel({
     }
     if (log.current) log.current.scrollTop = log.current.scrollHeight;
   }, [selectedId, currentMessages.length]);
-  async function createConversation(event: React.SubmitEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (createLock.current) return;
-    createLock.current = true;
-    setCreatePending(true);
-    setListError("");
-    try {
-      const value = await request<SaraConversation>(
-        "sara/conversations",
-        "POST",
-        newTitle.trim() ? { title: newTitle.trim() } : {},
-      );
-      if (!alive.current) return;
-      setConversations((old) => [
-        value,
-        ...old.filter((item) => item.id !== value.id),
-      ]);
-      setSelectedId(value.id);
-      setNewTitle("");
-      setCreating(false);
-      setHistoryOpen(false);
-      requestAnimationFrame(() => composer.current?.focus());
-    } catch (cause) {
-      setListError(feedback(cause));
-    } finally {
-      createLock.current = false;
-      if (alive.current) setCreatePending(false);
+  useEffect(() => {
+    const field = composer.current;
+    if (field) {
+      field.style.height = "auto";
+      field.style.height = `${Math.min(field.scrollHeight, 180)}px`;
     }
-  }
+  }, [draft.text, selectedId]);
   async function rename(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedId || createLock.current) return;
@@ -745,6 +758,8 @@ export function SaraPanel({
       busy ||
       historicalPending ||
       isUploading ||
+      recording ||
+      recordStarting ||
       (!draft.text.trim() && !draft.attachments.length)
     )
       return;
@@ -869,24 +884,22 @@ export function SaraPanel({
     item.title.toLocaleLowerCase("es").includes(search.toLocaleLowerCase("es")),
   );
   return (
-    <section
-      className={`sara-workspace ${historyOpen ? "sara-history-open" : ""}`}
-      aria-label="Sara IA"
-    >
-      <aside className="sara-history" aria-label="Conversaciones de Sara">
-        <div className="sara-history-heading">
-          <strong>Conversaciones</strong>
+    <section className="sara-workspace" aria-label="Sara IA">
+      <dialog
+        ref={historyDialog}
+        className="sara-history-dialog"
+        aria-labelledby="sara-history-title"
+      >
+        <header className="sara-history-heading">
+          <h2 id="sara-history-title">Conversaciones</h2>
           <button
             className="sara-icon-button"
-            aria-label="Nueva conversación"
-            onClick={() => {
-              setCreating(true);
-              setHistoryOpen(true);
-            }}
+            aria-label="Cerrar historial"
+            onClick={() => historyDialog.current?.close()}
           >
-            <Icon name="plus" />
+            <Icon name="close" />
           </button>
-        </div>
+        </header>
         <label className="sara-search">
           <Icon name="search" />
           <span className="crm-sr-only">Buscar conversaciones cargadas</span>
@@ -896,30 +909,6 @@ export function SaraPanel({
             placeholder="Buscar conversaciones"
           />
         </label>
-        {creating && (
-          <form className="sara-title-form" onSubmit={createConversation}>
-            <label>
-              Título (opcional)
-              <input
-                autoFocus
-                value={newTitle}
-                onChange={(event) => setNewTitle(event.target.value)}
-                maxLength={120}
-                disabled={createPending}
-              />
-            </label>
-            <div>
-              <button disabled={createPending}>Crear conversación</button>
-              <button
-                type="button"
-                disabled={createPending}
-                onClick={() => setCreating(false)}
-              >
-                Cancelar
-              </button>
-            </div>
-          </form>
-        )}
         {listError && (
           <p className="sara-error" role="alert">
             {listError}
@@ -939,7 +928,7 @@ export function SaraPanel({
               title={item.title}
               onClick={() => {
                 setSelectedId(item.id);
-                setHistoryOpen(false);
+                historyDialog.current?.close();
               }}
             >
               <span>{item.title}</span>
@@ -974,50 +963,81 @@ export function SaraPanel({
             Actualizar historial
           </button>
         )}
-      </aside>
+      </dialog>
       <div className="sara-chat">
         <header className="sara-header">
-          <button
-            className="sara-history-toggle sara-icon-button"
-            aria-label={
-              historyOpen ? "Ocultar conversaciones" : "Ver conversaciones"
-            }
-            aria-expanded={historyOpen}
-            onClick={() => setHistoryOpen((value) => !value)}
-          >
-            <Icon name="list" />
-          </button>
           <div className="sara-heading">
-            <h2>Sara IA</h2>
-            <span>
-              {statusError
-                ? "No disponible"
-                : !status
-                  ? "Consultando estado…"
-                  : ready
-                    ? "Disponible"
-                    : "No disponible"}
-            </span>
+            <span
+              className="sara-presence"
+              data-ready={ready}
+              role="status"
+              aria-label={
+                statusError
+                  ? "Sara no disponible"
+                  : !status
+                    ? "Consultando estado de Sara"
+                    : ready
+                      ? "Sara disponible"
+                      : "Sara no disponible"
+              }
+            />
+            <h2 title={selected?.title}>
+              {selected?.title ?? "Nueva conversación"}
+            </h2>
           </div>
-          <button
-            className="sara-skills-button"
-            onClick={() => void showSkills()}
-          >
-            <Icon name="task" />
-            Skills
-          </button>
-          {selected && (
+          <nav className="sara-toolbar" aria-label="Herramientas de Sara">
+            {selected && (
+              <button
+                className="sara-icon-button"
+                aria-label="Actualizar conversación"
+                title="Actualizar conversación"
+                disabled={historyLoading}
+                onClick={() => void loadMessages(selected.id)}
+              >
+                <Icon name="refresh" />
+              </button>
+            )}
+            {selected && (
+              <button
+                className="sara-icon-button"
+                aria-label="Cambiar título de conversación"
+                title="Cambiar título"
+                onClick={() => {
+                  setTitle(selected.title);
+                  setRenaming((value) => !value);
+                }}
+              >
+                <Icon name="edit" />
+              </button>
+            )}
             <button
               className="sara-icon-button"
-              aria-label="Cambiar título de conversación"
-              onClick={() => {
-                setTitle(selected.title);
-                setRenaming((value) => !value);
-              }}
+              aria-label="Ver skills"
+              title="Skills del proyecto"
+              aria-haspopup="dialog"
+              onClick={() => void showSkills()}
             >
-              <Icon name="settings" />
+              <Icon name="task" />
             </button>
-          )}
+            <button
+              className="sara-icon-button"
+              aria-label="Historial de conversaciones"
+              title="Historial de conversaciones"
+              aria-haspopup="dialog"
+              onClick={() => historyDialog.current?.showModal()}
+            >
+              <Icon name="history" />
+            </button>
+            <button
+              className="sara-icon-button"
+              aria-label="Nueva conversación"
+              title="Nueva conversación"
+              disabled={createPending || listLoading}
+              onClick={() => void createConversation()}
+            >
+              <Icon name="plus" />
+            </button>
+          </nav>
         </header>
         {renaming && selected && (
           <form className="sara-rename" onSubmit={rename}>
@@ -1050,17 +1070,6 @@ export function SaraPanel({
           aria-relevant="additions"
           aria-busy={historyLoading}
         >
-          {selected && (
-            <div className="sara-conversation-label">
-              <h3>{selected.title}</h3>
-              <button
-                disabled={historyLoading}
-                onClick={() => void loadMessages(selected.id)}
-              >
-                Actualizar conversación
-              </button>
-            </div>
-          )}
           {selectedId && messageCursors[selectedId] && (
             <button
               className="sara-older"
@@ -1086,41 +1095,38 @@ export function SaraPanel({
               {statusError}
             </p>
           )}
-          {!selectedId && !listLoading && (
-            <div className="sara-welcome">
-              <span className="sara-avatar">
-                <Icon name="message" size={28} />
-              </span>
-              <h3>Un espacio para avanzar.</h3>
-              <p>
-                Consulta el CRM, revisa documentos o prepara tu siguiente acción
-                con Sara IA.
-              </p>
-              <button
-                onClick={() => {
-                  setCreating(true);
-                  setHistoryOpen(true);
-                }}
-              >
-                Nueva conversación
-              </button>
-            </div>
-          )}
-          {selectedId &&
+          {!listLoading &&
             !historyLoading &&
             !currentMessages.length &&
-            !historyError && (
+            !historyError &&
+            turn?.phase !== "sending" && (
               <div className="sara-welcome">
-                <span className="sara-avatar">
-                  <Icon name="message" size={28} />
-                </span>
-                <h3>¿En qué trabajamos hoy?</h3>
-                <p>
-                  Escribe una consulta o adjunta un documento. Los cambios en el
-                  CRM requieren tu aprobación.
+                <p className="sara-welcome-eyebrow">
+                  SARA IA · JARDINES DEL ENCANTO
                 </p>
+                <h3>
+                  ¿Qué vamos a<br />
+                  hacer hoy?
+                </h3>
+                <p>
+                  Organiza tus clientes, revisa documentos y prepara tu próximo
+                  paso.
+                </p>
+                {!selectedId && (
+                  <button
+                    disabled={createPending}
+                    onClick={() => void createConversation()}
+                  >
+                    Iniciar conversación
+                  </button>
+                )}
               </div>
             )}
+          {listError && (
+            <p className="sara-error" role="alert">
+              {listError}
+            </p>
+          )}
           {currentMessages.map((message) => (
             <SaraMessageView
               key={`${selectedId}-${message.id}`}
@@ -1131,8 +1137,13 @@ export function SaraPanel({
             />
           ))}
           {turn?.phase === "sending" && (
-            <p className="sara-turn-state" role="status">
-              Sara está procesando el envío…
+            <p className="sara-turn-state sara-working" role="status">
+              <span className="sara-working-dots" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+              </span>
+              Sara está trabajando…
             </p>
           )}
           {(turn?.phase === "uncertain" || turn?.phase === "pending") && (
@@ -1210,40 +1221,6 @@ export function SaraPanel({
               </p>
             </div>
           )}
-          {draft.attachments.length > 0 && (
-            <div className="sara-draft-files">
-              {draft.attachments.map((file) => (
-                <div key={file.id}>
-                  <strong>{file.filename}</strong>
-                  <button
-                    type="button"
-                    className="sara-icon-button"
-                    aria-label={`Quitar ${file.filename}`}
-                    disabled={busy || isUploading}
-                    onClick={() =>
-                      selectedId &&
-                      updateDraft(selectedId, (current) => ({
-                        ...current,
-                        attachments: current.attachments.filter(
-                          (item) => item.id !== file.id,
-                        ),
-                      }))
-                    }
-                  >
-                    <Icon name="close" />
-                  </button>
-                  <details open={file.kind === "audio"}>
-                    <summary>
-                      {file.kind === "audio"
-                        ? "Revisar transcripción"
-                        : "Revisar extracto"}
-                    </summary>
-                    <p>{file.text}</p>
-                  </details>
-                </div>
-              ))}
-            </div>
-          )}
           <form className="sara-composer" onSubmit={submit}>
             <label className="crm-sr-only" htmlFor="sara-message">
               Mensaje para Sara IA
@@ -1260,108 +1237,160 @@ export function SaraPanel({
                 }))
               }
               maxLength={4000}
+              aria-describedby="sara-composer-hint"
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing &&
+                  !event.repeat
+                ) {
+                  event.preventDefault();
+                  event.currentTarget.form?.requestSubmit();
+                }
+              }}
               disabled={!selectedId || busy || historicalPending}
               placeholder={
                 selectedId
                   ? "Escribe a Sara IA…"
-                  : "Crea o selecciona una conversación"
+                  : createPending
+                    ? "Preparando tu conversación…"
+                    : "Inicia una conversación para escribir"
               }
               rows={2}
             />
+            {draft.attachments.length > 0 && (
+              <div className="sara-draft-files">
+                {draft.attachments.map((file) => (
+                  <div key={file.id}>
+                    <strong>{file.filename}</strong>
+                    <button
+                      type="button"
+                      className="sara-icon-button"
+                      aria-label={`Quitar ${file.filename}`}
+                      disabled={busy || isUploading}
+                      onClick={() =>
+                        selectedId &&
+                        updateDraft(selectedId, (current) => ({
+                          ...current,
+                          attachments: current.attachments.filter(
+                            (item) => item.id !== file.id,
+                          ),
+                        }))
+                      }
+                    >
+                      <Icon name="close" />
+                    </button>
+                    <details open={file.kind === "audio"}>
+                      <summary>
+                        {file.kind === "audio"
+                          ? "Revisar transcripción"
+                          : "Revisar extracto"}
+                      </summary>
+                      <p>{file.text}</p>
+                    </details>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="sara-composer-toolbar">
-              <div>
+              <div className="sara-model">
+                <Icon name="leaf" size={16} />
+                <span title={status?.model ?? "Hermes"}>
+                  {status?.model ?? "Sara IA"}
+                </span>
+              </div>
+              <div className="sara-composer-actions">
                 <button
                   className="sara-icon-button"
                   type="button"
-                  title="Adjuntar documento (máximo 512 KiB)"
-                  aria-label="Adjuntar documento"
+                  title="Adjuntar documentos o audio (máximo 512 KiB)"
+                  aria-label="Adjuntar documentos o audio"
                   disabled={
                     !selectedId ||
                     busy ||
                     historicalPending ||
                     isUploading ||
-                    draft.attachments.length >= 4
+                    draft.attachments.length >= 4 ||
+                    recording ||
+                    recordStarting
                   }
                   onClick={() => docInput.current?.click()}
                 >
                   <Icon name="paperclip" />
-                </button>
-                <button
-                  className="sara-icon-button"
-                  type="button"
-                  title={
-                    !status?.voice_available
-                      ? "Transcripción no disponible"
-                      : "Adjuntar nota de voz"
-                  }
-                  aria-label="Adjuntar nota de voz"
-                  disabled={
-                    !selectedId ||
-                    busy ||
-                    historicalPending ||
-                    isUploading ||
-                    !status?.voice_available ||
-                    draft.attachments.length >= 4
-                  }
-                  onClick={() => audioInput.current?.click()}
-                >
-                  <Icon name="microphone" />
                 </button>
                 {recording || recordStarting ? (
                   <>
                     <button
                       className="sara-icon-button sara-recording"
                       type="button"
+                      title="Detener grabación"
                       aria-label="Detener grabación"
                       disabled={recordStarting}
                       onClick={() => recorder.current?.stop()}
                     >
                       <Icon name="stop" />
                     </button>
-                    <button type="button" onClick={stopCapture}>
-                      Cancelar grabación
+                    <button
+                      className="sara-icon-button"
+                      type="button"
+                      aria-label="Cancelar grabación"
+                      title="Cancelar grabación"
+                      onClick={stopCapture}
+                    >
+                      <Icon name="close" />
                     </button>
                   </>
                 ) : (
                   <button
+                    className="sara-icon-button"
                     type="button"
-                    className="sara-record-button"
+                    aria-label="Grabar nota de voz"
+                    title={
+                      !status?.voice_available
+                        ? "Transcripción no disponible"
+                        : !recordSupported
+                          ? "Este navegador no permite grabar; adjunta un audio"
+                          : "Grabar nota de voz"
+                    }
                     disabled={
                       !selectedId ||
                       busy ||
                       historicalPending ||
                       isUploading ||
-                      recordStarting ||
                       !status?.voice_available ||
                       !recordSupported ||
                       draft.attachments.length >= 4
                     }
                     onClick={() => void startRecording()}
                   >
-                    <span aria-hidden="true">●</span>
-                    {recordStarting ? "Abriendo micrófono…" : "Grabar nota"}
+                    <Icon name="microphone" />
                   </button>
                 )}
+                <button
+                  className="sara-send sara-icon-button"
+                  type="submit"
+                  title="Enviar mensaje"
+                  aria-label="Enviar mensaje"
+                  disabled={
+                    !selectedId ||
+                    !ready ||
+                    historyLoading ||
+                    busy ||
+                    historicalPending ||
+                    isUploading ||
+                    recording ||
+                    recordStarting ||
+                    (!draft.text.trim() && !draft.attachments.length)
+                  }
+                >
+                  <Icon name="arrowUp" />
+                </button>
               </div>
-              <button
-                className="sara-send"
-                type="submit"
-                disabled={
-                  !selectedId ||
-                  !ready ||
-                  historyLoading ||
-                  busy ||
-                  historicalPending ||
-                  isUploading ||
-                  recording ||
-                  recordStarting ||
-                  (!draft.text.trim() && !draft.attachments.length)
-                }
-              >
-                <Icon name="send" />
-                Enviar
-              </button>
             </div>
+            <span className="crm-sr-only" id="sara-composer-hint">
+              Enter para enviar. Shift y Enter para una nueva línea.
+            </span>
           </form>
           {isUploading && (
             <p className="sara-muted" role="status">
@@ -1389,24 +1418,37 @@ export function SaraPanel({
           <input
             ref={docInput}
             type="file"
-            accept=".txt,.md,.csv,.pdf,text/plain,text/markdown,text/csv,application/pdf"
+            accept=".txt,.md,.csv,.pdf,.webm,.ogg,.mp3,.wav,.mp4,.m4a,text/plain,text/markdown,text/csv,application/pdf,audio/webm,audio/ogg,audio/mpeg,audio/wav,audio/mp4"
             multiple
             hidden
             onChange={(event) => {
               const files = Array.from(event.target.files ?? []);
               event.target.value = "";
-              if (files.length) void uploadFiles(files);
-            }}
-          />
-          <input
-            ref={audioInput}
-            type="file"
-            accept=".webm,.ogg,.mp3,.wav,.mp4,.m4a,audio/webm,audio/ogg,audio/mpeg,audio/wav,audio/mp4"
-            hidden
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (file) localPreview(file);
+              if (!files.length || !selectedId) return;
+              try {
+                const audios = files.filter((file) =>
+                  saraUploadMime(file.name, file.type).startsWith("audio/"),
+                );
+                if (audios.length > 1)
+                  throw new Error(
+                    "Selecciona una sola nota de voz para revisarla antes de usarla.",
+                  );
+                if (audios.length && !status?.voice_available)
+                  throw new Error(
+                    "Las notas de voz no están disponibles en este servidor.",
+                  );
+                if (files.length + draft.attachments.length > 4)
+                  throw new Error(
+                    "Puedes adjuntar hasta 4 archivos por mensaje.",
+                  );
+                const documents = files.filter(
+                  (file) => !audios.includes(file),
+                );
+                if (documents.length) void uploadFiles(documents);
+                if (audios[0]) localPreview(audios[0]);
+              } catch (cause) {
+                setError(selectedId, feedback(cause));
+              }
             }}
           />
         </div>

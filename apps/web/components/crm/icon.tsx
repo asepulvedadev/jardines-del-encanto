@@ -1,5 +1,9 @@
 import type { CSSProperties } from "react";
 const paths = {
+  history: "M3 11a9 9 0 1 1 3 7M3 4v7h7M12 7v5l3 2",
+  refresh: "M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 14 6M4 12a8 8 0 0 0 14 6",
+  edit: "m16 3 5 5M4 20l5-1L21 7l-5-5L4 14z",
+  arrowUp: "M12 20V4m-7 7 7-7 7 7",
   microphone:
     "M12 15a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v7a3 3 0 0 0 3 3ZM5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8",
   paperclip: "m8 12 7-7a3 3 0 0 1 4 4L9 19a5 5 0 0 1-7-7L13 1M6 14l8-8",

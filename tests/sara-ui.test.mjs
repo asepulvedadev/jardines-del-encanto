@@ -374,3 +374,66 @@ test("recording automatically stops at60seconds and releases media", async () =>
     media.restore();
   }
 });
+
+test("Sara follows the reference's single chat with named modal history and one attachment entry", () => {
+  const { SaraPanel } = load("sara-panel.tsx");
+  const html = renderToStaticMarkup(
+    React.createElement(SaraPanel, {
+      csrf: "fixture",
+      onChanged: async () => {},
+    }),
+  );
+  assert.match(
+    html,
+    /<dialog[^>]*class="sara-history-dialog"[^>]*aria-labelledby="sara-history-title"/,
+  );
+  assert.doesNotMatch(html, /<aside/);
+  assert.match(html, /aria-label="Historial de conversaciones"/);
+  assert.match(html, /aria-label="Nueva conversación"/);
+  assert.equal((html.match(/type="file"/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /sara-title-form/);
+});
+
+test("composer keyboard preserves multiline and IME input while new chats need no title form", () => {
+  const source = read("sara-panel.tsx");
+  assert.match(source, /event\.nativeEvent\.isComposing/);
+  assert.match(source, /event\.shiftKey/);
+  assert.match(source, /requestSubmit\(\)/);
+  assert.doesNotMatch(source, /setCreating|setNewTitle/);
+});
+
+test("tool results collapse together but live proposal consequences remain separate", () => {
+  const { SaraMessageView } = load("sara-panel.tsx");
+  const html = renderToStaticMarkup(
+    React.createElement(SaraMessageView, {
+      message: {
+        id: "reference-message",
+        role: "assistant",
+        content: "Resultado real",
+        created_at: "2026-11-11T10:00:00Z",
+        state: "completed",
+        attachments: [],
+        results: [{ action: "crm.workspace", result: { contacts: [] } }],
+        proposals: [],
+      },
+      csrf: "fixture",
+      request: async () => {},
+      onChanged: async () => {},
+    }),
+  );
+  assert.match(html, /<details class="sara-activity">/);
+  assert.match(html, /Actividad de Sara/);
+});
+
+test("composer exposes one focus boundary and activity retains a44px keyboard/touch target", () => {
+  const css = read("sara.css");
+  assert.match(
+    css,
+    /\.crm-shell \.sara-composer textarea:focus-visible\s*\{[^}]*outline: none/s,
+  );
+  assert.match(css, /\.sara-composer:focus-within\s*\{[^}]*box-shadow:/s);
+  assert.match(
+    css,
+    /\.sara-workspace \.sara-activity > summary\s*\{[^}]*min-height: 44px/s,
+  );
+});

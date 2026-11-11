@@ -269,19 +269,26 @@ scrub callback parameters promptly, and preserve Escape, focus return and small-
 ### Sara IA chat
 
 Keep the CRM's light canvas, Manrope typography and quiet forest/leaf accents.
-Use a compact conversation/history column and a readable message column with a
-persistent composer. Reflow history behind a labeled control on smaller screens;
-do not make the whole page horizontally scroll. Chat prose is plain text, never
-untrusted rendered HTML. Separate draft text, attached files, actual tool results
-and actions awaiting live-session approval.
+Following the owner's personal-assistant reference, use one centered conversation
+column (approximately 820px) with a compact icon toolbar, a large left-aligned
+welcome and a unified composer. History is a named native modal at every viewport,
+not a permanent second sidebar. Preserve the CRM shell and Jardines palette rather
+than copying the reference's dark/orange theme. Do not make the whole page
+horizontally scroll. Chat prose is plain text, never untrusted rendered HTML.
+Group confirmed tool results in a collapsible activity section; keep exact pending
+proposal consequences and approval controls separate and visible.
 
 Offer new conversations, title editing, history search and paging, project skills,
 documents and voice notes. An uploaded document is data, not agent instructions.
 Voice recording requires an explicit click and a local preview/discard step before
 upload/transcription; sending is a separate action. There is no live call or spoken
 reply in this scope. Show real unavailable states instead of a decorative active
-microphone or invented skills. Keep drafts and recover ambiguous submissions with
-the same request identity rather than generating twice.
+microphone or invented skills. Create an untitled conversation directly on first
+use or the new-chat action; renaming is secondary, not a prerequisite to writing.
+Enter sends, Shift+Enter inserts a line break, and IME composition never sends.
+One attachment entry accepts supported documents/audio; one recording control
+retains the explicit voice-note review flow. Keep drafts and recover ambiguous
+submissions with the same request identity rather than generating twice.
 
 ## 9. Motion, imagery and optional 3D
 
