@@ -2,10 +2,43 @@ import os
 from pathlib import Path
 
 import psycopg
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from .crm.routes import router as crm_router
+from .social.routes import router as social_router
+from .social.routes import webhook_router
+
 app = FastAPI(title="Jardines del Encanto API", docs_url=None, redoc_url=None, openapi_url=None)
+
+
+app.include_router(crm_router)
+app.include_router(social_router)
+app.include_router(webhook_router)
+
+
+@app.middleware("http")
+async def private_response_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/crm/"):
+        response.headers["Cache-Control"] = "no-store, private"
+    return response
+
+
+@app.exception_handler(RequestValidationError)
+async def invalid_input(request, error):
+    if request.url.path.startswith("/crm/"):
+        return JSONResponse({"detail": "invalid_input"}, status_code=422)
+    return await request_validation_exception_handler(request, error)
+
+
+@app.exception_handler(psycopg.Error)
+async def database_error(request, error):
+    if isinstance(error, psycopg.errors.UniqueViolation):
+        return JSONResponse({"detail": "phone_already_exists"}, status_code=409)
+    return JSONResponse({"detail": "database_unavailable"}, status_code=503)
 
 
 @app.get("/health/live")
@@ -16,11 +49,15 @@ def live():
 @app.get("/health/ready")
 def ready():
     try:
-        password = Path(os.environ["DATABASE_PASSWORD_FILE"]).read_text().strip()
-        with psycopg.connect(
-            host="db", dbname="jardines", user="jardines", password=password, connect_timeout=3
-        ) as connection:
-            connection.execute("SELECT 1")
+        if os.getenv("CRM_DATABASE_URL"):
+            with psycopg.connect(os.environ["CRM_DATABASE_URL"], connect_timeout=3) as connection:
+                connection.execute("SELECT 1 FROM crm.contacts LIMIT 1")
+        else:
+            password = Path(os.environ["DATABASE_PASSWORD_FILE"]).read_text().strip()
+            with psycopg.connect(
+                host="db", dbname="jardines", user="jardines", password=password, connect_timeout=3
+            ) as connection:
+                connection.execute("SELECT 1")
     except (OSError, KeyError, psycopg.Error):
         return JSONResponse({"status": "unavailable"}, status_code=503)
     return {"status": "ok"}

@@ -1,0 +1,30 @@
+# Local CRM only. Never use this file to change the shared VPS.
+name: jardines-crm-dev
+services:
+  db:
+    image: postgres:17-alpine@sha256:3540c0362c809df084ffac0ae69fe794515f9de92692f02178bcdce0ef0302ac
+    user: "70:70"
+    ports: ["127.0.0.1:15432:5432"]
+    environment:
+      POSTGRES_USER: jardines_local_owner
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes: ["database:/var/lib/postgresql/data"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ["/tmp:size=32m,mode=1777", "/var/run/postgresql:size=16m,uid=70,gid=70"]
+    mem_limit: 384m
+    cpus: 0.75
+    pids_limit: 128
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U jardines_local_owner -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  database:
+secrets:
+  db_password:
+    file: ../../.local/crm/database-password

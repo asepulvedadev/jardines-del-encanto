@@ -11,6 +11,7 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def database_secret(tmp_path, monkeypatch):
+    monkeypatch.delenv("CRM_DATABASE_URL", raising=False)
     secret = tmp_path / "db_password"
     secret.write_text("unit-test-only")
     monkeypatch.setenv("DATABASE_PASSWORD_FILE", str(secret))
@@ -43,3 +44,13 @@ def test_readiness_checks_database():
 def test_no_crm_or_api_docs_exposed():
     for path in ["/customers", "/docs", "/openapi.json"]:
         assert client.get(path).status_code == 404
+
+
+def test_crm_readiness_checks_configured_schema(monkeypatch):
+    monkeypatch.setenv("CRM_DATABASE_URL", "postgresql://runtime@localhost/isolated")
+    with patch("app.main.psycopg.connect") as connect:
+        response = client.get("/health/ready")
+    assert response.status_code == 200
+    connect.return_value.__enter__.return_value.execute.assert_called_once_with(
+        "SELECT 1 FROM crm.contacts LIMIT 1"
+    )

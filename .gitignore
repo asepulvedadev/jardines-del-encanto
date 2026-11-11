@@ -13,3 +13,6 @@ __pycache__/
 *.tar
 coverage/
 .DS_Store
+
+# Local CRM credentials and developer state
+.local/

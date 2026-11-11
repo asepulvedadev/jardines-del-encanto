@@ -8,5 +8,9 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 COPY --from=build /install /usr/local
 COPY app ./app
+COPY migrations ./migrations
+RUN mkdir -p /var/lib/jardines-zernio \
+    && chown 10001:10001 /var/lib/jardines-zernio \
+    && chmod 700 /var/lib/jardines-zernio
 USER 10001:10001
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]

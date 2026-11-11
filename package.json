@@ -1,12 +1,18 @@
 {
   "name": "jardines-del-encanto",
   "private": true,
-  "workspaces": ["apps/web"],
-  "engines": { "node": ">=24 <25" },
+  "workspaces": [
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "dev": "npm run dev --workspace=apps/web",
     "build": "npm run build --workspace=apps/web",
     "typecheck": "npm run typecheck --workspace=apps/web",
-    "test:web": "node --test tests/landing.test.mjs"
+    "test:web": "node --test tests/landing.test.mjs",
+    "test:crm": "uv run --project apps/api python ops/dev/crm.py test",
+    "test:crm:gateway": "node --test tests/crm-gateway.test.mjs tests/zernio-webhook-gateway.test.mjs"
   }
 }

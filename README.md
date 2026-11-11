@@ -47,3 +47,5 @@ No license grant is implied by public source visibility. Customer data, keys, pr
 commercial information and operational evidence do not belong in this repository.
 
 Landing content, asset provenance and local checks: [LANDING.md](docs/LANDING.md).
+
+Private CRM local setup and security: [CRM.md](docs/CRM.md).

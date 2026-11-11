@@ -2,7 +2,12 @@
 name = "jardines-api"
 version = "0.1.0"
 requires-python = ">=3.13,<3.14"
-dependencies = ["fastapi", "uvicorn", "psycopg[binary]"]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "psycopg[binary]",
+    "pwdlib[argon2]>=0.3.1",
+]
 
 [dependency-groups]
 dev = ["pytest", "httpx", "ruff"]

@@ -1,0 +1,330 @@
+/* Connections use private workspace density and shared CRM controls. */
+.crm-social {
+  min-width: 0;
+}
+.crm-social p {
+  margin: 0;
+}
+.crm-social > section {
+  margin-bottom: 20px;
+}
+.crm-social .crm-error {
+  margin-bottom: 12px;
+}
+.social-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 16px;
+}
+.social-overview > div {
+  max-width: 64ch;
+}
+.social-section-label {
+  font-size: 12px;
+  letter-spacing: 0.09em;
+  font-weight: 600;
+  color: #526056;
+}
+.social-overview p,
+.social-section-heading p,
+.social-channel-info > p {
+  color: #526056;
+  margin-top: 6px;
+}
+.social-feedback {
+  color: #216e47;
+  min-height: 24px;
+  margin-bottom: 12px !important;
+}
+.social-setup,
+.social-authorization,
+.social-readiness {
+  padding: 24px;
+}
+.social-section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+.social-section-heading p {
+  max-width: 65ch;
+}
+.social-status {
+  font-size: 12px;
+  line-height: 1.6;
+  font-weight: 500;
+  border-radius: 4px;
+  background: #f1f3ef;
+  color: #526056;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.social-status-good {
+  background: #eaf5ec;
+  color: #216e47;
+}
+.social-configured {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding-top: 20px;
+}
+.social-configured > div {
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.social-configured span {
+  color: #526056;
+}
+.social-config-form {
+  padding-top: 20px;
+}
+.social-form-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.social-form-fields label {
+  font-weight: 600;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.social-help {
+  color: #526056;
+  font-size: 13px;
+  margin-top: 8px !important;
+}
+.social-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.social-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.social-authorization {
+  border: 1px solid #9aa79b;
+  border-left: 3px solid #507010;
+  background: #f5f8f1;
+  border-radius: 8px;
+}
+.social-authorization > p {
+  margin-top: 12px;
+}
+.social-instructions {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.social-code code {
+  display: inline-block;
+  background: #fff;
+  padding: 6px 12px;
+  border: 1px solid #7b897e;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+.social-warning {
+  padding: 12px 16px;
+  background: #fff4db;
+  color: #855708;
+  border-radius: 7px;
+  margin-bottom: 16px !important;
+}
+.social-channels > .social-section-heading,
+.social-events > .social-section-heading {
+  padding: 24px;
+  border-bottom: 1px solid #e0e6df;
+}
+.crm-social ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.social-channel {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e6df;
+}
+.social-channel-mark {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #d9e1d5;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #f6f7f1;
+}
+.social-channel-info {
+  flex: 1;
+  min-width: 0;
+}
+.social-channel-info > .social-status {
+  margin-top: 10px;
+}
+.social-account-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px !important;
+}
+.social-account-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  overflow-wrap: anywhere;
+}
+.social-channel-notes {
+  padding: 16px 24px;
+  color: #526056;
+  font-size: 13px;
+  display: grid;
+  gap: 8px;
+}
+.social-event-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #e0e6df;
+}
+.social-event-list li:last-child {
+  border-bottom: 0;
+}
+.social-event-list li > div {
+  min-width: 0;
+  display: grid;
+  overflow-wrap: anywhere;
+}
+.social-event-list span,
+.social-event-list time {
+  color: #526056;
+  font-size: 13px;
+}
+.social-event-list time {
+  flex-shrink: 0;
+}
+.social-empty {
+  padding: 32px 24px;
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  color: #526056;
+}
+.social-empty p {
+  max-width: 60ch;
+}
+.social-readiness {
+  background: #eef3e8;
+  border-radius: 12px;
+}
+.social-readiness > div p {
+  margin-top: 8px;
+}
+.social-readiness ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-top: 20px;
+}
+.social-readiness li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.social-readiness > .social-help {
+  margin-top: 20px !important;
+}
+.crm-social :is(button, a, input):focus-visible {
+  outline: 2px solid #507010;
+  outline-offset: 3px;
+}
+.crm-social button:disabled {
+  cursor: not-allowed;
+}
+@media (max-width: 767px) {
+  .social-overview,
+  .social-configured {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .social-form-fields {
+    grid-template-columns: 1fr;
+  }
+  .social-section-heading {
+    flex-wrap: wrap;
+  }
+  .social-setup,
+  .social-authorization,
+  .social-readiness,
+  .social-channels > .social-section-heading,
+  .social-events > .social-section-heading {
+    padding: 20px;
+  }
+  .social-channel {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 20px;
+  }
+  .social-channel-info {
+    flex-basis: calc(100% - 52px);
+  }
+  .social-channel > button {
+    margin-left: 52px;
+  }
+  .social-event-list li {
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px 20px;
+  }
+}
+@media (max-width: 389px) {
+  .social-setup,
+  .social-authorization,
+  .social-readiness,
+  .social-channels > .social-section-heading,
+  .social-events > .social-section-heading,
+  .social-channel {
+    padding: 16px;
+  }
+  .social-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .crm-social .crm-button {
+    white-space: normal;
+    text-align: center;
+  }
+  .social-channel > button {
+    margin-left: 0;
+    width: 100%;
+  }
+  .social-readiness ul {
+    display: grid;
+  }
+}

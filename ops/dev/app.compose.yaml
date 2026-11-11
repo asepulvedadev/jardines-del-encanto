@@ -1,0 +1,63 @@
+# Local preview only. Never apply this policy to the shared VPS.
+name: jardines-crm-local
+services:
+  api:
+    image: jardines-crm-api:social-local
+    build:
+      context: ../../apps/api
+    env_file: ../../.local/crm/app.env
+    environment:
+      ZERNIO_CONFIG_DIR: /var/lib/jardines-zernio
+    volumes:
+      - social_config:/var/lib/jardines-zernio
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m,uid=10001,gid=10001,mode=1700"]
+    mem_limit: 384m
+    cpus: 1
+    pids_limit: 128
+    networks: [app, database]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 3s
+      timeout: 4s
+      retries: 20
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
+  web:
+    image: jardines-crm-web:social-local
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    ports: ["127.0.0.1:4321:3000"]
+    environment:
+      API_BASE_URL: http://api:8000
+      CRM_ORIGIN: http://127.0.0.1:4321
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m,uid=1000,gid=1000,mode=1700"]
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 128
+    networks: [app, ingress]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 3s
+      timeout: 4s
+      retries: 20
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
+networks:
+  app: { internal: true }
+  ingress: {}
+  database:
+    external: true
+    name: jardines-crm-dev_default
+volumes:
+  social_config:
