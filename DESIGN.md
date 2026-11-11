@@ -141,6 +141,15 @@ property, collect payment, or promise availability. Other contact links use What
 
 ## 4. Space, shape and layout
 
+### Public search visibility
+
+The owner confirmed buyers in Bogotá and Soacha as an audience for the project in
+Acacías, Meta. Keep that distinction explicit in visible copy and structured data.
+Use a useful shared buyer guide, not duplicated city pages or invented offices.
+Only approved public pages on `jardinesdelencanto.site` may index; CRM, login,
+APIs and the original preview remain excluded. See `docs/SEO-GEO.md` for policy,
+verification and the limits of SEO/GEO claims.
+
 - Spacing scale: 0, 2, 4, 8, 12, 16, 24, 32, 40, 48, 64, 80 and 96px.
 - Marketing container: max 1280px; gutters 16px mobile, 24px tablet, 32px desktop.
 - Marketing section spacing: 48–64px mobile, 80–96px desktop, adjusted for content.

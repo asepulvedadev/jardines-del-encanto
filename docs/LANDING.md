@@ -1,8 +1,9 @@
 # Landing page: content and local verification
 
 The public landing is implemented in `apps/web`. The owner authorized publication,
-VPS deployment and a temporary HTTPS preview on 2026-11-10. Search indexing remains
-disabled. Deployment and preview operations are documented in `DEPLOY.md`.
+VPS deployment and a temporary HTTPS preview on 2026-11-10. The later branded-domain
+SEO authorization enables only approved public pages; see `SEO-GEO.md`. Deployment
+and preview operations are documented in `DEPLOY.md`.
 `DESIGN.md` remains the shared visual contract. UI copy uses professional `es-CO`.
 
 ## Verified local redesign — 2026-11-11
@@ -181,7 +182,8 @@ SIL Open Font Licenses beside the font files.
   Desktop autoplay is muted and gated by screen size, reduced motion, connection
   hints and visibility. Mobile/data-saving/reduced-motion visitors start playback
   themselves. Video pauses offscreen or when the document is hidden.
-- Search indexing stays disabled until a production domain and publication are approved.
+- Approved public pages may index on the branded domain; CRM/private routes and
+  the preview remain noindex under the policy in `SEO-GEO.md`.
 
 ## Checks
 

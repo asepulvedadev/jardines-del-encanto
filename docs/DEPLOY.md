@@ -12,9 +12,14 @@ GitHub. Only the dedicated CI private key is stored in the production environmen
 
 ## Temporary HTTPS preview
 
+The owner's public landing domain is now `https://jardinesdelencanto.site`.
+See [DOMAIN.md](DOMAIN.md) for DNS, certificate, public-form origin adaptation,
+verification and recovery. The preview remains the separate CRM/provider origin.
+
 Preview hostname: `jardines.2.24.111.40.sslip.io`, proxying through the project-specific
 Nginx vhost to `127.0.0.1:13400`. The application, API and database ports stay private.
-Search indexing is disabled in page metadata and the preview response header. This
+The preview response header remains noindex. Approved pages on the branded domain
+use the separate indexing policy in `SEO-GEO.md`; private metadata stays noindex. This
 is a public test URL, not access control; do not expose private CRM data here.
 The hostname depends on the external [sslip.io DNS service](https://sslip.io/) and
 should be replaced with the owner's domain before permanent launch.
