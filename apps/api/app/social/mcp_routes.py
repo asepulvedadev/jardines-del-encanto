@@ -34,6 +34,9 @@ def status(admin: Admin):
 
 @router.post("/start")
 def start(data: StartInput, admin: Admin):
+    from ..control.service import require_social_enabled
+
+    require_social_enabled()
     return mcp.begin(admin, data.replace)
 
 

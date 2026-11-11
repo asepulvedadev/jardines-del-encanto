@@ -210,6 +210,9 @@ def persist_sync(db, profile_id, selected, truncated, warning):
 
 @router.post("/sync")
 def sync_settings(data: EmptyInput, admin: Admin):
+    from ..control.service import require_social_enabled
+
+    require_social_enabled()
     with config.locked():
         credentials = config.required()
         sync(credentials)
@@ -222,8 +225,11 @@ def intent_binding(admin, credentials):
 
 @router.post("/connect/{platform}")
 def start_connection(platform: str, data: EmptyInput, admin: Admin):
+    from ..control.service import require_social_enabled
+
     if platform not in provider.PLATFORMS:
         raise HTTPException(404, "unsupported_platform")
+    require_social_enabled(platform)
     with config.locked():
         credentials = config.required()
         # Snapshot vendor state, not a potentially stale cache, before beginning consent.

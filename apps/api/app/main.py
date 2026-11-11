@@ -7,8 +7,11 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from .control.routes import router as control_router
 from .crm.landing import router as landing_router
 from .crm.routes import router as crm_router
+from .hermes.routes import internal_router
+from .hermes.routes import router as hermes_router
 from .social.mcp_routes import router as social_mcp_router
 from .social.routes import router as social_router
 from .social.routes import webhook_router
@@ -17,6 +20,9 @@ app = FastAPI(title="Jardines del Encanto API", docs_url=None, redoc_url=None, o
 
 
 app.include_router(crm_router)
+app.include_router(control_router)
+app.include_router(hermes_router)
+app.include_router(internal_router)
 app.include_router(landing_router)
 app.include_router(social_router)
 app.include_router(social_mcp_router)
@@ -25,15 +31,36 @@ app.include_router(webhook_router)
 
 @app.middleware("http")
 async def private_response_headers(request: Request, call_next):
+    private_control = request.url.path.startswith(
+        ("/crm/control/", "/crm/hermes/", "/internal/hermes/")
+    )
+    if private_control and request.method in ("POST", "PATCH"):
+        # Bound bytes before JSON/Pydantic parsing, including chunked requests.
+        large = request.url.path.startswith("/internal/hermes/") or (
+            request.url.path.startswith("/crm/control/items")
+            and not request.url.path.endswith("/run")
+        )
+        maximum = 65536 if large else 16384
+        chunks, size = [], 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > maximum:
+                return JSONResponse(
+                    {"detail": "request_too_large"},
+                    status_code=413,
+                    headers={"Cache-Control": "no-store, private"},
+                )
+            chunks.append(chunk)
+        request._body = b"".join(chunks)
     response = await call_next(request)
-    if request.url.path.startswith(("/crm/", "/public/")):
+    if request.url.path.startswith(("/crm/", "/public/", "/internal/hermes/")):
         response.headers["Cache-Control"] = "no-store, private"
     return response
 
 
 @app.exception_handler(RequestValidationError)
 async def invalid_input(request, error):
-    if request.url.path.startswith(("/crm/", "/public/")):
+    if request.url.path.startswith(("/crm/", "/public/", "/internal/hermes/")):
         return JSONResponse({"detail": "invalid_input"}, status_code=422)
     return await request_validation_exception_handler(request, error)
 

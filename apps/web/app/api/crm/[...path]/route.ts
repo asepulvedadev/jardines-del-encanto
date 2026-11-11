@@ -5,11 +5,25 @@ const rules: [RegExp, string[]][] = [
   [/^auth\/logout$/, ["POST"]],
   [/^auth\/session$/, ["GET"]],
   [/^workspace$/, ["GET"]],
+  [/^control\/catalog$/, ["GET"]],
+  [/^control\/items$/, ["POST"]],
+  [/^control\/items\/[0-9a-f-]{36}$/, ["PATCH"]],
+  [/^control\/items\/[0-9a-f-]{36}\/run$/, ["POST"]],
+  [
+    /^control\/connections\/(hermes|zernio|facebook|instagram|tiktok|whatsapp|telegram)$/,
+    ["PATCH"],
+  ],
+  [/^hermes\/status$/, ["GET"]],
+  [/^hermes\/(chat|actions)$/, ["POST"]],
+  [/^hermes\/proposals\/[0-9a-f-]{36}\/(approve|reject)$/, ["POST"]],
   [/^social\/settings$/, ["GET", "POST"]],
   [/^social\/(sync|complete)$/, ["POST"]],
   [/^social\/mcp\/status$/, ["GET"]],
   [/^social\/mcp\/(start|complete|check|disconnect)$/, ["POST"]],
-  [/^social\/connect\/(facebook|instagram|tiktok|whatsapp|telegram)$/, ["POST"]],
+  [
+    /^social\/connect\/(facebook|instagram|tiktok|whatsapp|telegram)$/,
+    ["POST"],
+  ],
   [/^contacts$/, ["POST"]],
   [/^contacts\/[0-9a-f-]{36}$/, ["PATCH"]],
   [/^deals\/[0-9a-f-]{36}$/, ["PATCH"]],
@@ -48,6 +62,11 @@ async function proxy(
   }
   let body: Uint8Array | undefined;
   if (mutation) {
+    const definitionWrite =
+      (request.method === "POST" && endpoint === "control/items") ||
+      (request.method === "PATCH" &&
+        /^control\/items\/[0-9a-f-]{36}$/.test(endpoint));
+    const bodyLimit = definitionWrite ? 65536 : 16384;
     if (!request.headers.get("content-type")?.startsWith("application/json"))
       return fail(415, "invalid_content_type");
     const reader = request.body?.getReader();
@@ -58,7 +77,7 @@ async function proxy(
         const part = await reader.read();
         if (part.done) break;
         length += part.value.byteLength;
-        if (length > 16384) {
+        if (length > bodyLimit) {
           await reader.cancel();
           return fail(413, "request_too_large");
         }
@@ -81,6 +100,15 @@ async function proxy(
     request.cookies.get("__Host-jardines_session") ??
     request.cookies.get("jardines_session");
   if (session) headers.set("cookie", `${session.name}=${session.value}`);
+  const timeout =
+    endpoint === "hermes/chat"
+      ? 90000
+      : endpoint.startsWith("hermes/") ||
+          /^control\/items\/[0-9a-f-]{36}\/run$/.test(endpoint)
+        ? 30000
+        : endpoint.startsWith("social/mcp/")
+          ? 20000
+          : 8000;
   try {
     const upstream = await fetch(`${base}/crm/${endpoint}`, {
       method: request.method,
@@ -88,7 +116,7 @@ async function proxy(
       body: body as BodyInit | undefined,
       cache: "no-store",
       redirect: "error",
-      signal: AbortSignal.timeout(endpoint.startsWith("social/mcp/") ? 20000 : 8000),
+      signal: AbortSignal.timeout(timeout),
     });
     const resultHeaders = new Headers({
       ...privateHeaders,
