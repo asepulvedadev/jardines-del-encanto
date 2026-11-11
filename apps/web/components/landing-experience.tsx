@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { dailyCycleSeconds, formatCycle } from "../lib/launch-cycle";
-import { whatsappLink } from "../lib/project";
+import { LeadCaptureButton } from "./lead-capture";
 
 export function LaunchBanner() {
   const [remaining, setRemaining] = useState<number | null>(null);
@@ -35,17 +35,7 @@ export function LaunchBanner() {
             {remaining === null ? "— : — : —" : formatCycle(remaining)}
           </span>
         </div>
-        <a
-          className="button button-lime"
-          href={whatsappLink(
-            "Hola, quiero mi cupo para conocer Jardines del Encanto. Me interesa el precio de lanzamiento desde $13 millones COP.",
-          )}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Quiero mi cupo <span aria-hidden="true">↗</span>
-          <span className="sr-only"> (abre WhatsApp en otra pestaña)</span>
-        </a>
+        <LeadCaptureButton className="button button-lime" />
       </div>
     </aside>
   );

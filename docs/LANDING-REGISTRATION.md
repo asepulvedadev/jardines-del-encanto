@@ -2,9 +2,24 @@
 
 The modal opens when at least 30% of `#amenities-title` enters the visible region
 below the sticky header. It opens automatically once per browser session and can be
-reopened through the amenities “Quiero mi cupo” button. It remains dismissible;
+reopened through any “Quiero mi cupo” button: launch banner, hero, amenities,
+final contact section and sticky mobile bar. A single `LeadCaptureProvider` owns
+the existing dialog, form, request state and receipt; `LeadCaptureButton` exposes
+the same action throughout the landing. These are native buttons, not WhatsApp
+links. Other explicitly named contact/WhatsApp links remain unchanged.
+
+Opening or closing the dialog never submits data. Manual opening marks the
+session prompt as seen and suppresses subsequent automatic prompting. Escape
+returns focus to the clicked trigger; fields survive closing/reopening, and all
+buttons share the confirmed receipt state. It remains dismissible;
 registration is not required to explore the project. When session storage is
 unavailable, automatic prompting is limited to once per mounted page.
+
+The shared-trigger revision passed the optimized build, TypeScript, all25 web
+checks and all35 CRM gateway checks locally. Browser checks exercised every
+visible trigger at390px and1440px, one dialog instance, preserved fields, Escape
+focus restoration, the existing automatic section prompt and a shared saved-code
+fixture. No registration POST, production data change or publication was performed.
 
 ## Data and semantics
 

@@ -17,8 +17,9 @@ The clock uses one shared midnight-to-midnight Colombia cycle, without visitor
 identifiers or localStorage. The owner requested removing the explanatory paragraph;
 the daily-cycle label and the location/sales eyebrow above the hero were also
 removed in a later annotated request. The timer retains its accessible name,
-without a price-expiration or stock deadline claim. Contact links open WhatsApp;
-the amenities-section cupo button opens the registration modal described below.
+without a price-expiration or stock deadline claim. All “Quiero mi cupo” buttons
+open the same registration modal described below; other explicitly named contact
+links continue to open WhatsApp.
 Neither path reserves property or charges the visitor.
 
 The Montecarlo reference was inspected locally for the promotion cycle and native
