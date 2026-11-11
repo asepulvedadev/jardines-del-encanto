@@ -125,6 +125,8 @@ test("the buyer guide reflows and leads back to the working interest modal", { s
         await page.screenshot({ path: `${process.env.SEO_SCREENSHOT_DIR}/jardines-buyer-guide-${width}.png` });
       }
       await page.getByRole("link", { name: "Conocer los lotes y registrar mi interés" }).click();
+      // Native navigation commits while the new document is still loading.
+      await page.waitForLoadState("load");
       await page.locator(".hero-actions [data-lead-capture-trigger]").click();
       await page.locator("dialog.lead-capture").waitFor({ state: "visible" });
       assert.equal(await page.locator("dialog[open]").count(), 1);

@@ -51,8 +51,17 @@ browser-enabled web checks passed,53/53 CRM gateway checks passed and3/3 Nginx
 policy checks passed. Guide screenshots at390px and1440px were visually reviewed;
 the browser test also covered320px and768px. No physical-device or search-ranking
 result is implied. The administrator policy checkpoint is
-`/srv/jardines-del-encanto/seo-setup-8ph0t2lx`; its candidate is not active until
-the application deployment succeeds.
+`/srv/jardines-del-encanto/seo-setup-8ph0t2lx`; its candidate was staged until
+the application deployment succeeded, then activated after release `a4f9f56`.
+
+Public acceptance passed31/31 browser-enabled web tests,6/6 domain/origin checks
+and Googlebot-identified requests for both indexable pages. The preview still
+returned noindex. Nineteen other vhost hashes and22 sibling container identities/
+start times were unchanged. No registration was submitted. The first public guide
+browser test clicked its destination while `document.readyState` was `loading`;
+after explicitly waiting for native navigation's load state, all four widths
+passed with zero page errors. This was test navigation synchronization, not an
+application/form rewrite.
 
 Run Node24 build, browser-enabled `test:web`, CRM gateway checks, and the Nginx
 policy tests. Browser-check the guide at320/390/768/1440px, navigation back to the
