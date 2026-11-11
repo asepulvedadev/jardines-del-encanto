@@ -124,6 +124,37 @@ See [HERMES.md](HERMES.md) for the isolated OpenAI proxy, administrator-only inv
 verification and shutdown. The baseline above remains offline. Neither policy enables
 WhatsApp, CRM tools or autonomous sales actions; those need separate authorization.
 
+## Application operator release — administrator only
+
+The owner authorized production deployment of the shared settings/Hermes feature on
+2026-11-11. Keep the existing text-only profile unchanged. The additional policy is
+`ops/hermes/operator.compose.yaml`, with its three Python modules installed together
+under `/srv/jardines-del-encanto/hermes-operator/`. The folder is root-owned0700;
+modules are0644 for non-root bind-mounted readers and Compose is0600. Mount
+`operator.py` as `/policy/hermes_operator.py`, not its original basename, to avoid
+shadowing the Python standard library.
+
+Before activation, retain the current release, a logical backup, the previous
+root-owned CRM policy and sibling-container/vhost metadata in a private deployment
+checkpoint. Install the reviewed CRM policy's fixed `HERMES_BRIDGE_URL` environment
+entry without changing its networks or exposing API/bridge ports. The operator uses
+only the existing project credential file; do not print, rotate or copy its contents.
+
+Push the verified release to main and observe the existing GitHub Actions deployment.
+The gate performs backup, migrations005/006 and application health checks. Then start
+only this project's additional operator stack using its root-owned policy. The shared
+`jardines_app` network must remain internal. Check credential/provider readiness,
+fixed model, private broker reachability and public auth boundaries before enabling
+the persisted Hermes connection preference. Health does not prove live model quota.
+Do not activate Zernio accounts, broad MCP tools, native plugins or sibling services.
+
+If operator verification fails, stop only its two services and leave the normal CRM
+available. If the application release fails, use the existing deployment gate's
+previous healthy SHA; rollback does not reverse additive database migrations. Recheck
+sibling container IDs and Nginx configuration hashes after all operations. Future
+operator policy changes still need administrator review/install: CI never overwrites
+root-owned policy or receives the provider credential.
+
 ## Bootstrap / policy changes — administrator only
 
 1. Create an empty public repository at the owner/repository path specified in

@@ -39,6 +39,8 @@ services:
     image: jardines-api:${RELEASE}
     user: "10001:10001"
     env_file: /srv/jardines-del-encanto/secrets/crm-runtime.env
+    environment:
+      HERMES_BRIDGE_URL: http://hermes-bridge:8081
     volumes: ["social_config:/var/lib/jardines-zernio"]
     networks: [app, data]
     tmpfs: ["/tmp:size=32m,mode=1777"]

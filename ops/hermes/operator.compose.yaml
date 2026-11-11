@@ -1,0 +1,69 @@
+# Separately activated app operator; the existing text-only profile is unchanged.
+name: jardines-hermes-operator
+x-runtime: &runtime
+  image: nousresearch/hermes-agent:stable@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08
+  user: "1000:1000"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  cpus: 1
+  mem_limit: 1g
+  memswap_limit: 1g
+  restart: unless-stopped
+  environment: &environment
+    PYTHONDONTWRITEBYTECODE: "1"
+    HOME: /tmp
+    HERMES_HOME: /tmp/hermes-operator
+    HERMES_SAFE_MODE: "1"
+    HERMES_KANBAN_DISPATCH_IN_GATEWAY: "false"
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=128m,uid=1000,gid=1000,mode=1770
+    - /opt/data:rw,noexec,nosuid,size=16m,uid=1000,gid=1000,mode=0700
+  logging:
+    driver: json-file
+    options: { max-size: "2m", max-file: "2" }
+services:
+  operator-provider:
+    <<: *runtime
+    entrypoint: ["/opt/hermes/.venv/bin/python", "/policy/operator_provider.py"]
+    command: []
+    volumes:
+      - ./operator_provider.py:/policy/operator_provider.py:ro
+      - ./operator_protocol.py:/policy/operator_protocol.py:ro
+    secrets: [openai_api_key]
+    networks: [operator, egress]
+    healthcheck:
+      test: ["CMD", "/opt/hermes/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  hermes-bridge:
+    <<: *runtime
+    entrypoint: ["/opt/hermes/.venv/bin/python", "/policy/hermes_operator.py"]
+    command: []
+    environment:
+      <<: *environment
+      HERMES_BROKER_URL: http://api:8000
+      HERMES_OPERATOR_PROVIDER_URL: http://operator-provider:8080
+    volumes:
+      - ./operator.py:/policy/hermes_operator.py:ro
+      - ./operator_protocol.py:/policy/operator_protocol.py:ro
+    networks: [operator, application]
+    expose: ["8081"]
+    depends_on:
+      operator-provider: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/opt/hermes/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+networks:
+  operator: { internal: true }
+  egress: {}
+  application:
+    external: true
+    name: ${JARDINES_APP_NETWORK:-jardines_app}
+secrets:
+  openai_api_key:
+    file: ${HERMES_OPENAI_SECRET_FILE:-/srv/jardines-del-encanto/secrets/hermes-openai.key}
