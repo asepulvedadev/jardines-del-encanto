@@ -55,6 +55,12 @@ requires initialized Hermes and a provider reporting the fixed model and configu
 readiness. This does not promise that an untested key has live quota or entitlement:
 upstream denial becomes an opaque failure, never an invented reply or success.
 
+Live deployment verification observed normal OpenAI assistant replies containing
+`refusal: null` and `annotations: []`. The provider strips only that inert metadata
+and nullable/empty tool-call lists before strict validation. Nonempty refusals,
+annotations or unsupported reply fields remain denied. Request schemas/tool names
+stay unchanged; this is not permission to forward arbitrary response extensions.
+
 ## Pinned SDK evidence
 
 Inspected the actual image, not an assumed SDK:

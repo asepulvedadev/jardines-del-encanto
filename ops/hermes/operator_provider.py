@@ -89,6 +89,23 @@ def ready():
         return False
 
 
+def model_reply(message):
+    """Normalize only observed inert Chat Completions metadata, never extra tools."""
+    if (not isinstance(message, dict) or message.get('role') != 'assistant'
+            or set(message) - {'role', 'content', 'tool_calls', 'refusal', 'annotations'}
+            or message.get('refusal') not in (None, '')
+            or message.get('annotations') not in (None, [])):
+        raise ValueError('Unsupported provider reply')
+    result = {'role': 'assistant', 'content': message.get('content')}
+    calls = message.get('tool_calls')
+    if calls is not None:
+        if not isinstance(calls, list):
+            raise ValueError('Invalid tool calls')
+        if calls:
+            result['tool_calls'] = calls
+    return result
+
+
 class Handler(BaseHTTPRequestHandler):
     """One upstream request at a time; no content or authorization logging."""
     requests = deque()
@@ -152,7 +169,7 @@ class Handler(BaseHTTPRequestHandler):
             result = bounded_json(raw, MAX_REPLY)
             # Do not permit upstream auxiliary fields or arbitrary tool names into Hermes.
             choice = result['choices'][0]
-            message = choice['message']
+            message = model_reply(choice['message'])
             validate(json.dumps({**data, 'messages': [*data['messages'], message,
                 *[{'role': 'tool', 'tool_call_id': call['id'], 'content': '{}'}
                   for call in message.get('tool_calls', [])]]}, ensure_ascii=False).encode())

@@ -200,6 +200,39 @@ class OperatorHTTPTests(unittest.TestCase):
         self.assertEqual(connection.request.call_args.args, ('POST', '/v1/chat/completions'))
         self.assertEqual(connection.request.call_args.kwargs['headers']['Authorization'], 'Bearer fixture-private-key')
 
+    def test_standard_openai_reply_metadata_is_normalized_before_validation(self):
+        for tool_calls in ('absent', None):
+            message = {'role': 'assistant', 'content': 'Verified response',
+                       'refusal': None, 'annotations': []}
+            if tool_calls is None:
+                message['tool_calls'] = None
+            reply = Mock(status=200)
+            reply.read.return_value = json.dumps({'choices': [{'message': message,
+                                                  'finish_reason': 'stop'}]}).encode()
+            connection = Mock()
+            connection.getresponse.return_value = reply
+            self.provider.Handler.runs.clear()
+            with patch.object(self.provider, 'ready', return_value=True), patch.object(self.provider, 'HTTPSConnection', return_value=connection), patch.object(self.provider, 'SECRET', Mock(read_text=lambda: 'fixture-private-key')):
+                status, raw = self.post(OperatorPolicyTests().payload())
+            self.assertEqual(status, 200)
+            self.assertEqual(json.loads(raw)['choices'][0]['message'],
+                             {'role': 'assistant', 'content': 'Verified response'})
+
+    def test_nonempty_refusal_and_unknown_reply_fields_fail_closed(self):
+        for extra in ({'refusal': 'not allowed'}, {'annotations': [{'url': 'untrusted'}]},
+                      {'audio': {'data': 'not supported'}}):
+            reply = Mock(status=200)
+            reply.read.return_value = json.dumps({'choices': [{'message': {
+                'role': 'assistant', 'content': 'not forwarded', **extra},
+                'finish_reason': 'stop'}]}).encode()
+            connection = Mock()
+            connection.getresponse.return_value = reply
+            self.provider.Handler.runs.clear()
+            with patch.object(self.provider, 'ready', return_value=True), patch.object(self.provider, 'HTTPSConnection', return_value=connection), patch.object(self.provider, 'SECRET', Mock(read_text=lambda: 'fixture-private-key')):
+                status, raw = self.post(OperatorPolicyTests().payload())
+            self.assertEqual(status, 502)
+            self.assertNotIn(b'not forwarded', raw)
+
     def test_invalid_tools_never_reach_upstream(self):
         with patch.object(self.provider, 'HTTPSConnection') as upstream:
             status, _ = self.post(OperatorPolicyTests().payload(tools=[]))
@@ -267,6 +300,7 @@ class RealPinnedHermesTests(unittest.TestCase):
                     assert any('verified-broker-result' in msg.get('content', '') for msg in upstream_payloads[-1]['messages'] if msg['role'] == 'tool')
                     message = {'role': 'assistant', 'content': 'Consulta verificada mediante la herramienta de la aplicación.'}
                     reason = 'stop'
+                message.update({'refusal': None, 'annotations': []})
                 return Mock(status=200, read=lambda *_: json.dumps({'choices': [{'message': message, 'finish_reason': reason}]}).encode())
             def close(self):
                 pass
