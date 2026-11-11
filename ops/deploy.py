@@ -8,8 +8,8 @@ import re
 import subprocess
 import sys
 import tarfile
-from tempfile import TemporaryDirectory
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 ROOT = Path("/srv/jardines-del-encanto")
 REPOSITORY = "https://github.com/asepulvedadev/jardines-del-encanto.git"
@@ -37,6 +37,8 @@ def git(*args, **kwargs):
 
 
 def compose(sha, *args):
+    # Retain the foundation policy for previously healthy pre-CRM images.
+    policy = "crm.compose.yaml" if (ROOT / "crm-releases" / sha).is_file() else "compose.yaml"
     return subprocess.run(
         [
             "docker",
@@ -44,13 +46,22 @@ def compose(sha, *args):
             "--project-name",
             "jardines",
             "-f",
-            str(ROOT / "compose.yaml"),
+            str(ROOT / policy),
             *args,
         ],
         env={**ENV, "RELEASE": sha},
         check=True,
         cwd=ROOT,
     )
+
+
+def prepare_crm(sha):
+    markers = ROOT / "crm-releases"
+    markers.mkdir(mode=0o700, exist_ok=True)
+    (markers / sha).touch(mode=0o600)
+    compose(sha, "up", "-d", "--wait", "--wait-timeout", "90", "db")
+    # A short-lived maintenance process alone receives the migration credential.
+    compose(sha, "run", "--rm", "--no-deps", "migrate")
 
 
 def activate(sha):
@@ -150,6 +161,8 @@ def deploy(operation, sha):
     elif not (ROOT / "healthy" / sha).is_file():
         raise ValueError("Rollback target must be a previously healthy release")
     try:
+        if operation == "deploy":
+            prepare_crm(sha)
         activate(sha)
     except Exception:
         if previous:

@@ -25,10 +25,13 @@ jobs:
           enable-cache: true
           cache-dependency-glob: apps/api/uv.lock
       - run: npm ci --no-audit --no-fund
-      - run: npm run typecheck && npm run build
+      - run: npm run typecheck && npm run build && npm run test:crm:gateway
       - run: uv sync --project apps/api --frozen
-      - run: uv run --project apps/api --frozen ruff check apps/api
-      - run: uv run --project apps/api --frozen pytest apps/api/tests -q
+      - run: uv run --project apps/api --frozen ruff check apps/api ops/dev/crm.py
+      - name: Verify CRM against isolated PostgreSQL
+        run: |
+          uv run --project apps/api --frozen python ops/dev/crm.py init
+          uv run --project apps/api --frozen python ops/dev/crm.py test
       - run: python3 -m unittest discover -s tests -v
       - name: Build production images
         env:
@@ -41,16 +44,26 @@ jobs:
           RELEASE: ${{ github.sha }}
         run: |
           sudo mkdir -p /srv/jardines-del-encanto/secrets
+          sudo chmod 700 /srv/jardines-del-encanto/secrets
           openssl rand -hex 32 | sudo tee /srv/jardines-del-encanto/secrets/db_password >/dev/null
           sudo chmod 444 /srv/jardines-del-encanto/secrets/db_password
-          docker compose -p jardines-ci -f ops/compose.yaml up -d --wait --wait-timeout 150
+          docker compose -p jardines-ci -f ops/compose.yaml up -d --wait --wait-timeout 90 db
+          sudo python3 ops/crm-provision.py --project jardines-ci
+          sudo --preserve-env=RELEASE docker compose -p jardines-ci -f ops/crm.compose.yaml run --rm --no-deps migrate
+          sudo --preserve-env=RELEASE docker compose -p jardines-ci -f ops/crm.compose.yaml up -d --wait --wait-timeout 150 web api db
           curl --fail --max-time 10 http://127.0.0.1:13400/health/ready
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:13400/login)" = 200
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:13400/crm)" = 307
           LANDING_BASE_URL=http://127.0.0.1:13400 npm run test:web
       - name: Clean up ephemeral runner only
         if: always()
         env:
           RELEASE: ${{ github.sha }}
         run: docker compose -p jardines-ci -f ops/compose.yaml down --volumes
+
+      - name: Clean up isolated CRM database on ephemeral runner
+        if: always()
+        run: docker compose -f ops/dev/compose.yaml down --volumes
 
   deploy:
     needs: verify

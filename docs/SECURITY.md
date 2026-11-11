@@ -17,7 +17,13 @@
   to a `main`-only deployment environment. Fork PR verification does not deploy.
 - Root-only secret parent directory. Mounted DB password file is readable inside only
   the two containers requiring it; its value is not stored in code or environment logs.
-- Separate Hermes state and pinned image, no network or active gateway by default.
+- CRM policy separates the database owner, migration login and runtime login. The CRM
+  API has only its restricted runtime credential, not the bootstrap or migration secret.
+  Migrations run explicitly before activation in a short-lived maintenance container.
+- Separate Hermes state and pinned image; offline baseline has no active gateway.
+- Separately authorized on-demand Hermes policy: no agent tools, private internal network,
+  credential-injecting bounded OpenAI proxy, no secret mounted in the agent, no public ports
+  or CRM access. See [HERMES.md](HERMES.md) for controls and isolation limits.
 
 ## Important limits
 
@@ -38,7 +44,9 @@ routes without server-side authorization, session security, rate limits and audi
 
 No claim is made that all existing services or the whole host have been hardened. The
 bootstrap deliberately leaves shared SSH, firewall, Docker and Nginx policies unchanged.
-The temporary public landing preview uses a dedicated Nginx vhost and TLS certificate;
-this does not expose backend/database ports or provide authentication for a future CRM.
+The public site uses a dedicated Nginx vhost and TLS certificate without exposing backend
+or database ports. The CRM adds server-validated administrator sessions, secure cookies,
+exact-origin CSRF checks and PostgreSQL-backed throttling; see [CRM.md](CRM.md).
 Off-host disaster recovery, permanent-domain cutover, monitoring, data-protection policy,
-AI provider and autonomous actions are pending and are not represented as complete.
+CRM-to-AI integration and autonomous actions are pending and are not represented as complete.
+Provider-only configuration is independent from those features.

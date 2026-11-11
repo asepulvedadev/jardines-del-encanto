@@ -50,7 +50,44 @@ Concurrent manual and CI deployments share a host lock.
 The current release is `/srv/jardines-del-encanto/current`. A failed activation restores
 the previous application images; a failed first deployment stops only this project's
 web/API, keeping its database. Rollback does not restore or reverse database migrations.
-No schema migrations are installed in this foundation.
+CRM deployments run checksum-checked, transactional migrations explicitly using a
+short-lived maintenance container before application activation. Runtime never receives
+the migration or PostgreSQL bootstrap credential. Rollback does not reverse migrations.
+Root-owned `crm-releases/<SHA>` markers select `crm.compose.yaml` for CRM releases;
+older healthy images retain the original `compose.yaml`, including during recovery.
+
+## CRM production policy (one-time administrator installation)
+
+The owner authorized the CRM release, dedicated database credentials and root-owned policy
+upgrade. The verified administrator connection uses the existing local Ed25519 identity
+with **`root@2.24.111.40`**, not the workstation's default username. Normal deployments
+still use GitHub Actions and its restricted key; never upload the administrator key.
+
+Review the files, transfer them through that authorized session into a private staging
+directory, and install only this project's policy:
+
+```sh
+install -m 0600 crm.compose.yaml /srv/jardines-del-encanto/crm.compose.yaml
+install -m 0755 deploy.py /usr/local/libexec/jardines-deploy
+install -m 0755 backup.sh /usr/local/libexec/jardines-backup
+python3 crm-provision.py
+```
+
+Do not overwrite legacy `compose.yaml`, rerun general provisioning with another CI key,
+restart Docker/Nginx, or remove volumes. Retain private copies of the previous gate and
+backup policy. Provisioning creates only `jardines_crm`, `jardines_crm_migrator` and
+`jardines_crm_app` in the existing project PostgreSQL container. Secrets are generated
+once in the root-only project secrets directory, never printed, committed or implicitly
+rotated. Existing unmanaged roles/databases are rejected, not adopted. Maintenance alone
+reads `crm-migration.env`; the API reads only `crm-runtime.env` with restricted grants.
+
+Copy only the owner's local administrator username and Argon2 verifier for initial access,
+not contacts or sessions. Never reset existing administrators. Verify HTTPS login/logout,
+protected CRM redirects, database grants, landing health, logical backup/recovery and
+unchanged sibling containers/vhosts. Rotate the chat-disclosed initial password through
+authorized maintenance before handling sensitive customer data; no password-change UI
+exists yet. Zernio configuration UI is included, but provider credentials/accounts are
+not copied or activated. Hermes remains separately managed.
 
 ## Status and backups
 
@@ -64,7 +101,8 @@ sudo /usr/local/libexec/jardines-backup
 
 Backups are compressed SQL with SHA-256 checksums in the project's root-only `backups/`
 directory, scheduled daily at 08:30 UTC plus up to 15 minutes jitter. They are also
-taken before deployments when a current release exists. No backup is automatically
+taken before deployments when a current release exists. The dedicated CRM database also
+receives its own `.crm.sql.gz` dump and checksum when present. No backup is automatically
 deleted. Monitor disk usage; define retention and encrypted off-host storage before
 collecting real customer data. A backup is not a verified restore until tested.
 
@@ -73,16 +111,18 @@ verify its checksum and `gzip -t`, create an empty recovery DB, stream the SQL t
 `psql -v ON_ERROR_STOP=1`, inspect its contents and only then plan a controlled switch.
 Production restoration is destructive and needs separate explicit authorization.
 
-## Hermes (installed, not activated)
+## Hermes (offline baseline and optional provider activation)
 
 ```sh
 docker compose -f /srv/jardines-del-encanto/hermes.compose.yaml run --rm hermes --version
 ```
 
-The pinned upstream image and state mount are project-specific. Networking is disabled;
+The baseline pinned upstream image and state mount are project-specific. Networking is disabled;
 there is no exposed port, Docker socket, host workspace mount or borrowed provider key.
-Selecting an AI provider, adding credentials, enabling egress and configuring the CRM
-tool API is a later authorized step. The image is not a functioning sales assistant yet.
+The owner separately authorized provider-only activation using `ops/hermes/compose.yaml`.
+See [HERMES.md](HERMES.md) for the isolated OpenAI proxy, administrator-only invocation,
+verification and shutdown. The baseline above remains offline. Neither policy enables
+WhatsApp, CRM tools or autonomous sales actions; those need separate authorization.
 
 ## Bootstrap / policy changes — administrator only
 

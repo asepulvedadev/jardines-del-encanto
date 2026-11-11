@@ -131,6 +131,45 @@ class DeploymentStateTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "builder"):
                 module.verify_builder()
 
+    def test_runtime_policy_is_bound_to_each_release(self):
+        markers = self.root / "crm-releases"
+        markers.mkdir()
+        (markers / self.target).touch()
+        with patch.object(module.subprocess, "run") as run:
+            module.compose(self.previous, "config", "--quiet")
+            self.assertIn(str(self.root / "compose.yaml"), run.call_args.args[0])
+            module.compose(self.target, "config", "--quiet")
+            self.assertIn(str(self.root / "crm.compose.yaml"), run.call_args.args[0])
+
+    def test_migrations_complete_before_application_activation(self):
+        events = []
+        with (
+            patch.object(module, "run"),
+            patch.object(module, "git") as git,
+            patch.object(module, "materialize", return_value=self.root / "releases" / self.target),
+            patch.object(module, "verify_builder"),
+            patch.object(module, "prepare_crm", create=True, side_effect=lambda sha: events.append("migrate")),
+            patch.object(module, "activate", side_effect=lambda sha: events.append("activate")),
+        ):
+            git.return_value.stdout = self.target + "\n"
+            module.deploy("deploy", self.target)
+        self.assertEqual(events, ["migrate", "activate"])
+
+    def test_failed_migration_restores_previous_without_advancing_release(self):
+        with (
+            patch.object(module, "run"),
+            patch.object(module, "git") as git,
+            patch.object(module, "materialize", return_value=self.root / "releases" / self.target),
+            patch.object(module, "verify_builder"),
+            patch.object(module, "prepare_crm", create=True, side_effect=RuntimeError("migration failed")),
+            patch.object(module, "activate") as activate,
+        ):
+            git.return_value.stdout = self.target + "\n"
+            with self.assertRaisesRegex(RuntimeError, "migration failed"):
+                module.deploy("deploy", self.target)
+        activate.assert_called_once_with(self.previous)
+        self.assertEqual((self.root / "current").read_text(), self.previous + "\n")
+
 
 if __name__ == "__main__":
     unittest.main()
