@@ -296,3 +296,39 @@ restore an old source token after a possible destination refresh or remove a new
 replacement grant. Retain a failure as unverified and preserve recoverable state.
 A vendor revocation requires fresh owner authorization, not fabricated connectivity.
 Root-owned policies are not updated by CI; retain their checkpoint for rollback.
+
+## Sara IA rollout — not activated by local implementation
+
+The Sara IA source change does not authorize deployment, credential access, paid
+transcription calls or changes to the shared VPS. Obtain a separately scoped
+production authorization before running these steps. See [SARA-IA.md](SARA-IA.md)
+and [SARA-RUNTIME.md](SARA-RUNTIME.md) for the protocol and verified local checks.
+
+1. Back up the project database and record the release and sibling-service
+   baseline. Deploy migration007 additively through the existing migrator; do not
+   rewrite earlier migrations. Attachment bytes are private PostgreSQL bytea and
+   belong in the same backup. Retain the forward schema when rolling application
+   code back; do not drop conversation or attachment tables.
+2. Review/install the new operator source and audio helper into this project's
+   existing root-owned policy directory. Apply the reviewed operator Compose
+   mounts and restart only its provider/bridge as authorized. Existing CI cannot
+   replace these root-owned policies. Keep the legacy text-only profile intact.
+3. Verify explicit `history_available=true` through the upgraded provider and
+   bridge before accepting Sara chat traffic. An old runtime must leave Sara
+   unavailable rather than silently losing conversation context. Confirm the
+   installed pinned Hermes SDK accepts the bounded conversation-history shape.
+4. Keep voice disabled by default. Only a separately authorized enablement sets
+   `HERMES_TRANSCRIPTION_ENABLED=1` at the operator-provider. Keep credentials in
+   that isolated boundary; never add provider keys to the API, Next.js, GitHub
+   repository or browser. Test capability health without sending customer audio.
+5. Verify private owner/session/CSRF enforcement, a text turn, history after
+   relogin, file download isolation and session-bound approval behavior. Any real
+   transcription test is a paid external data transfer requiring explicit scope.
+   Recheck sibling services and the existing OAuth flow after deployment.
+
+Text turns can outlive the current public proxy read timeout. Preserve request
+UUIDs and recover the stored run after an ambiguous timeout; never retry with a
+new UUID automatically. A future timeout adjustment is project-vhost-only and
+requires its own reviewed configuration change. The existing1MiB proxy body cap
+accommodates Sara's768KiB JSON upload limit. Reassess the fixed transcription
+model before its documented February26,2027 deprecation; do not silently switch it.

@@ -3,12 +3,15 @@ from collections import deque
 from http.client import HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
+import os
 from pathlib import Path
 import re
 import time
 
 from operator_protocol import (MODEL, MAX_BODY, MAX_RESULT, MAX_ITERATIONS, bounded_json,
                                call_arguments, text, tool_schema)
+
+from operator_audio import AudioDeadline, MAX_AUDIO_BODY, multipart, read_json, read_reply, request_deadline, validate_audio
 
 SECRET = Path('/run/secrets/openai_api_key')
 MAX_REPLY = 65536
@@ -38,7 +41,7 @@ def validate(raw):
         if role in {'system', 'developer', 'user'}:
             if set(msg) != {'role', 'content'} or pending:
                 raise ValueError('Invalid text message')
-            text(msg['content'], 100000 if role in {'system', 'developer'} else 4096)
+            text(msg['content'], 100000 if role in {'system', 'developer'} else 8000)
         elif role == 'assistant':
             if set(msg) - {'role', 'content', 'tool_calls'} or pending:
                 raise ValueError('Invalid assistant message')
@@ -85,8 +88,12 @@ def validate(raw):
 def ready():
     try:
         return bool(SECRET.is_file() and SECRET.read_text().strip())
-    except OSError:
+    except (OSError, UnicodeError):
         return False
+
+
+def transcription_ready():
+    return os.environ.get('HERMES_TRANSCRIPTION_ENABLED') == '1' and ready()
 
 
 def model_reply(message):
@@ -110,6 +117,8 @@ class Handler(BaseHTTPRequestHandler):
     """One upstream request at a time; no content or authorization logging."""
     requests = deque()
     runs = {}
+    audio_requests = deque()
+    audio_runs = {}
 
     def setup(self):
         super().setup()
@@ -131,17 +140,60 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != '/health':
             return self.reply(404, {'error': 'Route denied'})
         available = ready()
-        self.reply(200 if available else 503, {'available': available, 'configured': available, 'model': MODEL})
+        self.reply(200 if available else 503, {'available': available, 'configured': available,
+            'model': MODEL, 'history_available': True, 'transcription_available': available and os.environ.get('HERMES_TRANSCRIPTION_ENABLED') == '1'})
+
+    def transcribe(self):
+        try:
+            with request_deadline(25):
+                return self.transcribe_bounded()
+        except AudioDeadline:
+            self.close_connection = True
+            self.connection.close()
+        except Exception:
+            self.reply(502, {'error': {'message': 'Transcription unavailable'}})
+
+    def transcribe_bounded(self):
+        if not transcription_ready():
+            return self.reply(503, {'error': {'message': 'Transcription unavailable'}})
+        try:
+            audio, mime = validate_audio(read_json(self, MAX_AUDIO_BODY))
+        except (ValueError, TypeError, OSError, RecursionError):
+            return self.reply(400, {'error': {'message': 'Audio request denied'}})
+        run = self.headers.get('Authorization', '').removeprefix('Bearer ')
+        if not re.fullmatch(r'[0-9a-f]{32}', run):
+            return self.reply(401, {'error': {'message': 'Invocation denied'}})
+        now = time.monotonic()
+        type(self).audio_runs = {key: stamp for key, stamp in self.audio_runs.items() if now - stamp < 300}
+        while self.audio_requests and now - self.audio_requests[0] >= 60:
+            self.audio_requests.popleft()
+        if run in self.audio_runs or len(self.audio_requests) >= 6:
+            return self.reply(429, {'error': {'message': 'Transcription budget reached'}})
+        self.audio_requests.append(now)
+        self.audio_runs[run] = now
+        connection = HTTPSConnection('api.openai.com', timeout=20)
+        try:
+            body, content_type = multipart(audio, mime)
+            connection.request('POST', '/v1/audio/transcriptions', body=body, headers={
+                'Authorization': 'Bearer ' + SECRET.read_text().strip(),
+                'Content-Type': content_type, 'Accept': 'application/json'})
+            response = connection.getresponse()
+            if response.status != 200:
+                return self.reply(502, {'error': {'message': 'Transcription unavailable'}})
+            self.reply(200, read_reply(response))
+        except Exception:
+            self.reply(502, {'error': {'message': 'Transcription unavailable'}})
+        finally:
+            connection.close()
 
     def do_POST(self):
+        if self.path == '/audio/transcriptions':
+            return self.transcribe()
         if self.path != '/v1/chat/completions':
             return self.reply(404, {'error': {'message': 'Route denied'}})
         try:
-            length = int(self.headers.get('Content-Length', '0'))
-            if not 0 < length <= MAX_BODY or self.headers.get('Transfer-Encoding'):
-                raise ValueError('Invalid body')
-            data = validate(self.rfile.read(length))
-        except (ValueError, TypeError, OSError, KeyError):
+            data = validate(json.dumps(read_json(self, MAX_BODY, require_json=False, body_seconds=10), ensure_ascii=False).encode())
+        except (ValueError, TypeError, OSError, KeyError, RecursionError):
             return self.reply(400, {'error': {'message': 'Request denied by operator policy'}})
         run = self.headers.get('Authorization', '').removeprefix('Bearer ')
         if not re.fullmatch(r'[0-9a-f]{32}', run):

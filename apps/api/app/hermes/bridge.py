@@ -68,6 +68,12 @@ def health():
             result["available"] = state.get("available") is True
             model = state.get("model")
             result["model"] = model[:100] if isinstance(model, str) else None
+            if type(state.get("history_available")) is bool:
+                result["history_available"] = result["available"] and state["history_available"]
+            if type(state.get("transcription_available")) is bool:
+                result["transcription_available"] = (
+                    result["available"] and state["transcription_available"]
+                )
         except HTTPException:
             pass
     return result

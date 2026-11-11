@@ -32,7 +32,7 @@ ACTION_MODELS = {
 READ_ACTIONS = {"crm.workspace", "crm.activities", "control.catalog", "social.status"}
 SOCIAL_ACTIONS = {"social.sync", "social.connect"}
 CONNECTION_NAMES = {
-    "hermes": "Hermes",
+    "hermes": "Sara IA",
     "zernio": "Zernio",
     "facebook": "Facebook",
     "instagram": "Instagram",

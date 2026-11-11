@@ -27,8 +27,8 @@ const errors: Record<string, string> = {
   invalid_csrf: "Tu sesión cambió. Recarga la página antes de guardar.",
   permission_denied: "Esta sesión no tiene permiso para la acción.",
   hermes_unavailable:
-    "Hermes no está disponible. Revisa su configuración y proveedor.",
-  hermes_disabled: "Hermes está desactivado.",
+    "Sara IA no está disponible. Revisa su configuración y proveedor.",
+  hermes_disabled: "Sara IA está desactivada.",
   connection_disabled: "La conexión está pausada.",
   item_disabled: "La customización está desactivada.",
   proposal_expired: "La propuesta venció. Solicita una nueva.",
@@ -43,12 +43,16 @@ export function SettingsModal({
   csrf,
   onWorkspaceChanged,
   initialSocial = false,
+  initialTab = "social",
+  onOpenSara,
 }: {
   open: boolean;
   onClose: () => void;
   csrf: string;
   onWorkspaceChanged: () => Promise<void>;
   initialSocial?: boolean;
+  initialTab?: Tab;
+  onOpenSara?: () => void;
 }) {
   const router = useRouter();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -136,9 +140,10 @@ export function SettingsModal({
     if (open) {
       setVisited(true);
       if (initialSocial) setTab("social");
+      else setTab(initialTab);
       if (!dialog.current?.open) dialog.current?.showModal();
     } else if (dialog.current?.open) dialog.current.close();
-  }, [open, initialSocial]);
+  }, [open, initialSocial, initialTab]);
   useEffect(() => {
     if (!open) return;
     let active = true;
@@ -392,6 +397,7 @@ export function SettingsModal({
               >
                 {visited && (
                   <HermesPanel
+                    onOpenChat={onOpenSara}
                     request={request}
                     onChanged={onChanged}
                     revision={revision}

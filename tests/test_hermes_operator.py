@@ -70,7 +70,7 @@ class OperatorPolicyTests(unittest.TestCase):
         claim = {'run_id': 'run', 'prompt': 'Read workspace', 'skills': [], 'tools': [self.schema()]}
         self.assertEqual(self.protocol.validate_claim(claim)['run_id'], 'run')
         self.assertEqual(self.protocol.validate_claim({**claim, 'skills': [{'name': 'lectura', 'content': 'ó' * 16000}]})['skills'][0]['content'], 'ó' * 16000)
-        for key, value in [('tools', [self.schema(), self.schema()]), ('prompt', 'x' * 4097),
+        for key, value in [('tools', [self.schema(), self.schema()]), ('prompt', 'x' * 8001),
                            ('skills', [{'name': 'bad', 'content': 'x' * 16001}])]:
             with self.subTest(key=key), self.assertRaises(ValueError):
                 self.protocol.validate_claim({**claim, key: value})
@@ -269,7 +269,9 @@ class RealPinnedHermesTests(unittest.TestCase):
                 events.append((self.path, body))
                 if self.path.endswith('/claim'):
                     result = {'run_id': 'fixture-run', 'prompt': 'Consulta el espacio de trabajo con la herramienta.',
-                              'tools': [schema], 'skills': [{'name': 'fixture', 'content': 'Use crm.workspace to read.'}]}
+                              'tools': [schema], 'skills': [{'name': 'fixture', 'content': 'Use crm.workspace to read.'}],
+                              'history': [{'role': 'user', 'content': 'prior-history-marker'},
+                                          {'role': 'assistant', 'content': 'Previous bounded response'}]}
                 elif self.path.endswith('/call'):
                     self.server.testcase.assertEqual(body['action'], 'crm.workspace')
                     result = {'result': {'fixture_marker': 'verified-broker-result'}}
@@ -291,6 +293,8 @@ class RealPinnedHermesTests(unittest.TestCase):
                 assert method == 'POST' and path == '/v1/chat/completions'
                 assert headers['Authorization'] == 'Bearer fixture-not-a-real-key'
                 upstream_payloads.append(json.loads(body))
+                assert any(msg.get('content') == 'prior-history-marker' for msg in upstream_payloads[-1]['messages'])
+                assert 'Sara IA' in upstream_payloads[-1]['messages'][0]['content']
             def getresponse(self):
                 if len(upstream_payloads) == 1:
                     message = {'role': 'assistant', 'content': None, 'tool_calls': [{'id': 'fixture_call', 'type': 'function',
@@ -334,6 +338,7 @@ class RealPinnedHermesTests(unittest.TestCase):
             if path.is_file():
                 raw = path.read_bytes()
                 self.assertNotIn(b'verified-broker-result', raw, str(path))
+                self.assertNotIn(b'prior-history-marker', raw, str(path))
                 self.assertNotIn(token.encode(), raw, str(path))
                 self.assertNotIn('Consulta el espacio'.encode(), raw, str(path))
 

@@ -187,8 +187,9 @@ density. No full-bleed photographs, oversized promotional typography or decorati
 
 - Desktop shell: approximately 224px quiet navigation, a 64px header, and a flexible
   content area. Active navigation uses label weight and a clear selected surface.
-- Proposed navigation: “Inicio”, “Contactos”, “Pipeline”, “Lotes”, “Visitas”,
-  “Actividad”, “Configuración”. Show only authorized, implemented modules.
+- Implemented navigation begins with “Dashboard”, then “Sara IA”, followed by
+  “Pipeline”, “Clientes” and “Seguimientos”; “Configuraciones” stays at the bottom.
+  Show only authorized, implemented modules.
 - The home view prioritizes next actions and overdue follow-ups. Metrics must answer
   real questions, not occupy a decorative four-card dashboard row.
 - Contact detail: identity, assignment, next action and a readable activity timeline.
@@ -229,8 +230,9 @@ actions should not depend on an unexplained icon. Brand artwork is not an icon-l
 
 ## 8. AI-native interaction
 
-AI is a contextual assistant, not the default navigation or an always-open chat window.
-Use a contextual action and an optional supporting panel, preserving the current CRM task.
+AI remains optional, not the default view or an always-open overlay. The owner's
+dedicated “Sara IA” navigation opens the existing Hermes operator as a full-height
+workspace; contextual actions preserve the current CRM task.
 
 - Distinguish “Borrador de IA”, “Pendiente de revisión”, “Confirmado” and “Error”.
 - Show source activity/records and data recency when available; disclose unavailable
@@ -261,6 +263,23 @@ execution. Approve/reject controls must show the consequences before a write. A 
 reflects server-confirmed preferences, never proof of provider authorization or health.
 Keep one social callback consumer mounted through completion across tabs/modal closing,
 scrub callback parameters promptly, and preserve Escape, focus return and small-screen reflow.
+
+### Sara IA chat
+
+Keep the CRM's light canvas, Manrope typography and quiet forest/leaf accents.
+Use a compact conversation/history column and a readable message column with a
+persistent composer. Reflow history behind a labeled control on smaller screens;
+do not make the whole page horizontally scroll. Chat prose is plain text, never
+untrusted rendered HTML. Separate draft text, attached files, actual tool results
+and actions awaiting live-session approval.
+
+Offer new conversations, title editing, history search and paging, project skills,
+documents and voice notes. An uploaded document is data, not agent instructions.
+Voice recording requires an explicit click and a local preview/discard step before
+upload/transcription; sending is a separate action. There is no live call or spoken
+reply in this scope. Show real unavailable states instead of a decorative active
+microphone or invented skills. Keep drafts and recover ambiguous submissions with
+the same request identity rather than generating twice.
 
 ## 9. Motion, imagery and optional 3D
 

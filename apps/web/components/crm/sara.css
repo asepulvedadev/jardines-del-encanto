@@ -1,0 +1,811 @@
+.sara-workspace {
+  display: grid;
+  grid-template-columns: 244px minmax(0, 1fr);
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid #d9e1d5;
+  border-radius: 16px;
+  background: #fff;
+  color: #062619;
+  font-family: var(--font-manrope), sans-serif;
+  box-sizing: border-box;
+}
+.sara-workspace * {
+  box-sizing: border-box;
+}
+.sara-workspace button,
+.sara-workspace input,
+.sara-workspace textarea {
+  font: inherit;
+}
+.sara-workspace button {
+  cursor: pointer;
+  min-height: 44px;
+  color: #062619;
+}
+.sara-workspace button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.sara-workspace button:focus-visible,
+.sara-workspace input:focus-visible,
+.sara-workspace textarea:focus-visible,
+.sara-workspace summary:focus-visible {
+  outline: 2px solid #507010;
+  outline-offset: 3px;
+}
+.sara-workspace button {
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.sara-workspace button:hover:not(:disabled) {
+  background: #eef3e8;
+}
+.sara-workspace .sara-icon-button {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 8px;
+}
+.sara-history {
+  background: #f6f7f1;
+  border-right: 1px solid #d9e1d5;
+  padding: 16px 12px;
+  overflow: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sara-history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  padding-left: 8px;
+}
+.sara-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 10px;
+  min-width: 0;
+}
+.sara-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  background: transparent;
+  border: 0;
+  padding: 8px 0;
+  font-size: 14px;
+  color: #062619;
+}
+.sara-history nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sara-history nav button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  text-align: left;
+  padding: 12px;
+}
+.sara-history nav button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sara-history nav button > time {
+  flex: none;
+  font-size: 12px;
+  color: #526056;
+  font-weight: 400;
+}
+.sara-history nav button[aria-current] {
+  background: #e6eddf;
+  color: #062619;
+}
+.sara-history-more {
+  border: 1px solid #d9e1d5 !important;
+}
+.sara-title-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #d9e1d5;
+}
+.sara-title-form label,
+.sara-rename label {
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sara-title-form input,
+.sara-rename input {
+  border: 1px solid #7b897e;
+  border-radius: 6px;
+  min-height: 44px;
+  padding: 8px;
+  font-size: 16px;
+  min-width: 0;
+  width: 100%;
+  color: #062619;
+}
+.sara-title-form > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sara-chat {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.sara-header {
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #e5eae1;
+  flex: none;
+  min-height: 76px;
+}
+.sara-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+.crm-shell .sara-heading h2 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+.sara-heading > span {
+  font-size: 12px;
+  color: #526056;
+  white-space: nowrap;
+}
+.sara-skills-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sara-history-toggle {
+  display: none !important;
+}
+.sara-rename {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  padding: 12px 24px;
+  flex: none;
+  border-bottom: 1px solid #d9e1d5;
+}
+.sara-rename label {
+  flex: 1;
+}
+.sara-log {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 24px clamp(16px, 4vw, 56px);
+  scroll-behavior: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  overflow-wrap: anywhere;
+}
+.sara-conversation-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 auto;
+  width: min(100%, 760px);
+}
+.crm-shell .sara-conversation-label h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+  color: #526056;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.sara-conversation-label button {
+  font-size: 12px;
+  font-weight: 400;
+  text-decoration: underline;
+  color: #526056;
+  min-height: 36px;
+}
+.sara-older {
+  align-self: center;
+  border: 1px solid #d9e1d5 !important;
+}
+.sara-message {
+  width: min(100%, 760px);
+  margin: 0 auto;
+  flex: none;
+  font-size: 14px;
+  line-height: 1.75;
+  min-width: 0;
+}
+.sara-message-user {
+  padding: 16px 20px;
+  background: #f0f4eb;
+  border-radius: 14px;
+}
+.sara-message-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #526056;
+  margin-bottom: 8px;
+}
+.sara-message-meta strong {
+  color: #062619;
+  font-size: 13px;
+}
+.sara-message-meta time {
+  font-size: 12px;
+}
+.sara-message-meta > span {
+  border: 1px solid #d9e1d5;
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-size: 12px;
+}
+.sara-message-text {
+  white-space: pre-wrap;
+  line-height: 1.8;
+  margin: 0;
+  font-size: 14px;
+}
+.sara-welcome {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+  gap: 12px;
+  margin: auto;
+  max-width: 400px;
+  padding: 24px 0;
+  flex: none;
+}
+.sara-avatar {
+  width: 60px;
+  height: 60px;
+  display: grid;
+  place-items: center;
+  background: #eef3e8;
+  color: #507010;
+  border-radius: 18px;
+  margin-bottom: 6px;
+}
+.crm-shell .sara-welcome h3 {
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0;
+}
+.sara-welcome p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #526056;
+  margin: 0;
+}
+.sara-welcome button {
+  background: #062619;
+  color: #fff;
+  padding: 10px 16px;
+}
+.sara-welcome button:hover {
+  color: #062619;
+}
+.sara-muted {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #526056;
+  margin: 4px 0;
+}
+.sara-error {
+  background: #fdebed;
+  color: #a62b35;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.sara-turn-state {
+  width: min(100%, 760px);
+  margin: 0 auto;
+  font-size: 13px;
+  color: #526056;
+  line-height: 1.7;
+}
+.sara-turn-state button {
+  border: 1px solid #7b897e;
+}
+.sara-unavailable-proposal {
+  margin-top: 12px;
+  padding: 12px;
+  border-left: 3px solid #7b897e;
+  background: #f6f7f1;
+}
+.sara-unavailable-proposal p {
+  font-size: 12px;
+  color: #526056;
+  margin: 4px 0;
+}
+.sara-workspace pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.6;
+  max-height: 280px;
+  overflow: auto;
+}
+.sara-workspace summary {
+  cursor: pointer;
+  min-height: 36px;
+  padding: 6px 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+.sara-workspace .settings-proposal {
+  border: 1px solid #7b897e;
+  border-radius: 10px;
+  padding: 14px;
+  margin: 14px 0;
+}
+.sara-workspace .settings-proposal > strong {
+  display: block;
+}
+.sara-workspace .settings-proposals button {
+  border: 1px solid #7b897e;
+}
+.sara-workspace .settings-proposals .social-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sara-workspace .settings-result {
+  padding: 12px;
+  border-radius: 8px;
+  background: #f1f3ef;
+}
+.sara-workspace .social-status {
+  font-size: 12px;
+  color: #526056;
+}
+.sara-workspace .social-warning {
+  background: #fff4db;
+  color: #855708;
+  padding: 10px;
+  border-radius: 6px;
+}
+.sara-file {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  border: 1px solid #d9e1d5;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  font-size: 12px;
+  min-width: 0;
+}
+.sara-file > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-wrap: anywhere;
+  flex: 1;
+  min-width: 100px;
+}
+.sara-file > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.sara-file button {
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sara-file > details,
+.sara-file > audio,
+.sara-file > .sara-error {
+  width: 100%;
+}
+.sara-file details > p {
+  font-size: 12px;
+  white-space: pre-wrap;
+  margin: 0;
+  color: #526056;
+  max-height: 180px;
+  overflow: auto;
+}
+.sara-workspace audio {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 44px;
+}
+.sara-composer-area {
+  flex: none;
+  border-top: 1px solid #e5eae1;
+  padding: 16px 24px 12px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 55%;
+  overflow: auto;
+  min-height: 0;
+}
+.sara-composer {
+  border: 1px solid #7b897e;
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px 12px 8px;
+  max-width: 900px;
+  width: 100%;
+  margin: auto;
+  flex: none;
+}
+.crm-shell .sara-composer textarea {
+  width: 100%;
+  display: block;
+  min-height: 64px;
+  max-height: 160px;
+  resize: vertical;
+  border: 0;
+  padding: 4px 6px;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #062619;
+}
+.sara-composer textarea:focus-visible {
+  outline-offset: 0;
+}
+.sara-composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sara-composer-toolbar > div {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.sara-workspace .sara-send {
+  background: #062619;
+  color: #fff;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 16px;
+  flex: none;
+}
+.sara-workspace .sara-send:hover:not(:disabled) {
+  background: #0c3b28;
+}
+.sara-record-button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.sara-record-button > span,
+.sara-recording {
+  color: #a62b35;
+}
+.sara-record-state {
+  font-size: 12px;
+  color: #a62b35;
+  line-height: 1.6;
+  margin: 0;
+}
+.sara-audio-preview {
+  border: 1px solid #7b897e;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 12px;
+  flex: none;
+}
+.sara-audio-preview > div {
+  display: flex;
+  gap: 8px;
+}
+.sara-audio-preview button {
+  border: 1px solid #7b897e;
+}
+.sara-draft-files {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: none;
+}
+.sara-draft-files > div {
+  padding: 8px 10px;
+  border: 1px solid #d9e1d5;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  max-width: 100%;
+  background: #fafbf7;
+}
+.sara-draft-files > div > strong {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.sara-draft-files .sara-icon-button {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+}
+.sara-draft-files details {
+  width: 100%;
+}
+.sara-draft-files details p {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  font-size: 12px;
+  max-height: 120px;
+  overflow: auto;
+  margin: 0;
+  color: #526056;
+}
+.sara-skills-dialog {
+  margin: auto;
+  border: 1px solid #d9e1d5;
+  border-radius: 16px;
+  padding: 24px;
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  color: #062619;
+  background: #fff;
+  overflow: auto;
+  box-shadow: 0 24px 80px #06261930;
+}
+.sara-skills-dialog::backdrop {
+  background: #06261966;
+}
+.sara-skills-dialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.crm-shell .sara-skills-dialog h2 {
+  font-size: 22px;
+  font-weight: 700;
+}
+.sara-skills-dialog > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.sara-skills-dialog input {
+  min-height: 44px;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 16px;
+  width: 100%;
+  color: #062619;
+}
+.sara-skills-dialog > details {
+  border-top: 1px solid #d9e1d5;
+  padding: 10px 0;
+}
+.sara-skills-dialog > details summary {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  list-style: disclosure-closed;
+  min-height: 44px;
+}
+.sara-skills-dialog summary > span {
+  font-size: 12px;
+  font-weight: 400;
+  color: #526056;
+}
+.sara-skills-dialog > details > p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #526056;
+}
+.sara-skills-dialog .sara-manage {
+  background: #062619;
+  color: #fff;
+  padding: 12px 16px;
+  margin-top: 20px;
+  min-height: 44px;
+}
+@media (max-width: 760px) {
+  .sara-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    border-radius: 12px;
+  }
+  .sara-history {
+    display: none;
+    border-right: 0;
+    border-bottom: 1px solid #d9e1d5;
+    max-height: 45dvh;
+  }
+  .sara-history-open {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .sara-history-open .sara-history {
+    display: flex;
+  }
+  .sara-history-toggle {
+    display: inline-flex !important;
+  }
+  .sara-header {
+    padding: 8px 10px;
+    gap: 4px;
+    min-height: 64px;
+  }
+  .sara-heading {
+    gap: 6px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .crm-shell .sara-heading h2 {
+    font-size: 17px;
+  }
+  .sara-heading > span {
+    font-size: 12px;
+  }
+  .sara-header .sara-skills-button {
+    padding: 8px;
+    font-size: 12px;
+  }
+  .sara-header .sara-skills-button svg {
+    display: none;
+  }
+  .sara-log {
+    padding: 16px;
+    gap: 20px;
+  }
+  .sara-conversation-label {
+    gap: 4px;
+  }
+  .sara-conversation-label button {
+    padding: 4px 0;
+  }
+  .sara-message-user {
+    padding: 12px;
+  }
+  .sara-message-text {
+    font-size: 14px;
+  }
+  .sara-welcome {
+    padding: 16px 4px;
+  }
+  .crm-shell .sara-welcome h3 {
+    font-size: 22px;
+  }
+  .sara-composer-area {
+    padding: 10px;
+    max-height: 58%;
+  }
+  .sara-composer {
+    padding: 8px;
+    border-radius: 10px;
+  }
+  .sara-composer-toolbar {
+    align-items: flex-end;
+  }
+  .sara-composer-toolbar > div {
+    gap: 0;
+  }
+  .sara-record-button {
+    font-size: 12px !important;
+    padding: 6px !important;
+  }
+  .sara-composer .sara-icon-button {
+    width: 38px;
+    height: 38px;
+    min-height: 44px;
+  }
+  .sara-workspace .sara-send {
+    padding: 10px;
+    font-size: 12px;
+    gap: 5px;
+  }
+  .sara-rename {
+    padding: 10px;
+    flex-wrap: wrap;
+  }
+  .sara-rename label {
+    flex-basis: 100%;
+  }
+  .sara-skills-dialog {
+    padding: 18px;
+    width: calc(100vw - 16px);
+  }
+  .sara-audio-preview {
+    padding: 10px;
+  }
+  .sara-draft-files > div {
+    width: 100%;
+  }
+  .sara-file > div {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sara-workspace * {
+    scroll-behavior: auto !important;
+  }
+}
+
+.crm-shell .sara-workspace .sara-search input {
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 8px 0;
+}
+
+.sara-skills-dialog {
+  overflow-wrap: anywhere;
+}

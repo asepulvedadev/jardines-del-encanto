@@ -152,10 +152,12 @@ export function HermesPanel({
   request,
   onChanged,
   revision,
+  onOpenChat,
 }: {
   request: SettingsRequest;
   onChanged: () => Promise<void>;
   revision: number;
+  onOpenChat?: () => void;
 }) {
   const [status, setStatus] = useState<HermesStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -215,7 +217,7 @@ export function HermesPanel({
       aria-busy={pending || loading}
     >
       <div className="settings-section-heading">
-        <h3 id="hermes-panel-title">Hermes</h3>
+        <h3 id="hermes-panel-title">Sara IA</h3>
         <span className="social-status">
           {loading
             ? "Consultando…"
@@ -237,50 +239,60 @@ export function HermesPanel({
           {error}
         </p>
       )}
-      <form onSubmit={submit}>
-        <label htmlFor="hermes-message">¿Qué necesitas gestionar?</label>
-        <textarea
-          id="hermes-message"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          maxLength={4000}
-          required
-          disabled={pending}
-          placeholder="Consulta clientes o prepara un seguimiento…"
-        />
-        <button
-          className="crm-button"
-          disabled={
-            loading ||
-            pending ||
-            !status?.available ||
-            !status.enabled ||
-            !message.trim()
-          }
-        >
-          Enviar a Hermes
+      {onOpenChat ? (
+        <button className="crm-button" onClick={onOpenChat}>
+          Abrir chat de Sara IA
         </button>
-      </form>
-      {pending && <p role="status">Hermes está consultando la aplicación…</p>}
-      {response && (
-        <div className="settings-hermes-reply">
-          <h4>Respuesta de Hermes</h4>
-          <p>{response.reply}</p>
-          {response.results.map((result, index) => (
-            <ActionOutput
-              key={`${response.run_id}-${index}`}
-              value={{ result }}
-              request={request}
-              onChanged={onChanged}
+      ) : (
+        <>
+          <form onSubmit={submit}>
+            <label htmlFor="hermes-message">¿Qué necesitas gestionar?</label>
+            <textarea
+              id="hermes-message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              maxLength={4000}
+              required
+              disabled={pending}
+              placeholder="Consulta clientes o prepara un seguimiento…"
             />
-          ))}
-          <ActionProposals
-            key={response.run_id}
-            proposals={response.proposals}
-            request={request}
-            onChanged={onChanged}
-          />
-        </div>
+            <button
+              className="crm-button"
+              disabled={
+                loading ||
+                pending ||
+                !status?.available ||
+                !status.enabled ||
+                !message.trim()
+              }
+            >
+              Enviar a Sara IA
+            </button>
+          </form>
+          {pending && (
+            <p role="status">Sara IA está consultando la aplicación…</p>
+          )}
+          {response && (
+            <div className="settings-hermes-reply">
+              <h4>Respuesta de Sara IA</h4>
+              <p>{response.reply}</p>
+              {response.results.map((result, index) => (
+                <ActionOutput
+                  key={`${response.run_id}-${index}`}
+                  value={{ result }}
+                  request={request}
+                  onChanged={onChanged}
+                />
+              ))}
+              <ActionProposals
+                key={response.run_id}
+                proposals={response.proposals}
+                request={request}
+                onChanged={onChanged}
+              />
+            </div>
+          )}
+        </>
       )}
     </section>
   );

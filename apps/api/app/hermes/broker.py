@@ -157,12 +157,33 @@ def resolve(proposal_id, version, admin, approve):
     return response
 
 
-def issue(db, admin, prompt):
+def validated_history(history):
+    if history is None:
+        return []
+    if (
+        not isinstance(history, list)
+        or len(history) > 8
+        or any(
+            not isinstance(item, dict)
+            or set(item) != {"role", "content"}
+            or item["role"] not in ("user", "assistant")
+            or not isinstance(item["content"], str)
+            or not 1 <= len(item["content"]) <= 4096
+            for item in history
+        )
+        or sum(len(item["content"]) for item in history) > 16000
+    ):
+        raise HTTPException(422, "invalid_history")
+    return history
+
+
+def issue(db, admin, prompt, history=None):
+    history = validated_history(history)
     token = secrets.token_urlsafe(32)
     row = db.execute(
-        """INSERT INTO crm.hermes_runs(actor_id,session_hash,token_hash,prompt)
-        VALUES (%s,%s,%s,%s) RETURNING id""",
-        (admin["id"], admin["token_hash"], security.digest(token), prompt),
+        """INSERT INTO crm.hermes_runs(actor_id,session_hash,token_hash,prompt,history)
+        VALUES (%s,%s,%s,%s,%s) RETURNING id""",
+        (admin["id"], admin["token_hash"], security.digest(token), prompt, Jsonb(history)),
     ).fetchone()
     return row["id"], token
 
@@ -296,7 +317,11 @@ def claim(db, run):
             ).fetchone()
             scope[key] = str(override["id"]) + ":" + str(override["version"]) if override else None
     service.audit(db, actor(run), "run.claim", {"run_id": str(run["id"]), "scope": scope})
-    return {"run_id": run["id"], "prompt": run["prompt"], "skills": skills, "tools": schemas}
+    result = {"run_id": run["id"], "prompt": run["prompt"], "skills": skills, "tools": schemas}
+    history = validated_history(run.get("history"))
+    if history:
+        result["history"] = history
+    return result
 
 
 def call(db, run, data):

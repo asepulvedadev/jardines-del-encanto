@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "./icon";
+import { SaraPanel } from "./sara-panel";
 import { SettingsModal } from "./settings-modal";
 import { Empty, StageSelect, TaskRow } from "./workspace-parts";
 import {
@@ -27,6 +28,7 @@ import {
 
 const navigation = [
   ["overview", "home"],
+  ["sara", "message"],
   ["pipeline", "board"],
   ["contacts", "people"],
   ["tasks", "task"],
@@ -45,6 +47,9 @@ export function Workspace({
   const [data, setData] = useState(initialData);
   const [view, setView] = useState<View>("overview");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"social" | "customizations">(
+    "social",
+  );
   const [socialCallback, setSocialCallback] = useState(false);
   const [query, setQuery] = useState("");
   const [list, setList] = useState(false);
@@ -285,6 +290,11 @@ export function Workspace({
         csrf={csrf}
         onWorkspaceChanged={refresh}
         initialSocial={socialCallback}
+        initialTab={settingsTab}
+        onOpenSara={() => {
+          setSettingsOpen(false);
+          changeView("sara");
+        }}
       />
       <a href="#crm-content" className="skip-link">
         Saltar al contenido
@@ -327,6 +337,7 @@ export function Workspace({
             onClick={() => {
               setMobileMenu(false);
               setSocialCallback(false);
+              setSettingsTab("social");
               setSettingsOpen(true);
             }}
           >
@@ -368,36 +379,47 @@ export function Workspace({
           </div>
           <span className="crm-private-label">Espacio privado</span>
         </header>
-        <main id="crm-content" className="crm-content">
-          <div className="crm-page-heading">
-            <div>
-              <p className="crm-eyebrow">GESTIÓN COMERCIAL</p>
-              <h1 ref={heading} tabIndex={-1}>
-                {view === "overview" ? "Tu día, en orden." : labels[view]}
-              </h1>
-              <p>
-                {view === "overview"
-                  ? "Las conversaciones y próximos pasos de tu equipo, en un solo lugar."
-                  : view === "pipeline"
-                    ? "Una vista clara de cada conversación y su siguiente paso."
-                    : view === "contacts"
-                      ? "Solo lo importante: nombre, celular y de dónde llega cada cliente."
-                      : "Que ninguna conversación se quede sin un siguiente paso."}
-              </p>
-            </div>
-            <div className="crm-heading-actions">
-              {view === "tasks" && (
-                <button
-                  className="crm-button crm-secondary"
-                  disabled={!data.contacts.length}
-                  onClick={() => openTask()}
-                >
-                  <Icon name="calendar" />
-                  Nueva tarea
-                </button>
-              )}
-            </div>
-          </div>
+        <main
+          id="crm-content"
+          className={`crm-content ${view === "sara" ? "crm-content-sara" : ""}`}
+        >
+          {view === "sara" ? (
+            <h1 className="sr-only" ref={heading} tabIndex={-1}>
+              Sara IA
+            </h1>
+          ) : (
+            <>
+              <div className="crm-page-heading">
+                <div>
+                  <p className="crm-eyebrow">GESTIÓN COMERCIAL</p>
+                  <h1 ref={heading} tabIndex={-1}>
+                    {view === "overview" ? "Tu día, en orden." : labels[view]}
+                  </h1>
+                  <p>
+                    {view === "overview"
+                      ? "Las conversaciones y próximos pasos de tu equipo, en un solo lugar."
+                      : view === "pipeline"
+                        ? "Una vista clara de cada conversación y su siguiente paso."
+                        : view === "contacts"
+                          ? "Solo lo importante: nombre, celular y de dónde llega cada cliente."
+                          : "Que ninguna conversación se quede sin un siguiente paso."}
+                  </p>
+                </div>
+                <div className="crm-heading-actions">
+                  {view === "tasks" && (
+                    <button
+                      className="crm-button crm-secondary"
+                      disabled={!data.contacts.length}
+                      onClick={() => openTask()}
+                    >
+                      <Icon name="calendar" />
+                      Nueva tarea
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
           {error && (
             <div className="crm-error crm-message" role="alert">
               {error}
@@ -406,17 +428,30 @@ export function Workspace({
               </button>
             </div>
           )}
-          <p className="crm-save-status" role="status">
+          <p
+            className={`crm-save-status ${view === "sara" ? "sr-only" : ""}`}
+            role="status"
+          >
             {pending ? "Guardando cambios…" : notice}
           </p>
-          {data.limited && (
+          {data.limited && view !== "sara" && (
             <p className="crm-limit-note">
               Esta vista muestra hasta 500 registros por sección. Los totales
               incluyen todos los registros. Se requiere paginación antes de
               superar este volumen.
             </p>
           )}
-          {view === "overview" ? (
+          {view === "sara" ? (
+            <SaraPanel
+              csrf={csrf}
+              onChanged={refresh}
+              onManageSkills={() => {
+                setSocialCallback(false);
+                setSettingsTab("customizations");
+                setSettingsOpen(true);
+              }}
+            />
+          ) : view === "overview" ? (
             <>
               <div className="crm-stat-strip">
                 <div>
@@ -875,10 +910,12 @@ export function Workspace({
               )}
             </>
           )}
-          <footer className="crm-workspace-footer">
-            <span>Jardines del Encanto · CRM</span>
-            <span>Los cambios se confirman al guardarse en PostgreSQL.</span>
-          </footer>
+          {view !== "sara" && (
+            <footer className="crm-workspace-footer">
+              <span>Jardines del Encanto · CRM</span>
+              <span>Los cambios se confirman al guardarse en PostgreSQL.</span>
+            </footer>
+          )}
         </main>
       </div>
       <dialog

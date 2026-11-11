@@ -80,11 +80,28 @@ def call_arguments(value, allowed):
     return value
 
 
+def validate_history(history):
+    if not isinstance(history, list) or len(history) > 8:
+        raise ValueError('History exceeds policy')
+    total = 0
+    for message in history:
+        if (not isinstance(message, dict) or set(message) != {'role', 'content'}
+                or not isinstance(message['role'], str) or message['role'] not in {'user', 'assistant'}):
+            raise ValueError('Historical authority denied')
+        total += len(text(message['content'], 4096, False))
+    if total > 16000:
+        raise ValueError('History exceeds context policy')
+    return history
+
+
 def validate_claim(claim):
-    if not isinstance(claim, dict) or set(claim) != {'run_id', 'prompt', 'skills', 'tools'}:
+    required = {'run_id', 'prompt', 'skills', 'tools'}
+    if not isinstance(claim, dict) or not required <= set(claim) or set(claim) - required - {'history'}:
         raise ValueError('Invalid claim')
     text(claim['run_id'], 128, False)
-    text(claim['prompt'], 4096, False)
+    text(claim['prompt'], 8000, False)
+    if 'history' in claim:
+        validate_history(claim['history'])
     skills = claim['skills']
     if not isinstance(skills, list) or len(skills) > 64:
         raise ValueError('Invalid skills')

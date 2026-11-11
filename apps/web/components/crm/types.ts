@@ -59,9 +59,10 @@ export type WorkspaceData = {
   };
   limited: boolean;
 };
-export type View = "overview" | "pipeline" | "contacts" | "tasks";
+export type View = "overview" | "sara" | "pipeline" | "contacts" | "tasks";
 export const labels: Record<View, string> = {
-  overview: "Inicio",
+  overview: "Dashboard",
+  sara: "Sara IA",
   pipeline: "Pipeline",
   contacts: "Clientes",
   tasks: "Seguimientos",

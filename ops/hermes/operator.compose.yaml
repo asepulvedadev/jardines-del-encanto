@@ -28,9 +28,13 @@ services:
     <<: *runtime
     entrypoint: ["/opt/hermes/.venv/bin/python", "/policy/operator_provider.py"]
     command: []
+    environment:
+      <<: *environment
+      HERMES_TRANSCRIPTION_ENABLED: ${HERMES_TRANSCRIPTION_ENABLED:-0}
     volumes:
       - ./operator_provider.py:/policy/operator_provider.py:ro
       - ./operator_protocol.py:/policy/operator_protocol.py:ro
+      - ./operator_audio.py:/policy/operator_audio.py:ro
     secrets: [openai_api_key]
     networks: [operator, egress]
     healthcheck:
@@ -49,6 +53,7 @@ services:
     volumes:
       - ./operator.py:/policy/hermes_operator.py:ro
       - ./operator_protocol.py:/policy/operator_protocol.py:ro
+      - ./operator_audio.py:/policy/operator_audio.py:ro
     networks: [operator, application]
     expose: ["8081"]
     depends_on:

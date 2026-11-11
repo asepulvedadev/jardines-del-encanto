@@ -1,7 +1,13 @@
 import type { CSSProperties } from "react";
 const paths = {
-  settings:
-    "M4 6h4m4 0h8M4 12h8m4 0h4M4 18h4m4 0h8M8 3v6M16 9v6M8 15v6",
+  microphone:
+    "M12 15a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v7a3 3 0 0 0 3 3ZM5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8",
+  paperclip: "m8 12 7-7a3 3 0 0 1 4 4L9 19a5 5 0 0 1-7-7L13 1M6 14l8-8",
+  send: "m21 3-7 18-4-8-8-4 19-6ZM10 13l11-10",
+  stop: "M6 6h12v12H6z",
+  download: "M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5",
+
+  settings: "M4 6h4m4 0h8M4 12h8m4 0h4M4 18h4m4 0h8M8 3v6M16 9v6M8 15v6",
   connections: "M8 8h8v8H8zM12 2v6M12 16v6M2 12h6M16 12h6",
   home: "M3 11 12 3l9 8M5 9v11h5v-6h4v6h5V9",
   board: "M3 4h5v16H3zM10 4h5v10h-5zM17 4h4v13h-4z",
