@@ -131,6 +131,46 @@ class DeploymentStateTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "builder"):
                 module.verify_builder()
 
+    def test_operator_refresh_follows_application_readiness(self):
+        events = []
+        with (
+            patch.object(module, "compose", side_effect=lambda *args: events.append("compose")),
+            patch.object(module, "run", side_effect=lambda *args: events.append("health")),
+            patch.object(module, "refresh_operator", side_effect=lambda: events.append("operator")),
+        ):
+            module.activate(self.target)
+        self.assertEqual(events, ["compose", "health", "operator"])
+
+    def test_operator_refresh_does_not_activate_an_absent_or_stopped_profile(self):
+        with patch.object(module, "run") as run:
+            module.refresh_operator()
+            run.assert_not_called()
+            policy = self.root / "hermes-operator" / "operator.compose.yaml"
+            policy.parent.mkdir()
+            policy.touch()
+            run.return_value.stdout = "operator-provider\n"
+            module.refresh_operator()
+            self.assertEqual(run.call_count, 1)
+            self.assertEqual(run.call_args.args[0][-4:], ["ps", "--status", "running", "--services"])
+
+    def test_operator_refresh_restarts_only_running_bridge_after_api_ip_changes(self):
+        policy = self.root / "hermes-operator" / "operator.compose.yaml"
+        policy.parent.mkdir()
+        policy.touch()
+        with patch.object(module, "run") as run:
+            run.return_value.stdout = "operator-provider\nhermes-bridge\n"
+            module.refresh_operator()
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(run.call_args.args[0][-3:], ["restart", "--no-deps", "hermes-bridge"])
+        self.assertIn(str(policy), run.call_args.args[0])
+
+    def test_optional_operator_failure_does_not_fail_healthy_application(self):
+        policy = self.root / "hermes-operator" / "operator.compose.yaml"
+        policy.parent.mkdir()
+        policy.touch()
+        with patch.object(module, "run", side_effect=subprocess.CalledProcessError(1, "docker")):
+            module.refresh_operator()
+
     def test_runtime_policy_is_bound_to_each_release(self):
         markers = self.root / "crm-releases"
         markers.mkdir()

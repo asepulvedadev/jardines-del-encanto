@@ -155,6 +155,11 @@ sibling container IDs and Nginx configuration hashes after all operations. Futur
 operator policy changes still need administrator review/install: CI never overwrites
 root-owned policy or receives the provider credential.
 
+The bridge pins its private peer IPs during startup. After replacing or rolling back
+the API, the root-owned gate restarts only an already-running Hermes bridge so it
+resolves the new API address. It never starts a stopped/uninstalled operator, restarts
+the provider, or fails an otherwise healthy CRM because the optional refresh failed.
+
 ## Bootstrap / policy changes — administrator only
 
 1. Create an empty public repository at the owner/repository path specified in

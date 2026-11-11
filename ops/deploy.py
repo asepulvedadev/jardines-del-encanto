@@ -77,6 +77,26 @@ def activate(sha):
             "http://127.0.0.1:13400/health/ready",
         ]
     )
+    refresh_operator()
+
+
+def refresh_operator():
+    # The operator pins private peer IPs for its audit guard. Refresh after API
+    # replacement/rollback, but never activate a profile the owner left stopped.
+    policy = ROOT / "hermes-operator" / "operator.compose.yaml"
+    if not policy.is_file():
+        return
+    command = ["docker", "compose", "-p", "jardines-hermes-operator", "-f", str(policy)]
+    try:
+        active = run(
+            [*command, "ps", "--status", "running", "--services"],
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+        if "hermes-bridge" in active:
+            run([*command, "restart", "--no-deps", "hermes-bridge"])
+    except (subprocess.CalledProcessError, OSError):
+        print("Application ready; optional Hermes operator refresh failed", file=sys.stderr)
 
 
 def verify_builder():

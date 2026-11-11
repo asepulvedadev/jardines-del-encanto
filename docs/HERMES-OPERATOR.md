@@ -106,6 +106,7 @@ docker run --rm --network none --user 1000:1000 --read-only \
   -e HOME=/tmp -e HERMES_HOME=/tmp/hermes-operator \
   -e HERMES_REAL_INTEGRATION=1 -e PYTHONDONTWRITEBYTECODE=1 \
   -v "$PWD/ops/hermes:/workspace/ops/hermes:ro" \
+  -v "$PWD/ops/crm.compose.yaml:/workspace/ops/crm.compose.yaml:ro" \
   -v "$PWD/tests/test_hermes_operator.py:/workspace/tests/test_hermes_operator.py:ro" \
   --entrypoint /opt/hermes/.venv/bin/python \
   nousresearch/hermes-agent:stable@sha256:276d44685c65c0cb2a25f190b63c65c8906f9dc76486fb1c05ae71b5826bda08 \
