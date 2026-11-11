@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { publicOrigin } from "../lib/public-seo";
 
 const manrope = localFont({
   src: "./fonts/Manrope-Variable.ttf",
@@ -10,6 +11,7 @@ const manrope = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(publicOrigin),
   title: "Jardines del Encanto | Lotes en Acacías, Meta",
   description:
     "Tu espacio para echar raíces. Lotes de 7 × 14 m desde $13 millones COP en Acacías, Meta. Financiación hasta 24 meses. Conoce el proyecto y agenda tu visita.",

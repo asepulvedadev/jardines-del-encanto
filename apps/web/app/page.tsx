@@ -1,15 +1,23 @@
-import localFont from "next/font/local";
+import { landingFont } from "../lib/landing-font";
+import {
+  buyerGuidePath,
+  homeDescription,
+  homeTitle,
+  publicGraph,
+  publicMetadata,
+  serializeGraph,
+} from "../lib/public-seo";
 import {
   MobileNavigation,
   PhotoGallery,
 } from "../components/landing-interactions";
-import {
-  LandingMotion,
-  LaunchBanner,
-} from "../components/landing-experience";
+import { LandingMotion, LaunchBanner } from "../components/landing-experience";
 import { HeroExperience } from "../components/hero-experience";
 import { MasterplanExplorer } from "../components/masterplan-explorer";
-import { LeadCaptureButton, LeadCaptureProvider } from "../components/lead-capture";
+import {
+  LeadCaptureButton,
+  LeadCaptureProvider,
+} from "../components/lead-capture";
 import {
   amenityGroups,
   project,
@@ -17,13 +25,9 @@ import {
   whatsappLink,
 } from "../lib/project";
 import "./landing.css";
+import "./buyer-guide.css";
 
-const jakarta = localFont({
-  src: "./fonts/PlusJakartaSans-Variable.ttf",
-  weight: "200 800",
-  display: "swap",
-  variable: "--font-landing",
-});
+export const metadata = publicMetadata(homeTitle, homeDescription, "/");
 
 function ContactLink({
   children,
@@ -52,7 +56,13 @@ function ContactLink({
 
 export default function Home() {
   return (
-    <div id="jardines-landing" className={`landing ${jakarta.variable}`}>
+    <div id="jardines-landing" className={`landing ${landingFont.variable}`}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeGraph(publicGraph(homeTitle, homeDescription, "/")),
+        }}
+      />
       <LeadCaptureProvider>
         <LandingMotion />
         <a href="#contenido" className="skip-link">
@@ -99,9 +109,9 @@ export default function Home() {
                 <span>Tu comienzo.</span>
               </h1>
               <p className="hero-description">
-                Tu próximo proyecto tiene lugar en el Llano. Conoce Jardines del
-                Encanto: naturaleza, espacios para compartir y un lote para lo que
-                viene.
+                Lotes en Acacías, Meta, para tu próximo comienzo. Conoce
+                Jardines del Encanto: naturaleza, espacios para compartir y una
+                opción en el Llano si vives en Bogotá o Soacha.
               </p>
               <div className="hero-offer">
                 <span>PRECIO DE LANZAMIENTO · LOTES DESDE</span>
@@ -218,8 +228,8 @@ export default function Home() {
                 <p>Portería de lujo y oficina de administración.</p>
               </div>
               <p className="content-note">
-                Espacios informados por el proyecto. Consulta durante tu visita el
-                estado de avance y las condiciones de entrega de cada zona.
+                Espacios informados por el proyecto. Consulta durante tu visita
+                el estado de avance y las condiciones de entrega de cada zona.
               </p>
               <LeadCaptureButton
                 id="lead-capture-amenities"
@@ -246,8 +256,8 @@ export default function Home() {
                 asesor.
               </p>
               <p className="content-note">
-                Plano de referencia: no refleja disponibilidad en tiempo real. Las
-                medidas y condiciones del lote se confirman con el equipo
+                Plano de referencia: no refleja disponibilidad en tiempo real.
+                Las medidas y condiciones del lote se confirman con el equipo
                 comercial.
               </p>
             </div>
@@ -272,6 +282,34 @@ export default function Home() {
             >
               Pedir ubicación
             </ContactLink>
+          </section>
+          <section
+            className="section container buyer-intro"
+            aria-labelledby="buyer-title"
+          >
+            <div>
+              <p className="eyebrow">TU DECISIÓN, CON INFORMACIÓN CLARA</p>
+              <h2 id="buyer-title">
+                ¿Vives en Bogotá o Soacha y buscas un lote en el Llano?
+              </h2>
+            </div>
+            <div className="buyer-intro-copy">
+              <p>
+                Jardines del Encanto está en Acacías, Meta. No son lotes
+                ubicados en Bogotá ni en Soacha: la propuesta es conocer una
+                alternativa fuera de la ciudad, revisar el plano y conversar con
+                el equipo antes de decidir.
+              </p>
+              <p>
+                Consulta los precios informados, las condiciones de financiación
+                y qué preguntar sobre el lote y el avance del proyecto. Coordina
+                la ubicación y tu visita sin pagos ni reservas automáticas.
+              </p>
+              <a className="button button-outline" href={buyerGuidePath}>
+                Guía para compradores de Bogotá y Soacha{" "}
+                <span aria-hidden="true">↗</span>
+              </a>
+            </div>
           </section>
           <section
             id="preguntas"
@@ -365,9 +403,9 @@ export default function Home() {
             </div>
             <p className="legal-note">
               Información comercial suministrada por el proyecto. Confirma
-              precios, disponibilidad, documentación y condiciones de financiación
-              con el asesor. Las fotografías y el plano no certifican el estado de
-              entrega de las zonas comunes.
+              precios, disponibilidad, documentación y condiciones de
+              financiación con el asesor. Las fotografías y el plano no
+              certifican el estado de entrega de las zonas comunes.
             </p>
           </div>
         </footer>
