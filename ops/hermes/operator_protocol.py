@@ -12,7 +12,8 @@ MAX_ITERATIONS = 4
 ACTIONS = frozenset({'crm.workspace', 'crm.activities', 'crm.contact.create', 'crm.contact.update',
     'crm.deal.update', 'crm.note.create', 'crm.task.create', 'crm.task.update', 'control.catalog',
     'control.item.create', 'control.item.update', 'control.connection.update', 'social.status',
-    'social.sync', 'social.connect'})
+    'social.sync', 'social.connect', 'control.extension.create', 'control.extension.update',
+    'control.extension.install', 'control.extension.test'})
 
 
 def valid_token(token):

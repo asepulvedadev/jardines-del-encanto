@@ -34,6 +34,12 @@ def dispatch(db, action, arguments, admin, run_id=None, parent=None):
             "SELECT version FROM crm.control_connections WHERE key=%s", (args.platform,)
         ).fetchone()
         frozen["connection:" + args.platform] = pref["version"]
+    if action in service.EXTENSION_ACTIONS:
+        if parent:
+            raise HTTPException(422, "nested_extension_lifecycle_denied")
+        from ..control import extensions
+
+        return {"result": jsonable_encoder(extensions.execute(db, action, args, admin))}
     if action in service.READ_ACTIONS:
         return {"result": jsonable_encoder(service.execute(db, action, args, admin))}
     row = db.execute(
@@ -255,7 +261,11 @@ def tools(db):
     }
     description = (
         "Consultar la aplicación o proponer cambios para aprobación exacta del administrador. "
-        "Las mutaciones NO se aplican hasta aprobación humana. No inventar IDs ni versiones; "
+        "Los cambios de negocio/configuración requieren aprobación humana. Solo control.extension.* "
+        "gestiona directamente definiciones declarativas propias: create crea borrador, update lo "
+        "desactiva, install habilita, test valida sin ejecutar. Nuevas extensiones solo en el próximo "
+        "turno. Sin código, paquetes nativos, conexiones ni cambios de permisos. "
+        "No inventar IDs ni versiones; "
         "consultar crm.workspace y crm.activities primero. custom tool combina defaults con arguments; "
         "plugin/connection usa arguments={action,arguments}; script usa arguments={}. "
         "Contratos JSON de argumentos y definiciones: "
@@ -312,7 +322,7 @@ def claim(db, run):
         else:
             override = db.execute(
                 "SELECT id,version FROM crm.control_items WHERE kind='tool' "
-                "AND definition->>'action'=%s",
+                "AND origin='human' AND definition->>'action'=%s",
                 (key,),
             ).fetchone()
             scope[key] = str(override["id"]) + ":" + str(override["version"]) if override else None

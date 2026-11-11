@@ -22,6 +22,10 @@ ACTION_MODELS = {
     "crm.task.create": crm_models.TaskInput,
     "crm.task.update": models.TaskUpdate,
     "control.catalog": models.Empty,
+    "control.extension.create": models.ExtensionCreate,
+    "control.extension.update": models.ExtensionUpdate,
+    "control.extension.install": models.ExtensionID,
+    "control.extension.test": models.ExtensionID,
     "control.item.create": models.ItemCreate,
     "control.item.update": models.ItemActionUpdate,
     "control.connection.update": models.ConnectionActionUpdate,
@@ -30,6 +34,10 @@ ACTION_MODELS = {
     "social.connect": models.SocialConnect,
 }
 READ_ACTIONS = {"crm.workspace", "crm.activities", "control.catalog", "social.status"}
+EXTENSION_ACTIONS = frozenset({
+    "control.extension.create", "control.extension.update",
+    "control.extension.install", "control.extension.test",
+})
 SOCIAL_ACTIONS = {"social.sync", "social.connect"}
 CONNECTION_NAMES = {
     "hermes": "Sara IA",
@@ -72,6 +80,11 @@ def definition_actions(item):
 
 
 def supported(item):
+    if item.get("origin") == "sara":
+        from .extensions import allowed
+
+        if not allowed(item):
+            return False
     actions = definition_actions(item)
     if any(action not in ACTION_MODELS for action in actions):
         return False
@@ -95,7 +108,7 @@ def supported(item):
 
 def capability_enabled(db, action):
     override = db.execute(
-        "SELECT enabled FROM crm.control_items WHERE kind='tool' AND definition->>'action'=%s",
+        "SELECT enabled FROM crm.control_items WHERE kind='tool' AND origin='human' AND definition->>'action'=%s",
         (action,),
     ).fetchone()
     return not override or override["enabled"]
@@ -193,17 +206,21 @@ def audit(db, admin, action, arguments, proposal_id=None):
     )
 
 
-def create_item(db, data, admin):
+def create_item(db, data, admin, *, origin="human"):
     lock(db)
     if len(rows(db)) >= 200:
         raise HTTPException(409, "registry_limit")
     candidate = data.model_dump()
+    if origin == "sara":
+        from .extensions import validate_candidate
+
+        validate_candidate(db, candidate, installing=data.enabled)
     if data.enabled and not supported(candidate):
         raise HTTPException(422, "unsupported_definition")
     result = db.execute(
         """INSERT INTO crm.control_items
-        (actor_id,kind,name,description,definition,enabled) VALUES (%s,%s,%s,%s,%s,%s) RETURNING *""",
-        (admin["id"], data.kind, data.name, data.description, Jsonb(data.definition), data.enabled),
+        (actor_id,kind,name,description,definition,enabled,origin) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
+        (admin["id"], data.kind, data.name, data.description, Jsonb(data.definition), data.enabled, origin),
     ).fetchone()
     audit(db, admin, "control.item.create", candidate)
     return item_view(db, result)
@@ -224,6 +241,10 @@ def update_item(db, item_id, data, admin):
         candidate = models.ItemCreate.model_validate(payload)
     except ValidationError:
         raise HTTPException(422, "invalid_input") from None
+    if old["origin"] == "sara":
+        from .extensions import validate_candidate
+
+        validate_candidate(db, candidate.model_dump(), installing=candidate.enabled)
     if candidate.enabled and not supported(candidate.model_dump()):
         raise HTTPException(422, "unsupported_definition")
     result = db.execute(
@@ -331,7 +352,7 @@ def revisions(db, actions, parent=None):
         require_capability(db, action)
         override = db.execute(
             "SELECT id,version FROM crm.control_items WHERE kind='tool' "
-            "AND definition->>'action'=%s",
+            "AND origin='human' AND definition->>'action'=%s",
             (action,),
         ).fetchone()
         # Missing overrides must also be frozen so newly disabled tools revoke pending proposals.

@@ -154,3 +154,32 @@ class Workspace(Input):
     query: str = Field(default="", max_length=120)
     limit: int = Field(default=50, ge=1, le=100, strict=True)
     offset: int = Field(default=0, ge=0, le=500, strict=True)
+
+
+class ExtensionCreate(Input):
+    kind: Literal["skill", "tool", "plugin", "script"]
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=1000)
+    definition: dict
+
+    @model_validator(mode="after")
+    def validate_definition(self):
+        self.definition = ItemCreate.model_validate(self.model_dump()).definition
+        return self
+
+
+class ExtensionID(Input):
+    id: UUID
+    version: int = Field(ge=1, strict=True)
+
+
+class ExtensionUpdate(ExtensionID):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    description: str | None = Field(default=None, max_length=1000)
+    definition: dict | None = None
+
+    @model_validator(mode="after")
+    def no_null_changes(self):
+        if any(getattr(self, key) is None for key in self.model_fields_set):
+            raise ValueError("null_change")
+        return self
