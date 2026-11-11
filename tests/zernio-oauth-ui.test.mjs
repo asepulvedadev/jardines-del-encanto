@@ -232,3 +232,22 @@ test("failed MCP verification invalidates OAuth-only presentation and reloads sa
   assert.match(social, /verified_at: null/);
   assert.match(social, /await reloadAfterMcpChange\(\)/);
 });
+
+test("filtered vendor-only account types are informational, not a failed verification", () => {
+  const settings = oauthSettings();
+  settings.sync_warning = "oauth_unsupported_platforms_filtered";
+  const html = renderSocial(settings);
+  assert.match(
+    html,
+    /Otras conexiones de Zernio no forman parte de estas redes sociales/,
+  );
+  assert.doesNotMatch(
+    html,
+    /La última consulta no pudo verificar todos los canales/,
+  );
+  settings.sync_warning = "oauth_verification_required";
+  assert.match(
+    renderSocial(settings),
+    /La última consulta no pudo verificar todos los canales/,
+  );
+});

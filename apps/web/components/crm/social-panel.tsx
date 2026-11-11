@@ -671,8 +671,9 @@ export function SocialPanel({
           </details>
           {settings.sync_warning ? (
             <p className="social-warning" role="status">
-              La última consulta no pudo verificar todos los canales. Actualiza
-              las conexiones antes de confiar en su estado.
+              {settings.sync_warning === "oauth_unsupported_platforms_filtered"
+                ? "Otras conexiones de Zernio no forman parte de estas redes sociales."
+                : "La última consulta no pudo verificar todos los canales. Actualiza las conexiones antes de confiar en su estado."}
             </p>
           ) : null}
           {intent ? (
