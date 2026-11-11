@@ -31,6 +31,13 @@ def owned_conversation(db, conversation_id, admin, lock=False):
     return row
 
 
+def lock_files(db, file_ids):
+    # Append-only private blobs deliberately have no UPDATE grant. Namespaced,
+    # sorted advisory locks serialize reuse/purge without broadening that role.
+    for file_id in sorted(file_ids, key=str):
+        db.execute("SELECT pg_advisory_xact_lock(20261114,hashtext(%s))", (str(file_id),))
+
+
 def files_for(db, message_id, owner_id, excerpt=None):
     rows = db.execute(
         """SELECT a.id,a.filename,a.mime_type,a.size,a.kind,a.text,a.created_at
@@ -204,6 +211,7 @@ def send(conversation_id, data, admin):
             if conversation["active_message_id"]:
                 raise HTTPException(409, "sara_conversation_busy")
             files = []
+            lock_files(db, data.attachment_ids)
             for attachment_id in data.attachment_ids:
                 file = db.execute(
                     """SELECT id,filename,mime_type,size,kind,text,created_at
@@ -286,3 +294,58 @@ def messages(conversation_id, before, admin):
             used += size
         next_cursor = output[-1]["id"] if len(rows) > len(output) and output else None
         return {"messages": list(reversed(output)), "next_cursor": next_cursor}
+
+
+def delete_conversation(conversation_id, admin):
+    """Erase owned chat content, revoke pending authority, keep immutable audit history."""
+    with connect() as db:
+        conversation = owned_conversation(db, conversation_id, admin, lock=True)
+        # Do not race a live send's finalization or silently cancel its provider request.
+        # GET messages settles expired leases before a subsequent explicit delete.
+        if conversation["active_message_id"]:
+            raise HTTPException(409, "sara_conversation_busy")
+        runs = db.execute(
+            """SELECT r.id FROM crm.hermes_runs r WHERE r.actor_id=%s
+            AND EXISTS (SELECT 1 FROM crm.sara_messages m
+                        WHERE m.conversation_id=%s AND m.run_id=r.id)
+            ORDER BY r.id FOR UPDATE""",
+            (admin["id"], conversation_id),
+        ).fetchall()
+        run_ids = [row["id"] for row in runs]
+        control.lock(db)
+        if run_ids:
+            db.execute(
+                """UPDATE crm.hermes_runs SET expires_at=now(),
+                state=CASE WHEN state='finished' THEN state ELSE 'failed' END
+                WHERE id=ANY(%s) AND actor_id=%s""",
+                (run_ids, admin["id"]),
+            )
+            db.execute(
+                """UPDATE crm.hermes_proposals SET status='expired',version=version+1
+                WHERE run_id=ANY(%s) AND actor_id=%s AND status='pending'""",
+                (run_ids, admin["id"]),
+            )
+        # Same sorted advisory locks as send: preserve concurrent shared reuse,
+        # or reject a missing file before another run can be issued.
+        files = db.execute(
+            """SELECT a.id FROM crm.sara_attachments a WHERE a.owner_id=%s
+            AND EXISTS (SELECT 1 FROM crm.sara_message_attachments ma
+                        JOIN crm.sara_messages m ON m.id=ma.message_id
+                        WHERE ma.attachment_id=a.id AND m.conversation_id=%s)
+            ORDER BY a.id""",
+            (admin["id"], conversation_id),
+        ).fetchall()
+        lock_files(db, [file["id"] for file in files])
+        db.execute(
+            "DELETE FROM crm.sara_conversations WHERE id=%s AND owner_id=%s",
+            (conversation_id, admin["id"]),
+        )
+        if files:
+            db.execute(
+                """DELETE FROM crm.sara_attachments a WHERE a.id=ANY(%s) AND a.owner_id=%s
+                AND NOT EXISTS (SELECT 1 FROM crm.sara_message_attachments ma
+                                WHERE ma.attachment_id=a.id)""",
+                ([file["id"] for file in files], admin["id"]),
+            )
+        control.audit(db, admin, "sara.conversation.delete", {"id": str(conversation_id)})
+    return {"id": conversation_id, "deleted": True}

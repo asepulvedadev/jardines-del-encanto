@@ -125,3 +125,26 @@ export async function saraFileBase64(file: Blob): Promise<string> {
 export function saraProposalAvailable(proposal: SaraProposal): boolean {
   return proposal.resolvable !== false;
 }
+
+export type SaraSkillQuery = { start: number; end: number; query: string };
+export function saraSkillQuery(
+  text: string,
+  caret: number,
+): SaraSkillQuery | null {
+  if (caret < 0 || caret > text.length) return null;
+  const match = /(?:^|\s)\$([^\s$\[\]]*)$/.exec(text.slice(0, caret));
+  return match
+    ? { start: caret - match[1].length - 1, end: caret, query: match[1] }
+    : null;
+}
+export function saraInsertSkill(
+  text: string,
+  token: SaraSkillQuery,
+  name: string,
+) {
+  const mention = `$[${name.replace(/[\[\]\r\n]/g, " ")}] `;
+  return {
+    text: text.slice(0, token.start) + mention + text.slice(token.end),
+    caret: token.start + mention.length,
+  };
+}

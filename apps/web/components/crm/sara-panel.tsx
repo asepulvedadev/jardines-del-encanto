@@ -13,6 +13,9 @@ import {
   saraFileBase64,
   saraProposalAvailable,
   saraUploadMime,
+  saraSkillQuery,
+  saraInsertSkill,
+  type SaraSkillQuery,
   type SaraAttachment,
   type SaraConversation,
   type SaraDraft,
@@ -73,6 +76,7 @@ class SaraRequestError extends Error {
   constructor(
     message: string,
     readonly uncertain: boolean,
+    readonly status?: number,
   ) {
     super(message);
   }
@@ -304,11 +308,9 @@ export function SaraMessageView({
 export function SaraPanel({
   csrf,
   onChanged,
-  onManageSkills,
 }: {
   csrf: string;
   onChanged: () => Promise<void>;
-  onManageSkills?: () => void;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<SaraStatus | null>(null);
@@ -322,6 +324,14 @@ export function SaraPanel({
   selectedRef.current = selectedId;
   const [search, setSearch] = useState("");
   const historyDialog = useRef<HTMLDialogElement>(null);
+  const deleted = useRef(new Set<string>());
+  const deleteDialog = useRef<HTMLDialogElement>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SaraConversation | null>(
+    null,
+  );
+  const [deletePending, setDeletePending] = useState(false);
+  const deleteLock = useRef(false);
+  const [deleteError, setDeleteError] = useState("");
   const [createPending, setCreatePending] = useState(false);
   const createLock = useRef(false);
   const [renaming, setRenaming] = useState(false);
@@ -349,10 +359,11 @@ export function SaraPanel({
   const alive = useRef(true);
   const scrollOlder = useRef(false);
   const [skills, setSkills] = useState<SaraSkill[]>([]);
-  const [skillSearch, setSkillSearch] = useState("");
+  const [skillToken, setSkillToken] = useState<SaraSkillQuery | null>(null);
+  const [activeSkill, setActiveSkill] = useState(0);
   const [skillsLoading, setSkillsLoading] = useState(false);
   const [skillsError, setSkillsError] = useState("");
-  const skillsDialog = useRef<HTMLDialogElement>(null);
+
   const [recording, setRecording] = useState(false);
   const [recordStarting, setRecordStarting] = useState(false);
   const recorder = useRef<SaraRecorder | null>(null);
@@ -418,6 +429,7 @@ export function SaraPanel({
           errors[typeof value?.detail === "string" ? value.detail : ""] ??
             "No pudimos completar la solicitud. Conservamos tu borrador.",
           response.status >= 500 || response.status === 408 || !value,
+          response.status,
         );
       return value as T;
     },
@@ -545,13 +557,24 @@ export function SaraPanel({
           `conversations${before ? `?before=${encodeURIComponent(before)}` : ""}`,
         );
         if (!alive.current) return;
-        setConversations((old) =>
-          mergeSaraConversations(old, value.conversations),
+        const available = value.conversations.filter(
+          (item) => !deleted.current.has(item.id),
         );
-        setListCursor(value.next_cursor);
+        setConversations((old) =>
+          mergeSaraConversations(old, available).filter(
+            (item) => !deleted.current.has(item.id),
+          ),
+        );
+        setListCursor(
+          deleted.current.has(value.next_cursor ?? "")
+            ? null
+            : value.next_cursor,
+        );
         if (!before)
-          setSelectedId((old) => old ?? value.conversations[0]?.id ?? null);
-        if (!before && !value.conversations.length && !selectedRef.current)
+          setSelectedId((old) =>
+            old && !deleted.current.has(old) ? old : (available[0]?.id ?? null),
+          );
+        if (!before && !available.length && !selectedRef.current)
           await createConversation();
       } catch (cause) {
         if (alive.current) setListError(feedback(cause));
@@ -619,6 +642,7 @@ export function SaraPanel({
   useEffect(() => {
     stopCapture();
     setRenaming(false);
+    setSkillToken(null);
     setHistoryError("");
     if (selectedId) void loadMessages(selectedId);
     else setHistoryLoading(false);
@@ -866,17 +890,144 @@ export function SaraPanel({
       if (alive.current) setRecordStarting(false);
     }
   }
-  async function showSkills() {
-    skillsDialog.current?.showModal();
+  const skillMenuOpen =
+    !!skillToken && !!selectedId && !busy && !historicalPending;
+  useEffect(() => {
+    if (!skillMenuOpen) return;
+    let active = true;
+    setSkills([]);
     setSkillsLoading(true);
     setSkillsError("");
+    request<{ skills: SaraSkill[] }>("sara/skills")
+      .then((value) => {
+        if (active) setSkills(value.skills);
+      })
+      .catch((cause) => {
+        if (active) setSkillsError(feedback(cause));
+      })
+      .finally(() => {
+        if (active) setSkillsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [skillMenuOpen, selectedId, request]);
+  const matchingSkills = skills.filter((skill) =>
+    `${skill.name} ${skill.description}`
+      .toLocaleLowerCase("es")
+      .includes((skillToken?.query ?? "").toLocaleLowerCase("es")),
+  );
+  const usableSkills = matchingSkills.filter((skill) => skill.effective);
+  const highlightedSkill =
+    usableSkills[Math.min(activeSkill, Math.max(0, usableSkills.length - 1))];
+  useEffect(() => {
+    if (skillMenuOpen && highlightedSkill)
+      document
+        .getElementById(`sara-skill-${highlightedSkill.id}`)
+        ?.scrollIntoView({ block: "nearest" });
+  }, [skillMenuOpen, highlightedSkill]);
+  function selectSkill(skill: SaraSkill) {
+    if (
+      !selectedId ||
+      !skillToken ||
+      !skill.effective ||
+      skillsLoading ||
+      skillsError
+    )
+      return;
+    const value = saraInsertSkill(draft.text, skillToken, skill.name);
+    if (value.text.length > 4000) {
+      setError(selectedId, "El mensaje no puede superar 4000 caracteres.");
+      return;
+    }
+    updateDraft(selectedId, (current) => ({ ...current, text: value.text }));
+    setSkillToken(null);
+    requestAnimationFrame(() => {
+      composer.current?.focus();
+      composer.current?.setSelectionRange(value.caret, value.caret);
+    });
+  }
+  function trackSkillToken(field: HTMLTextAreaElement) {
+    setSkillToken(
+      field.selectionStart === field.selectionEnd
+        ? saraSkillQuery(field.value, field.selectionStart)
+        : null,
+    );
+    setActiveSkill(0);
+  }
+  function closeDelete() {
+    if (deleteLock.current) return;
+    deleteDialog.current?.close();
+    setDeleteTarget(null);
+    setDeleteError("");
+  }
+  async function removeConversation() {
+    if (!deleteTarget || deleteLock.current) return;
+    const id = deleteTarget.id;
+    if (
+      turnLocks.current.has(id) ||
+      uploadLocks.current.has(id) ||
+      createLock.current ||
+      listLock.current
+    ) {
+      setDeleteError(
+        "Espera a que termine la operación en curso antes de borrar.",
+      );
+      return;
+    }
+    deleteLock.current = true;
+    setDeletePending(true);
+    setDeleteError("");
     try {
-      const value = await request<{ skills: SaraSkill[] }>("sara/skills");
-      setSkills(value.skills);
+      try {
+        await request(
+          `sara/conversations/${encodeURIComponent(id)}`,
+          "DELETE",
+          {},
+        );
+      } catch (cause) {
+        // A lost delete acknowledgement may be retried: an owned loaded row that
+        // is already absent is safe to remove locally, never re-created or replayed.
+        if (!(cause instanceof SaraRequestError && cause.status === 404))
+          throw cause;
+      }
+      if (!alive.current) return;
+      deleted.current.add(id);
+      const remaining = conversations.filter((item) => item.id !== id);
+      setConversations((old) => old.filter((item) => item.id !== id));
+      if (selectedRef.current === id) {
+        stopCapture();
+        historyAbort.current?.abort();
+        ++historyGeneration.current;
+        selectedRef.current = remaining[0]?.id ?? null;
+        setSelectedId(selectedRef.current);
+      }
+      const omit = <T,>(old: Record<string, T>) => {
+        const next = { ...old };
+        delete next[id];
+        return next;
+      };
+      setMessages(omit);
+      setDrafts(omit);
+      setTurns(omit);
+      setMessageCursors(omit);
+      setConversationErrors(omit);
+      setUploads(omit);
+      setListCursor(null);
+      deleteDialog.current?.close();
+      setDeleteTarget(null);
+      await loadConversations();
+      requestAnimationFrame(() => {
+        if (historyDialog.current?.open)
+          historyDialog.current
+            .querySelector<HTMLButtonElement>("button")
+            ?.focus();
+      });
     } catch (cause) {
-      setSkillsError(feedback(cause));
+      if (alive.current) setDeleteError(feedback(cause));
     } finally {
-      setSkillsLoading(false);
+      deleteLock.current = false;
+      if (alive.current) setDeletePending(false);
     }
   }
   const ready = !!(status?.available && status.enabled);
@@ -922,23 +1073,48 @@ export function SaraPanel({
         )}
         <nav aria-label="Historial de conversaciones">
           {filtered.map((item) => (
-            <button
-              key={item.id}
-              aria-current={selectedId === item.id ? "page" : undefined}
-              title={item.title}
-              onClick={() => {
-                setSelectedId(item.id);
-                historyDialog.current?.close();
-              }}
-            >
-              <span>{item.title}</span>
-              <time dateTime={item.updated_at}>
-                {new Date(item.updated_at).toLocaleDateString("es-CO", {
-                  day: "numeric",
-                  month: "short",
-                })}
-              </time>
-            </button>
+            <div className="sara-history-row" key={item.id}>
+              <button
+                aria-current={selectedId === item.id ? "page" : undefined}
+                title={item.title}
+                onClick={() => {
+                  setSelectedId(item.id);
+                  historyDialog.current?.close();
+                }}
+              >
+                <span>{item.title}</span>
+                <time dateTime={item.updated_at}>
+                  {new Date(item.updated_at).toLocaleDateString("es-CO", {
+                    day: "numeric",
+                    month: "short",
+                  })}
+                </time>
+              </button>
+              <button
+                className="sara-icon-button sara-delete-button"
+                aria-label={`Borrar conversación: ${item.title}`}
+                title="Borrar conversación"
+                disabled={
+                  deletePending ||
+                  listLoading ||
+                  createPending ||
+                  !!uploads[item.id] ||
+                  ["sending", "uncertain", "pending"].includes(
+                    turns[item.id]?.phase ?? "",
+                  ) ||
+                  (messages[item.id] ?? []).some(
+                    (message) => message.state === "pending",
+                  )
+                }
+                onClick={() => {
+                  setDeleteTarget(item);
+                  setDeleteError("");
+                  deleteDialog.current?.showModal();
+                }}
+              >
+                <Icon name="trash" />
+              </button>
+            </div>
           ))}
         </nav>
         {!filtered.length && search && (
@@ -1010,15 +1186,6 @@ export function SaraPanel({
                 <Icon name="edit" />
               </button>
             )}
-            <button
-              className="sara-icon-button"
-              aria-label="Ver skills"
-              title="Skills del proyecto"
-              aria-haspopup="dialog"
-              onClick={() => void showSkills()}
-            >
-              <Icon name="task" />
-            </button>
             <button
               className="sara-icon-button"
               aria-label="Historial de conversaciones"
@@ -1169,6 +1336,60 @@ export function SaraPanel({
             </p>
           )}
         </div>
+        {skillMenuOpen && (
+          <div className="sara-skill-picker">
+            <div className="sara-skill-picker-heading">
+              <strong>Skills</strong>
+              <span>Esc para cerrar</span>
+            </div>
+            {skillsLoading && <p role="status">Consultando skills…</p>}
+            {skillsError && (
+              <p className="sara-error" role="alert">
+                {skillsError}
+              </p>
+            )}
+            <div
+              id="sara-skill-options"
+              role="listbox"
+              aria-label="Skills del proyecto"
+            >
+              {!skillsLoading &&
+                !skillsError &&
+                matchingSkills.map((skill) => (
+                  <button
+                    type="button"
+                    role="option"
+                    id={`sara-skill-${skill.id}`}
+                    key={skill.id}
+                    tabIndex={-1}
+                    aria-selected={highlightedSkill?.id === skill.id}
+                    aria-disabled={!skill.effective}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectSkill(skill)}
+                  >
+                    <span>
+                      <strong>{skill.name}</strong>
+                      {skill.description && <small>{skill.description}</small>}
+                    </span>
+                    <small>
+                      {skill.effective
+                        ? "Disponible"
+                        : skill.enabled
+                          ? "No disponible"
+                          : "Desactivada"}
+                    </small>
+                  </button>
+                ))}
+            </div>
+            {!skillsLoading && !skillsError && !matchingSkills.length && (
+              <p role="status">
+                {skills.length
+                  ? "No hay coincidencias."
+                  : "No hay skills en el registro del proyecto."}
+              </p>
+            )}
+          </div>
+        )}
         <div className="sara-composer-area">
           {error && (
             <p className="sara-error" role="alert">
@@ -1229,16 +1450,62 @@ export function SaraPanel({
               id="sara-message"
               ref={composer}
               value={draft.text}
-              onChange={(event) =>
-                selectedId &&
-                updateDraft(selectedId, (current) => ({
-                  ...current,
-                  text: event.target.value,
-                }))
+              onChange={(event) => {
+                if (selectedId)
+                  updateDraft(selectedId, (current) => ({
+                    ...current,
+                    text: event.target.value,
+                  }));
+                trackSkillToken(event.currentTarget);
+              }}
+              onSelect={(event) => trackSkillToken(event.currentTarget)}
+              onBlur={(event) => {
+                if (!event.relatedTarget?.closest(".sara-skill-picker"))
+                  setSkillToken(null);
+              }}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={skillMenuOpen}
+              aria-controls={skillMenuOpen ? "sara-skill-options" : undefined}
+              aria-activedescendant={
+                skillMenuOpen && highlightedSkill
+                  ? `sara-skill-${highlightedSkill.id}`
+                  : undefined
               }
               maxLength={4000}
               aria-describedby="sara-composer-hint"
               onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing) return;
+                if (skillMenuOpen) {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setSkillToken(null);
+                    return;
+                  }
+                  if (
+                    ["ArrowDown", "ArrowUp"].includes(event.key) &&
+                    usableSkills.length
+                  ) {
+                    event.preventDefault();
+                    setActiveSkill(
+                      (value) =>
+                        (value +
+                          (event.key === "ArrowDown" ? 1 : -1) +
+                          usableSkills.length) %
+                        usableSkills.length,
+                    );
+                    return;
+                  }
+                  if (
+                    (event.key === "Enter" && !event.shiftKey) ||
+                    (event.key === "Tab" && !event.shiftKey && highlightedSkill)
+                  ) {
+                    event.preventDefault();
+                    if (!event.repeat && highlightedSkill)
+                      selectSkill(highlightedSkill);
+                    return;
+                  }
+                }
                 if (
                   event.key === "Enter" &&
                   !event.shiftKey &&
@@ -1389,7 +1656,8 @@ export function SaraPanel({
               </div>
             </div>
             <span className="crm-sr-only" id="sara-composer-hint">
-              Enter para enviar. Shift y Enter para una nueva línea.
+              Escribe $ para ver skills. Enter para enviar. Shift y Enter para
+              una nueva línea.
             </span>
           </form>
           {isUploading && (
@@ -1454,79 +1722,39 @@ export function SaraPanel({
         </div>
       </div>
       <dialog
-        ref={skillsDialog}
-        className="sara-skills-dialog"
-        aria-labelledby="sara-skills-title"
+        ref={deleteDialog}
+        className="sara-history-dialog sara-delete-dialog"
+        aria-labelledby="sara-delete-title"
+        aria-describedby="sara-delete-description"
+        onCancel={(event) => {
+          if (deleteLock.current) event.preventDefault();
+          else closeDelete();
+        }}
       >
-        <header>
-          <h2 id="sara-skills-title">Skills del proyecto</h2>
-          <button
-            className="sara-icon-button"
-            aria-label="Cerrar skills"
-            onClick={() => skillsDialog.current?.close()}
-          >
-            <Icon name="close" />
-          </button>
-        </header>
-        <label>
-          Buscar skills
-          <input
-            value={skillSearch}
-            onChange={(event) => setSkillSearch(event.target.value)}
-            placeholder="Nombre o descripción"
-          />
-        </label>
-        {skillsLoading && <p role="status">Consultando skills…</p>}
-        {skillsError && (
+        <h2 id="sara-delete-title">Borrar conversación</h2>
+        <p className="sara-delete-name">{deleteTarget?.title}</p>
+        <p id="sara-delete-description">
+          Se borrarán sus mensajes y los archivos que no estén en otras
+          conversaciones. No se puede deshacer. Los cambios ya realizados y su
+          registro de auditoría se conservan.
+        </p>
+        {deleteError && (
           <p className="sara-error" role="alert">
-            {skillsError}
+            {deleteError}
           </p>
         )}
-        {!skillsLoading && !skills.length && !skillsError && (
-          <p className="sara-muted">
-            Aún no hay skills en el registro del proyecto.
-          </p>
-        )}
-        {skills
-          .filter((skill) =>
-            `${skill.name} ${skill.description}`
-              .toLocaleLowerCase("es")
-              .includes(skillSearch.toLocaleLowerCase("es")),
-          )
-          .map((skill) => (
-            <details key={skill.id}>
-              <summary>
-                {skill.name}
-                <span>
-                  {skill.effective
-                    ? "Disponible"
-                    : skill.enabled
-                      ? "No disponible"
-                      : "Desactivada"}
-                </span>
-              </summary>
-              <p>{skill.description}</p>
-              <pre>{skill.content}</pre>
-            </details>
-          ))}
-        {!skillsLoading &&
-          skills.length > 0 &&
-          !skills.some((skill) =>
-            `${skill.name} ${skill.description}`
-              .toLocaleLowerCase("es")
-              .includes(skillSearch.toLocaleLowerCase("es")),
-          ) && <p className="sara-muted">No hay coincidencias.</p>}
-        {onManageSkills && (
-          <button
-            className="sara-manage"
-            onClick={() => {
-              skillsDialog.current?.close();
-              onManageSkills();
-            }}
-          >
-            Gestionar skills
+        <div className="sara-delete-actions">
+          <button autoFocus disabled={deletePending} onClick={closeDelete}>
+            Cancelar borrado
           </button>
-        )}
+          <button
+            className="sara-delete-confirm"
+            disabled={deletePending}
+            onClick={() => void removeConversation()}
+          >
+            {deletePending ? "Borrando…" : "Borrar conversación"}
+          </button>
+        </div>
       </dialog>
     </section>
   );

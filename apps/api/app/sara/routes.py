@@ -6,6 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
+from ..control import models as control_models
 from ..control import service as control
 from ..crm import security
 from ..crm.database import connect
@@ -71,6 +72,11 @@ def edit_conversation(conversation_id: UUID, data: models.ConversationEdit, admi
                 (data.title, conversation_id, admin["id"]),
             ).fetchone()
         )
+
+
+@router.delete("/conversations/{conversation_id}")
+def delete_conversation(conversation_id: UUID, data: control_models.Empty, admin: Admin):
+    return service.delete_conversation(conversation_id, admin)
 
 
 @router.get("/conversations/{conversation_id}/messages")

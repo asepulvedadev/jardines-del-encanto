@@ -661,78 +661,6 @@
   margin: 0;
   color: #526056;
 }
-.sara-skills-dialog {
-  margin: auto;
-  border: 1px solid #d9e1d5;
-  border-radius: 16px;
-  padding: 24px;
-  width: min(680px, calc(100vw - 32px));
-  max-height: calc(100dvh - 48px);
-  color: #062619;
-  background: #fff;
-  overflow: auto;
-  box-shadow: 0 24px 80px #06261930;
-}
-.sara-skills-dialog::backdrop {
-  background: #06261966;
-}
-.sara-skills-dialog > header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-.crm-shell .sara-skills-dialog h2 {
-  font-size: 22px;
-  font-weight: 700;
-}
-.sara-skills-dialog > label {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 14px;
-  margin-bottom: 16px;
-}
-.sara-skills-dialog input {
-  min-height: 44px;
-  border: 1px solid #7b897e;
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 16px;
-  width: 100%;
-  color: #062619;
-}
-.sara-skills-dialog > details {
-  border-top: 1px solid #d9e1d5;
-  padding: 10px 0;
-}
-.sara-skills-dialog > details summary {
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  list-style: disclosure-closed;
-  min-height: 44px;
-}
-.sara-skills-dialog summary > span {
-  font-size: 12px;
-  font-weight: 400;
-  color: #526056;
-}
-.sara-skills-dialog > details > p {
-  font-size: 13px;
-  line-height: 1.6;
-  color: #526056;
-}
-.sara-skills-dialog .sara-manage {
-  background: #062619;
-  color: #fff;
-  padding: 12px 16px;
-  margin-top: 20px;
-  min-height: 44px;
-}
 
 @media (max-width: 600px) {
   .sara-header {
@@ -778,7 +706,6 @@
   .sara-rename label {
     flex-basis: 100%;
   }
-  .sara-skills-dialog,
   .sara-history-dialog {
     padding: 18px;
     width: calc(100vw - 20px);
@@ -799,4 +726,128 @@
     scroll-behavior: auto !important;
     animation: none !important;
   }
+}
+
+.sara-history-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.sara-history-dialog nav .sara-history-row > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.sara-history-dialog nav .sara-delete-button {
+  width: 44px;
+  min-height: 44px;
+  padding: 10px;
+  flex: none;
+  justify-content: center;
+}
+.sara-delete-dialog {
+  max-width: 480px;
+}
+.crm-shell .sara-delete-dialog h2 {
+  font-size: 22px;
+  margin: 0 0 12px;
+}
+.sara-delete-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sara-delete-dialog p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.sara-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+.sara-delete-actions button {
+  min-height: 44px;
+  border: 1px solid #7b897e;
+  padding: 10px 16px;
+  border-radius: 8px;
+}
+.crm-shell .sara-delete-confirm {
+  background: #992e27;
+  color: #fff;
+  border-color: #992e27;
+}
+.sara-composer {
+  position: relative;
+}
+.sara-skill-picker {
+  flex: none;
+  min-height: 0;
+  margin: 0 24px;
+  max-height: min(260px, 30dvh);
+  overflow: auto;
+  border: 1px solid #b9c7b6;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px #0626191a;
+  padding: 8px;
+}
+.sara-skill-picker-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  gap: 12px;
+}
+.sara-skill-picker-heading span,
+.sara-skill-picker small {
+  color: #526056;
+  font-size: 12px;
+}
+.sara-skill-picker p {
+  margin: 8px;
+  font-size: 14px;
+}
+.crm-shell .sara-skill-picker [role="option"] {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px;
+  border-radius: 8px;
+}
+.sara-skill-picker [role="option"] > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sara-skill-picker [role="option"] > small {
+  flex: none;
+  align-self: center;
+}
+.sara-skill-picker [aria-selected="true"] {
+  background: #eef3e8;
+  outline: 1px solid #526c45;
+  outline-offset: -1px;
+}
+.sara-skill-picker [aria-disabled="true"] {
+  color: #68716b;
+  cursor: not-allowed;
+}
+@media (max-width: 480px) {
+  .sara-skill-picker {
+    margin-inline: 16px;
+  }
+  .sara-skill-picker [role="option"] {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+}
+
+.sara-workspace .sara-delete-confirm:hover:not(:disabled) {
+  background: #7d241e;
 }

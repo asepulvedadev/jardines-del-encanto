@@ -295,6 +295,11 @@ reply in this scope. Show real unavailable states instead of a decorative active
 microphone or invented skills. Create an untitled conversation directly on first
 use or the new-chat action; renaming is secondary, not a prerequisite to writing.
 Enter sends, Shift+Enter inserts a line break, and IME composition never sends.
+Skills management stays in Settings. Typing `$` in the composer opens a compact,
+keyboard-accessible skills picker with truthful enabled/unavailable states; selection
+inserts a mention and never submits. History rows offer deletion with a named native
+confirmation and explicit irreversible scope. Preserve failed/uncertain operations,
+reject active-turn deletion and never undo confirmed business changes implicitly.
 One attachment entry accepts supported documents/audio; one recording control
 retains the explicit voice-note review flow. Keep drafts and recover ambiguous
 submissions with the same request identity rather than generating twice.

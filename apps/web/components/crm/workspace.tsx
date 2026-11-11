@@ -442,15 +442,7 @@ export function Workspace({
             </p>
           )}
           {view === "sara" ? (
-            <SaraPanel
-              csrf={csrf}
-              onChanged={refresh}
-              onManageSkills={() => {
-                setSocialCallback(false);
-                setSettingsTab("customizations");
-                setSettingsOpen(true);
-              }}
-            />
+            <SaraPanel csrf={csrf} onChanged={refresh} />
           ) : view === "overview" ? (
             <>
               <div className="crm-stat-strip">

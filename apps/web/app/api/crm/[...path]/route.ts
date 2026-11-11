@@ -15,7 +15,7 @@ const rules: [RegExp, string[]][] = [
   ],
   [/^sara\/(status|skills)$/, ["GET"]],
   [/^sara\/conversations$/, ["GET", "POST"]],
-  [/^sara\/conversations\/[0-9a-f-]{36}$/, ["PATCH"]],
+  [/^sara\/conversations\/[0-9a-f-]{36}$/, ["PATCH", "DELETE"]],
   [/^sara\/conversations\/[0-9a-f-]{36}\/messages$/, ["GET", "POST"]],
   [/^sara\/attachments$/, ["POST"]],
   [/^sara\/attachments\/[0-9a-f-]{36}\/content$/, ["GET"]],
@@ -248,4 +248,4 @@ async function proxy(
     return fail(503, "service_unavailable");
   }
 }
-export { proxy as GET, proxy as POST, proxy as PATCH };
+export { proxy as GET, proxy as POST, proxy as PATCH, proxy as DELETE };

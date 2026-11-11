@@ -10,10 +10,11 @@ test("Dashboard is first and Sara IA is immediately below it in CRM navigation",
   assert.match(workspace, /\["overview", "home"\],\s*\["sara", "message"\]/);
   assert.match(workspace, /<SaraPanel/);
 });
-test("Sara skills management opens existing customization settings without duplicating OAuth consumers", () => {
+test("Skills management stays in customization settings without duplicating OAuth consumers", () => {
   const workspace = read("apps/web/components/crm/workspace.tsx"),
     settings = read("apps/web/components/crm/settings-modal.tsx");
-  assert.match(workspace, /setSettingsTab\("customizations"\)/);
+  assert.doesNotMatch(workspace, /onManageSkills/);
+  assert.match(settings, /customizations/);
   assert.match(workspace, /initialTab=\{settingsTab\}/);
   assert.match(settings, /initialTab/);
   assert.equal((settings.match(/<SocialPanel/g) || []).length, 1);

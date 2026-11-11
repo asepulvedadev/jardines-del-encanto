@@ -33,7 +33,7 @@ test("Sara uses private server history and explicit note preview before upload",
   assert.match(source, /Usar nota/);
   assert.match(source, /voice_available/);
   assert.match(source, /before=/);
-  assert.match(source, /onManageSkills/);
+  assert.match(source, /saraSkillQuery/);
 });
 
 import { createRequire } from "node:module";
@@ -168,7 +168,7 @@ test("rendered chat offers server-backed history, labeled composer and no invent
   assert.match(html, /aria-label="Sara IA"/);
   assert.match(html, /role="log"/);
   assert.match(html, /Mensaje para Sara IA/);
-  assert.match(html, /Skills del proyecto/);
+  assert.match(html, /Escribe \$ para ver skills/);
   assert.match(html, /Consultar|Consultando/);
   assert.doesNotMatch(html, /SpeechRecognition|Llamar|Iniciar llamada/);
 });
@@ -436,4 +436,46 @@ test("composer exposes one focus boundary and activity retains a44px keyboard/to
     css,
     /\.sara-workspace \.sara-activity > summary\s*\{[^}]*min-height: 44px/s,
   );
+});
+
+test("dollar skill picker recognizes only the active token and replaces it without sending", () => {
+  const { saraSkillQuery, saraInsertSkill } = load("sara-types.ts");
+  assert.deepEqual(saraSkillQuery("Usa $ven después", 8), {
+    start: 4,
+    end: 8,
+    query: "ven",
+  });
+  assert.deepEqual(saraSkillQuery("$", 1), { start: 0, end: 1, query: "" });
+  assert.equal(saraSkillQuery("Precio$13", 9), null);
+  assert.equal(saraSkillQuery("$[Ventas] ", 10), null);
+  assert.equal(saraSkillQuery("Texto normal", 12), null);
+  assert.deepEqual(
+    saraInsertSkill(
+      "Usa $ven después",
+      { start: 4, end: 8, query: "ven" },
+      "Ventas",
+    ),
+    {
+      text: "Usa $[Ventas]  después",
+      caret: 14,
+    },
+  );
+  assert.equal(
+    saraInsertSkill("$", { start: 0, end: 1, query: "" }, "x]\n[evil").text,
+    "$[x   evil] ",
+  );
+});
+
+test("skills management is absent from the top toolbar and history has confirmed deletion", () => {
+  const { SaraPanel } = load("sara-panel.tsx");
+  const html = renderToStaticMarkup(
+    React.createElement(SaraPanel, {
+      csrf: "fixture",
+      onChanged: async () => {},
+    }),
+  );
+  assert.doesNotMatch(html, /aria-label="Ver skills"|sara-skills-dialog/);
+  assert.match(html, /Borrar conversación/);
+  assert.match(html, /Cancelar borrado/);
+  assert.match(read("sara-panel.tsx"), /role="listbox"/);
 });

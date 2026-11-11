@@ -18,6 +18,7 @@ Existing `/crm/hermes/*`, proposals and social/OAuth flows stay compatible.
 | GET conversations               | `?before=<optional UUID>`                                | `{conversations:[{id,title,created_at,updated_at}],next_cursor}`; 30 per page                                      |
 | POST conversations              | `{title?:string}`                                        | conversation object                                                                                                |
 | PATCH conversations/:id         | `{title:string}`                                         | conversation object                                                                                                |
+| DELETE conversations/:id      | `{}`                                                     | `{id,deleted:true}`; 409 while a turn is active; owned chat only                                                  |
 | GET conversations/:id/messages  | `?before=<optional UUID>`                                | `{messages:[Message],next_cursor}`; 50 chronologically ordered from latest page                                    |
 | POST conversations/:id/messages | `{request_id:UUID,message:string,attachment_ids:UUID[]}` | `{user_message,assistant_message,state}`; assistant message nullable; state completed, pending or failed           |
 | GET skills                      | none                                                     | `{skills:[{id,name,description,content,enabled,effective}]}` from application registry, not invented global skills |
@@ -141,3 +142,25 @@ existing isolated provider key mount without reading, rotating or copying its
 contents. Do not perform paid inference/transcription tests or transfer customer
 files/audio. Record checkpoint, actual release, health and remaining live-provider
 limitations after deployment. Existing sections above describe the local stage.
+
+
+## Conversation deletion
+
+Migration008 only grants DELETE on `sara_conversations` and `sara_attachments` to
+the application role. The authenticated DELETE route requires an empty JSON object,
+Origin and CSRF and locks the owned conversation. Active turns return409 unchanged;
+GET messages can settle expired leases before an explicit retry. Conversation/message
+rows and attachment links are erased through existing FK cascades. Only referenced
+files with no remaining conversation links are deleted; shared files and unattached
+drafts are retained. Sends and deletion take the same sorted, namespaced
+per-file advisory locks to serialize reuse/purge without granting UPDATE on immutable
+blobs. PostgreSQL row-locking reads require an UPDATE privilege; those are deliberately
+not used for this append-only table.
+
+Related broker runs are locked and their bearer expiry revoked; pending proposals
+are expired atomically under the same control lock as approval. Previously executed
+CRM/social effects are not rolled back. Broker calls, run prompts/history/results and
+append-only control audit attribution remain for operational accountability; this is
+chat deletion, not complete personal-data erasure. No historical pending approval can
+be revived by retaining its old ID. No source, runtime policy, customer record or
+external account is deleted by this endpoint.

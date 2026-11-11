@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { test, beforeEach, afterEach } from "node:test";
-import { GET, POST, PATCH } from "../apps/web/app/api/crm/[...path]/route.ts";
+import {
+  GET,
+  POST,
+  PATCH,
+  DELETE,
+} from "../apps/web/app/api/crm/[...path]/route.ts";
 const oldFetch = globalThis.fetch,
   oldBase = process.env.API_BASE_URL,
   oldOrigin = process.env.CRM_ORIGIN;
@@ -50,12 +55,14 @@ test("Sara admits only the typed conversation and attachment routes", async () =
     ["GET", "sara/conversations"],
     ["POST", "sara/conversations"],
     ["PATCH", `sara/conversations/${id}`],
+    ["DELETE", `sara/conversations/${id}`],
     ["GET", `sara/conversations/${id}/messages`],
     ["POST", `sara/conversations/${id}/messages`],
     ["POST", "sara/attachments"],
   ])
     assert.equal(
-      (await { GET, POST, PATCH }[method](req(method), ctx(path))).status,
+      (await { GET, POST, PATCH, DELETE }[method](req(method), ctx(path)))
+        .status,
       200,
       path,
     );
@@ -153,4 +160,30 @@ test("Sara JSON responses have an explicit byte budget", async () => {
       headers: { "content-type": "application/json" },
     });
   assert.equal((await GET(req("GET"), ctx("sara/conversations"))).status, 502);
+});
+
+test("Sara deletion stays exact-route, JSON, Origin and CSRF forwarded", async () => {
+  for (const path of [
+    "sara/conversations",
+    `sara/conversations/${id}/messages`,
+    "contacts/" + id,
+  ])
+    assert.equal((await DELETE(req("DELETE"), ctx(path))).status, 404);
+  const bad = req("DELETE");
+  bad.headers.set("origin", "https://evil.invalid");
+  assert.equal(
+    (await DELETE(bad, ctx(`sara/conversations/${id}`))).status,
+    403,
+  );
+  assert.equal(calls.length, 0);
+  assert.equal(
+    (await DELETE(req("DELETE"), ctx(`sara/conversations/${id}`))).status,
+    200,
+  );
+  assert.equal(calls[0].options.method, "DELETE");
+  assert.equal(calls[0].options.headers.get("x-csrf-token"), "fixture");
+  assert.equal(
+    calls[0].options.headers.get("origin"),
+    "https://crm.example.invalid",
+  );
 });

@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 const paths = {
+  trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
   history: "M3 11a9 9 0 1 1 3 7M3 4v7h7M12 7v5l3 2",
   refresh: "M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 14 6M4 12a8 8 0 0 0 14 6",
   edit: "m16 3 5 5M4 20l5-1L21 7l-5-5L4 14z",

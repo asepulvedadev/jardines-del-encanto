@@ -6,11 +6,12 @@ TTS, browser speech recognition or a provider credential store.
 
 ## Composition and state
 
-`SaraPanel({csrf,onChanged,onManageSkills?})` fills the parent CRM flex layout.
+`SaraPanel({csrf,onChanged})` fills the parent CRM flex layout.
 Conversation history and messages come only from private server routes. A named
 native history dialog supports search across loaded conversations and cursor paging,
 without a permanent second navigation rail. A compact toolbar exposes history,
-one-click new chat, title editing, refresh and the skills dialog. On first use an
+one-click new chat, title editing and refresh. Skills management remains only in
+Settings → Customizations. On first use an
 empty server list creates one untitled conversation through the existing guarded
 route. The user does not need to fill a title form before writing.
 Message pages arrive chronologically; older pages prepend without duplicates.
@@ -50,9 +51,23 @@ refresh display a separate warning rather than suggesting a repeated mutation.
 
 ## Skills and files
 
-The named native skills dialog loads the application registry, exposes search and
-plain-text instruction previews, and restores focus with Escape. Gestionar skills
-calls the parent's actual settings/customization entry point.
+Typing `$` at the start of a token opens an inline, server-backed skills picker
+above the composer, outside its clipped attachment/preview scroller.
+Names/descriptions filter as the user types; inactive skills are labelled and cannot
+be selected. Arrow keys move through usable skills, Enter/Tab or a click inserts a
+plain `$[Name]` mention without sending, and Escape closes the picker. IME does not
+select or send. The picker reloads on each opening, ignores late closed-menu responses
+and has loading/error/empty states. Mentions do not grant permissions or replay
+instructions; effective project skills remain bounded guidance in the next broker
+claim. No toolbar Skills icon or duplicate management modal remains.
+
+History rows expose a named delete button and a separate native confirmation dialog.
+Cancel and Escape are non-destructive; a pending delete cannot be double-submitted or
+silently dismissed. The UI updates only after a server acknowledgement (or a 404
+confirming an already absent loaded conversation on retry), preserves failures, and
+removes deleted conversation drafts/cache entries. Active/uncertain sends and uploads
+block local deletion; the server independently rejects active turns. Pagination is
+refreshed after deletion, and stale list responses cannot resurrect deleted rows.
 
 Documents support UTF-8 TXT/MD/CSV and text PDF through the fixed private upload API.
 The client checks supported MIME/extension combinations, 512 KiB per file and four
@@ -160,3 +175,17 @@ camera and geolocation stayed denied on every probe. No getUserMedia call was ma
 Merged public-domain/SEO source retained its current routes and CRM separation.
 Final local checks: production build, TypeScript and58 CRM/UI/gateway tests passed;
 merged public web checks passed25 tests with six opt-in browser checks skipped.
+
+
+### Current revision verification
+
+The `$` picker and confirmed conversation deletion were verified with a real local
+Next UI and synthetic private API responses at 390×844 and 1440×1000. This caught a
+clipped absolute picker whose pointer events reached the transcript; the picker now
+occupies its own bounded flex row above the composer. Keyboard and mouse selection
+insert a mention without posting a message. Injected deletion409/500 preserve state;
+404 retries remove stale rows. Cancel, Escape, focus restoration, one DELETE under
+double activation, selected/nonselected/last deletion, draft cleanup, stale-list
+filtering and Settings-only skills management were observed. No real provider,
+customer account or microphone was used. Final option-scroll and destructive-hover
+polish has type/unit coverage but was not separately browser-retested.
