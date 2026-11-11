@@ -23,6 +23,10 @@ const config: NextConfig = {
       {
         source: "/crm/:path*",
         headers: [
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(self), geolocation=()",
+          },
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "Cache-Control", value: "no-store, private" },
         ],

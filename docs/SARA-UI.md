@@ -151,3 +151,12 @@ CRM-only `Permissions-Policy` override must allow same-origin microphone capture
 public pages keep camera, microphone and geolocation denied. This enables the
 already-requested explicit voice-note control, not automatic capture, live calls,
 provider tests or a broader origin policy.
+
+The focused permission-policy regression was observed RED before the override and
+GREEN afterward. Independent source review found no auth/origin/authority expansion.
+The built Next HTTP server returned `microphone=(self)` on `/crm` and its namespace,
+while `/`, `/login`, `/crm-other` and `/health` retained complete microphone denial;
+camera and geolocation stayed denied on every probe. No getUserMedia call was made.
+Merged public-domain/SEO source retained its current routes and CRM separation.
+Final local checks: production build, TypeScript and58 CRM/UI/gateway tests passed;
+merged public web checks passed25 tests with six opt-in browser checks skipped.

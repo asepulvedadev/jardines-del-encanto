@@ -18,3 +18,45 @@ test("Sara skills management opens existing customization settings without dupli
   assert.match(settings, /initialTab/);
   assert.equal((settings.match(/<SocialPanel/g) || []).length, 1);
 });
+
+import ts from "typescript";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+function nextHeaders() {
+  const module = { exports: {} };
+  const code = ts.transpileModule(read("apps/web/next.config.ts"), {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+      esModuleInterop: true,
+    },
+  }).outputText;
+  new Function("require", "module", "exports", code)(
+    require,
+    module,
+    module.exports,
+  );
+  return module.exports.default.headers();
+}
+
+test("voice notes allow only same-origin CRM microphone after the deny-by-default policy", async () => {
+  const rules = await nextHeaders();
+  const microphone = rules.flatMap((rule, index) =>
+    rule.headers
+      .filter((header) => header.key.toLowerCase() === "permissions-policy")
+      .map((header) => ({ source: rule.source, value: header.value, index })),
+  );
+  const global = microphone.find((rule) => rule.source === "/(.*)");
+  assert.equal(global?.value, "camera=(), microphone=(), geolocation=()");
+  const allowed = microphone.filter(
+    (rule) => !rule.value.includes("microphone=()"),
+  );
+  assert.equal(allowed.length, 1);
+  assert.equal(allowed[0].source, "/crm/:path*");
+  assert.equal(
+    allowed[0].value,
+    "camera=(), microphone=(self), geolocation=()",
+  );
+  assert.ok(allowed[0].index > global.index);
+  assert.doesNotMatch(allowed[0].value, /\*|https?:/);
+});
