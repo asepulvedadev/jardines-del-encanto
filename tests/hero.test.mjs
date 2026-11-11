@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { readFile } from "node:fs/promises";
 
 // Browser checks are opt-in so the existing HTTP suite needs no browser install.
 const browserModule = process.env.HERO_PLAYWRIGHT_MODULE;
@@ -59,6 +60,24 @@ test("the hero uses a dedicated silent film and a static poster", async () => {
   });
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type"), /video\/mp4/);
+});
+
+test("public responses deliver the complete HTML and exact hero assets", async () => {
+  const document = await fetch(base);
+  assert.equal(document.status, 200);
+  const bytes = Buffer.from(await document.arrayBuffer());
+  const length = document.headers.get("content-length");
+  if (length !== null) assert.equal(bytes.length, Number(length));
+  assert.match(bytes.toString(), /<\/html>/);
+  for (const name of ["hero-loop.mp4", "hero-poster.webp"]) {
+    const response = await fetch(`${base}/media/${name}`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(
+      Buffer.from(await response.arrayBuffer()),
+      await readFile(new URL(`../apps/web/public/media/${name}`, import.meta.url)),
+      `${name} must reach the visitor without proxy truncation`,
+    );
+  }
 });
 
 test(

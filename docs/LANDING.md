@@ -104,6 +104,13 @@ standalone preview, and 26/26 CRM gateway tests passed. Chromium software-WebGL
 checks and rendered screenshots covered 320, 390, 768 and 1440px layouts.
 Physical mobile devices and Safari were not tested. No publication was performed.
 
+The owner subsequently authorized publication of this hero on2026-11-11. The
+existing main-branch workflow verified and deployed release6744752. External
+checks found a host proxy temporary-directory ownership mismatch that truncated
+large responses, despite passing container health. The administrator-authorized
+project-only Nginx policy repair is documented in `DEPLOY.md`. All23 public web
+checks then passed, including browser interactions and complete hero asset bytes.
+
 ## Approved content and boundaries
 
 The owner supplied the offer and contact on 2026-11-10:

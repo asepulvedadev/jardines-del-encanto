@@ -191,6 +191,33 @@ configuration globally, restart Docker, or reuse another project's database/secr
 The root-owned Nginx preview policy is intentionally separate from CI releases.
 Templates are in `ops/nginx/`; CI must not install privileged host policy.
 
+HTTPS response buffering uses `/var/lib/nginx/jardines-proxy`, not the shared
+`/var/lib/nginx/proxy`. Before installing the HTTPS template, create this dedicated
+directory with mode0700 and the actual Nginx worker's user/group (currently
+`www-data:www-data`). Never recursively change ownership of the shared directory.
+Keep normal bounded memory buffering and disk spill for slow clients; monitor
+temporary disk usage. This policy applies only to the Jardines HTTPS server.
+
+On 2026-11-11, the application returned all 643758 HTML bytes directly, but public
+HTTPS stopped near 64 KiB. Project errors showed `Permission denied` when workers
+running as `www-data` tried to spill responses into the shared directory owned by
+`nobody` with mode0700. Running `nginx -t` also changed the shared base directory's
+owner to `www-data`, temporarily restoring full responses before the policy edit.
+The dedicated path removes this site's reliance on that shared ownership side
+effect; do not present the validation side effect as an application-code fix.
+Preserve a root-only project-vhost backup, validate `nginx -t`, then reload rather
+than restart Nginx. Verify full GET bodies, not merely HEAD/health responses:
+HTML length must match its declared length, and hero media bytes must match the
+release assets. The web regression suite now checks this explicitly.
+
+The repair passed all23 public web checks, including browser3D/mobile/fallback
+cases and exact media bytes. A rate-limited128KiB/s download also delivered all
+4118060 hero-video bytes; the original8586020-byte film remained intact.
+The Python suite ran69 tests:68 passed and the opt-in pinned-Hermes fixture was
+skipped. Eighteen sibling vhost content hashes and all29 container identities/start
+times were unchanged. The root-only rollback checkpoint is
+`/srv/jardines-del-encanto/proxy-fix-wdwb_fx3`.
+
 1. Record sibling container IDs, vhost checksums and HTTP status baselines. Verify
    DNS resolves to the VPS and `nginx -t` passes before making changes.
 2. Create `/var/www/jardines-acme/.well-known/acme-challenge`. Install only
