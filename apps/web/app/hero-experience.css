@@ -1,0 +1,269 @@
+.hero-experience {
+  min-width: 0;
+  margin: 0;
+  position: relative;
+  align-self: center;
+}
+
+.hero-world {
+  position: relative;
+  isolation: isolate;
+  height: clamp(440px, 40vw, 550px);
+  border-radius: 12px 12px 80px 12px;
+  overflow: hidden;
+  background: #173a29;
+}
+.hero-world[data-view="plan"] {
+  background: #e7ecdc;
+}
+.hero-world-switch {
+  position: absolute;
+  z-index: 4;
+  top: 18px;
+  left: 18px;
+  display: flex;
+  padding: 4px;
+  background: var(--canvas);
+  border: 1px solid #d9e1d5;
+  border-radius: 8px;
+  gap: 3px;
+}
+.hero-world-switch button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 14px;
+  color: var(--forest);
+  font-size: 12px;
+  font-weight: 800;
+  background: transparent;
+}
+.hero-world-switch button[aria-pressed="true"] {
+  background: var(--forest);
+  color: white;
+}
+.hero-world-switch button:hover:not([aria-pressed="true"]) {
+  background: #e5eadb;
+}
+.hero-world-switch button span {
+  font-size: 17px;
+  margin-right: 5px;
+}
+.hero-cinema,
+.hero-masterplan {
+  position: absolute;
+  inset: 0;
+}
+.hero-cinema video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-film-control {
+  position: absolute;
+  right: 24px;
+  bottom: 18px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #ffffffa6;
+  border-radius: 50%;
+  background: #062619d9;
+  color: white;
+  font-size: 18px;
+}
+.hero-film-control:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.hero-experience-caption {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 14px 0 0;
+}
+
+.hero-experience-caption p {
+  margin: 0;
+  max-width: 360px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.hero-experience-caption > a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #b7c2aa;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.hero-plan-canvas {
+  position: absolute;
+  inset: 68px 0 62px;
+}
+.hero-plan-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 35% 12% -5%;
+  background: radial-gradient(ellipse, #06261926, transparent 65%);
+  pointer-events: none;
+  z-index: 0;
+}
+.hero-plan-canvas canvas {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+.hero-plan-canvas canvas:active {
+  cursor: grabbing;
+}
+.hero-plan-canvas canvas:focus-visible {
+  outline-offset: -5px;
+}
+.hero-plan-selection {
+  position: absolute;
+  left: 26px;
+  bottom: 18px;
+  z-index: 2;
+  display: grid;
+  gap: 4px;
+}
+
+.hero-plan-selection select {
+  min-height: 44px;
+  max-width: 190px;
+  padding: 8px 30px 8px 12px;
+  border: 1px solid #7b897e;
+  border-radius: 5px;
+  background: var(--canvas);
+  color: var(--forest);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+.hero-plan-controls {
+  position: absolute;
+  z-index: 2;
+  right: 18px;
+  top: 94px;
+  display: grid;
+  gap: 6px;
+}
+.hero-plan-controls button {
+  height: 44px;
+  width: 44px;
+  background: var(--canvas);
+  color: var(--forest);
+  border: 1px solid #7b897e;
+  border-radius: 5px;
+  font-size: 21px;
+}
+.hero-plan-controls button:hover {
+  background: white;
+}
+
+.hero-world-loading {
+  position: absolute;
+  top: 55%;
+  left: 20px;
+  right: 20px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--forest);
+}
+.hero-plan-fallback {
+  position: absolute;
+  inset: 90px 30px 30px;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+.hero-plan-fallback img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  object-fit: contain;
+}
+.hero-plan-fallback p {
+  margin: 0;
+  font-size: 12px;
+  text-align: center;
+}
+.hero-plan-fallback a {
+  text-decoration: underline;
+}
+.hero-cinema-error {
+  position: absolute;
+  top: 80px;
+  left: 18px;
+  right: 18px;
+  padding: 12px;
+  border-radius: 5px;
+  background: var(--canvas);
+  color: var(--forest);
+  font-size: 12px;
+}
+@media (max-width: 1100px) and (min-width: 901px) {
+  .hero-world {
+    height: 495px;
+  }
+}
+@media (max-width: 900px) {
+  .hero-world {
+    height: 490px;
+  }
+
+  .hero-plan-canvas {
+    inset: 68px 0 62px;
+  }
+}
+@media (max-width: 639px) {
+  .hero-world {
+    height: 460px;
+    border-bottom-right-radius: 54px;
+  }
+  .hero-world-switch {
+    top: 14px;
+    left: 14px;
+  }
+  .hero-world-switch button {
+    min-height: 44px;
+    padding-inline: 12px;
+  }
+
+  .hero-film-control {
+    right: 20px;
+    bottom: 18px;
+  }
+
+  .hero-experience-caption {
+    grid-template-columns: 1fr auto;
+    padding-top: 17px;
+  }
+
+  .hero-experience-caption p {
+    font-size: 12px;
+  }
+
+  .hero-plan-controls {
+    right: 14px;
+    top: 91px;
+  }
+  .hero-plan-canvas {
+    inset: 68px 0 62px;
+  }
+  .hero-plan-selection {
+    left: 22px;
+    bottom: 18px;
+  }
+}

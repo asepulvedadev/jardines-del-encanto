@@ -37,6 +37,73 @@ The owner subsequently authorized production deployment on 2026-11-11. Publicati
 uses the existing main-branch CI/deployment gate described in `DEPLOY.md`. A local
 preview or successful push alone is not evidence of a healthy production release.
 
+## Optional cinematic / 3D hero — 2026-11-11
+
+The owner approved the “Del plano al lugar” concept for local implementation and
+preview. This change does not publish or deploy anything. `HeroExperience` replaces
+the old hero-only player; the full architectural film remains available elsewhere.
+The subsequent owner revision removes decorative headings, slogans, duplicate
+explore actions and instructions from both media views. Keep only view/player/3D
+controls over the media, with the factual illustrative-media notice outside it.
+On mobile/stacked layouts the media comes first, followed by the headline, offer
+and contact actions; desktop retains copy left and media right. The media is a
+single instance, first in document order, positioned with named grid areas.
+
+- The initial view uses `hero-loop.mp4`: an approximately sixteen-second edit.
+  It retains the entrance/lot views at source seconds 5.8–15.8 and appends the
+  ecological paths and children's park at seconds 30–36.5. A 0.6-second crossfade
+  joins the excerpts; a 0.8-second crossfade back to source seconds 5–5.8 closes
+  the loop. Source footage and its baked-in annotations remain illustrative,
+  with no new UI text overlays. The edit is
+  re-encoded as silent 848 × 478 H.264 at 24 fps with fast-start metadata. It is
+  approximately 4.1 MB, versus the original film's approximately 8.6 MB.
+- `hero-poster.webp` is the frame at source second 5.8, not a generated image.
+  Native poster behavior and explicit play/pause controls preserve a static view.
+- Desktop playback respects reduced motion, data-saving signals and document
+  visibility, and pauses outside the viewport. Mobile starts only on request.
+  A deliberate pause or view switch can interrupt a pending `play()` promise;
+  its `AbortError` is not a broken-media state and must not disable playback.
+- “Maqueta 3D” loads Three.js and the scene on demand. No
+  renderer, WebGL context or 3D render loop is started in the initial film view.
+- The scene uses existing PDF-derived block paths from `masterplan-data.json`.
+  Its shallow depth and rectangular display plinth are conceptual presentation,
+  not measured heights, terrain, a parcel boundary or real-time availability.
+  No source lot identifiers, anomalies, coordinates or measurements are changed.
+- Mouse/touch rotation, keyboard arrows, zoom buttons, Home/reset and a native
+  block selector offer complementary navigation. Wheel scrolling and pinch zoom
+  remain available to the page. Frames are rendered only on interaction, resize
+  or a bounded camera transition. Geometry, shadow targets, controls, observers
+  and the WebGL context are released when leaving the 3D view.
+- Unsupported/lost WebGL shows the original plan preview and a link to the
+  existing accessible 2D explorer. Video failure retains the poster and 3D/2D paths.
+
+Run the HTTP and source-regression suite against a local preview:
+
+```sh
+npm run dev --workspace=apps/web -- --hostname 127.0.0.1 --port 4317
+# In a second terminal:
+npm run test:web
+```
+
+The opt-in browser checks use an existing Playwright installation; set
+`HERO_PLAYWRIGHT_MODULE` to its resolvable module name or absolute `index.mjs`.
+Optionally set `HERO_CHROMIUM_PATH` for an installed Chromium executable:
+
+```sh
+HERO_PLAYWRIGHT_MODULE=playwright node --test tests/hero.test.mjs
+```
+
+The browser checks cover deferred loading, actual keyboard rendering, block
+selection, view teardown/re-entry, 320/390/768/1440px overflow, reduced-motion
+media requests and both unsupported and lost WebGL. They do not certify all
+assistive technologies or physical-device performance.
+
+Local verification of this implementation: Node.js 24 typecheck and optimized
+build passed; 22/22 web tests passed with browser checks enabled against the
+standalone preview, and 26/26 CRM gateway tests passed. Chromium software-WebGL
+checks and rendered screenshots covered 320, 390, 768 and 1440px layouts.
+Physical mobile devices and Safari were not tested. No publication was performed.
+
 ## Approved content and boundaries
 
 The owner supplied the offer and contact on 2026-11-10:
@@ -81,7 +148,8 @@ Photos were auto-oriented and encoded to 960/1920 px-wide WebP variants, without
 object removal or generative alteration. The video was remuxed with fast-start metadata;
 its original audio and video streams were not re-encoded. It is **an architectural
 render**, not evidence of completed construction. The hero caption explicitly states this.
-The player is initially muted and has native controls. Desktop autoplay is
+The full-film player is initially muted and has native controls; the hero uses
+the custom controls described above. Desktop autoplay is
 conditional; mobile and reduced-motion visitors start it explicitly. It pauses
 when offscreen or when the document becomes hidden. No speech transcription or captions were supplied;
 full audiovisual accessibility has not been certified.

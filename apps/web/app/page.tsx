@@ -4,10 +4,10 @@ import {
   PhotoGallery,
 } from "../components/landing-interactions";
 import {
-  HeroFilm,
   LandingMotion,
   LaunchBanner,
 } from "../components/landing-experience";
+import { HeroExperience } from "../components/hero-experience";
 import { MasterplanExplorer } from "../components/masterplan-explorer";
 import { LeadCapture } from "../components/lead-capture";
 import {
@@ -88,6 +88,7 @@ export default function Home() {
           id="inicio"
           aria-labelledby="hero-title"
         >
+          <HeroExperience />
           <div className="hero-copy">
             <h1 id="hero-title">
               Más tierra.
@@ -120,7 +121,6 @@ export default function Home() {
               Habla con un asesor. Sin pagos ni reservas automáticas.
             </p>
           </div>
-          <HeroFilm />
         </section>
         <section
           className="facts-section"

@@ -129,11 +129,16 @@
 .landing .hero {
   padding-block: 64px 68px;
   grid-template-columns: minmax(0, 0.96fr) minmax(0, 1.04fr);
+  grid-template-areas: "copy media";
   gap: 48px;
   align-items: center;
 }
 .landing .hero-copy {
+  grid-area: copy;
   animation: hero-arrive 650ms ease-out both;
+}
+.landing .hero-experience {
+  grid-area: media;
 }
 .landing .hero h1 {
   font-size: clamp(58px, 5.5vw, 80px);
@@ -196,67 +201,6 @@
   margin-top: 8px;
   font-size: 12px;
   color: var(--muted);
-}
-.hero-film {
-  min-width: 0;
-  position: relative;
-  align-self: center;
-  animation: hero-arrive 850ms ease-out both;
-}
-.hero-film-frame {
-  position: relative;
-  aspect-ratio: 16 / 13;
-  border-radius: 18px 18px 4px 4px;
-  overflow: hidden;
-  background: #183526;
-}
-.hero-film video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.hero-film-badge {
-  position: absolute;
-  pointer-events: none;
-  top: 18px;
-  left: 18px;
-  right: 18px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: white;
-  background: #062619e6;
-  border: 1px solid #ffffff40;
-  padding: 10px 14px;
-  width: fit-content;
-  max-width: calc(100% - 36px);
-  font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  gap: 24px;
-}
-.hero-film figcaption {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 7px;
-  background: #eaf0e2;
-  padding: 20px 22px;
-  border-radius: 0 0 18px 18px;
-}
-.hero-film figcaption strong {
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: -0.035em;
-}
-.hero-film figcaption span,
-.hero-film-error {
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--muted);
-  max-width: 460px;
-}
-.hero-film-error {
-  margin-top: 12px;
 }
 .landing .facts-section {
   background: #edf2e5;
@@ -473,6 +417,7 @@
 @media (max-width: 900px) {
   .landing .hero {
     grid-template-columns: 1fr;
+    grid-template-areas: "media" "copy";
     padding-top: 44px;
     gap: 36px;
   }
@@ -490,13 +435,6 @@
   }
   .landing .hero-description {
     max-width: 600px;
-  }
-  .hero-film-frame {
-    aspect-ratio: 16/9;
-  }
-  .hero-film figcaption {
-    grid-template-columns: 0.8fr 1.2fr;
-    gap: 24px;
   }
   .landing .overview > .section-heading {
     grid-template-columns: 1fr;
@@ -623,20 +561,6 @@
   }
   .landing .hero-actions .button {
     width: 100%;
-  }
-  .hero-film-frame {
-    aspect-ratio: 4/3;
-    border-radius: 14px 14px 0 0;
-  }
-  .hero-film figcaption {
-    grid-template-columns: 1fr;
-    gap: 7px;
-    padding: 18px;
-  }
-  .hero-film-badge {
-    font-size: 12px;
-    left: 12px;
-    top: 12px;
   }
   .landing .facts-grid {
     padding-block: 28px;

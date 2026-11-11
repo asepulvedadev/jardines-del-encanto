@@ -269,6 +269,18 @@ and 180–240ms panels. Prefer CSS opacity/transform changes; respect reduced mo
 No cursor replacement, magnetic buttons, scroll hijacking, autoplay parallax or perpetual
 decorative loops. Text and primary actions remain available without animation.
 
+The owner-approved “Del plano al lugar” hero pairs a short excerpt of the supplied
+architectural video with an optional interactive 3D masterplan. Load the renderer
+only after explicit selection. Reuse the PDF-extracted block/lot geometry; the
+presentation plinth and shallow extrusion are illustrative, not terrain, property
+boundaries, construction progress or live inventory. Retain a 2D fallback, keyboard
+and selection controls, reduced-motion support, and visible media disclaimers.
+Per the owner's cleanup revision, show no decorative headings, slogans, duplicate
+explore CTA or instruction text over either media view. Keep control labels and
+accessible names; place the factual illustrative-media notice outside the stage.
+On the stacked/mobile hero, show the media switcher and visual before the copy;
+keep desktop copy on the left and media on the right. Use one media instance.
+
 Use original, owner-approved photography with recorded usage rights. Preserve location
 truthfulness; never generate nonexistent facilities, property boundaries or an aerial
 image presented as evidence. The supplied poster may guide composition but is not a
