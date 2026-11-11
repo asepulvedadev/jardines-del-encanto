@@ -131,15 +131,13 @@ def item_view(db, item):
 
 def connection_views(db):
     from ..hermes.bridge import health
-    from ..social import config
     from ..social.routes import settings
 
     bridge = health()
     try:
-        credentials = config.load()
-        state = settings(credentials) if credentials else {"connections": []}
+        state = settings()
     except HTTPException:
-        credentials, state = None, {"connections": []}
+        state = {"configured": False, "oauth": {}, "connections": []}
     output = []
     preferences = db.execute("SELECT * FROM crm.control_connections ORDER BY key").fetchall()
     parent_enabled = next(row["enabled"] for row in preferences if row["key"] == "zernio")
@@ -148,7 +146,7 @@ def connection_views(db):
         available = (
             bridge["available"]
             if key == "hermes"
-            else bool(credentials)
+            else bool(state["configured"] or state.get("oauth", {}).get("verified_at"))
             if key == "zernio"
             else any(
                 row["platform"] == key and row["status"] == "connected"

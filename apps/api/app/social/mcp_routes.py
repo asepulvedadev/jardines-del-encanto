@@ -53,6 +53,9 @@ def complete(data: CallbackInput, admin: Admin):
 
 @router.post("/check")
 def check(data: EmptyInput, admin: Admin):
+    from ..control.service import require_social_enabled
+
+    require_social_enabled()
     return mcp.check()
 
 

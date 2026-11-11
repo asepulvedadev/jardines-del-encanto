@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from ..crm import security
 from ..crm.database import connect
-from . import config, provider
+from . import config, mcp, provider
 
 router = APIRouter(prefix="/crm/social")
 webhook_router = APIRouter(prefix="/integrations/zernio")
@@ -54,8 +54,17 @@ def settings(credentials=None):
         except HTTPException as error:
             if error.detail != "zernio_not_configured":
                 raise
+    observed = mcp.channel_state()
     result = {
         "configured": bool(credentials),
+        "oauth": observed["oauth"],
+        "can_sync": bool(credentials) or observed["can_sync"],
+        "connect_mode": "api"
+        if credentials
+        else "vendor_dashboard"
+        if observed["can_sync"]
+        else "unavailable",
+        "dashboard_url": mcp.DASHBOARD_URL,
         "profile": None,
         "last_sync": None,
         "connections": [],
@@ -69,6 +78,10 @@ def settings(credentials=None):
         "sync_warning": None,
     }
     if not credentials:
+        result["connections"] = observed["connections"]
+        result["sync_warning"] = observed["warning"]
+        if observed["observed_at"]:
+            result["last_sync"] = datetime.fromtimestamp(observed["observed_at"], UTC)
         return result
     profile_id = credentials["profile_id"]
     result["profile"] = {"id": profile_id, "name": credentials["profile_name"]}
@@ -87,6 +100,7 @@ def settings(credentials=None):
                ORDER BY observed_at DESC, account_id LIMIT 100""",
             (profile_id,),
         ).fetchall()
+        result["connections"] = [{**row, "source": "rest"} for row in result["connections"]]
         result["events"] = db.execute(
             """SELECT event_id AS id, event, platform, received_at, status
                FROM crm.social_webhook_events WHERE profile_id=%s OR event='webhook.test'
@@ -214,8 +228,16 @@ def sync_settings(data: EmptyInput, admin: Admin):
 
     require_social_enabled()
     with config.locked():
-        credentials = config.required()
-        sync(credentials)
+        try:
+            credentials = config.required()
+        except HTTPException as error:
+            if error.detail != "zernio_not_configured":
+                raise
+            credentials = None
+        if credentials:
+            sync(credentials)
+    if not credentials:
+        mcp.check()
     return settings(credentials)
 
 
@@ -231,7 +253,17 @@ def start_connection(platform: str, data: EmptyInput, admin: Admin):
         raise HTTPException(404, "unsupported_platform")
     require_social_enabled(platform)
     with config.locked():
-        credentials = config.required()
+        try:
+            credentials = config.required()
+        except HTTPException as error:
+            if error.detail != "zernio_not_configured":
+                raise
+            credentials = None
+        if not credentials:
+            mcp.require_enabled()
+            if not mcp.usable_grant(mcp.load()):
+                raise HTTPException(409, "zernio_mcp_sign_in_required")
+            return {"mode": "vendor_dashboard", "platform": platform, "url": mcp.DASHBOARD_URL}
         # Snapshot vendor state, not a potentially stale cache, before beginning consent.
         before = sync(credentials)
         intent_id = uuid4()

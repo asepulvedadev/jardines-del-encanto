@@ -19,6 +19,8 @@ from fastapi import HTTPException
 
 from ..crm import security
 from . import config
+from .provider import PLATFORMS
+from .transport import https_connection
 
 ISSUER = "https://zernio.com"
 ENDPOINT = "https://mcp.zernio.com/mcp"
@@ -28,6 +30,35 @@ REGISTER = ISSUER + "/api/oauth/register"
 SCOPE = "accounts:read"
 MAX_RESPONSE = 256 * 1024
 PROTOCOL = "2025-06-18"
+DASHBOARD_URL = "https://zernio.com/dashboard"
+# Core account text does not carry project/profile ownership; unsupported app
+# channels are counted and validated but never imported into the profile ledger.
+KNOWN_PLATFORMS = PLATFORMS | frozenset(
+    {
+        "twitter",
+        "linkedin",
+        "bluesky",
+        "youtube",
+        "pinterest",
+        "threads",
+        "reddit",
+        "snapchat",
+        "discord",
+        "slack",
+        "shopify",
+        "wordpress",
+        "googlebusiness",
+        "google",
+        "microsoft",
+        "email",
+        "imessage",
+        # Legitimate non-social account types observed through the exact core probe.
+        "phone",
+        "tiktokads",
+    }
+)
+MAX_ACCOUNTS = 100
+MAX_ACCOUNT_TEXT = 32768
 PATHS = {
     ("zernio.com", "/.well-known/oauth-authorization-server", "GET"),
     ("zernio.com", "/api/oauth/register", "POST"),
@@ -53,6 +84,36 @@ def store(data):
     config.store_private("mcp.json", data)
 
 
+def usable_grant(data):
+    tokens = data.get("tokens") or {}
+    if not isinstance(tokens, dict) or data.get("needs_authorization"):
+        return False
+    expiry = tokens.get("expires_at", 0)
+    valid_expiry = isinstance(expiry, (int, float)) and not isinstance(expiry, bool)
+    return bool(
+        printable(tokens.get("access_token"))
+        and valid_expiry
+        and (expiry > time.time() or printable(tokens.get("refresh_token")))
+    )
+
+
+def verified_snapshot(data):
+    tokens = data.get("tokens") or {}
+    snapshot = data.get("account_observations") or {}
+    expiry = tokens.get("expires_at", 0) if isinstance(tokens, dict) else 0
+    return bool(
+        enabled()
+        and usable_grant(data)
+        and isinstance(expiry, (int, float))
+        and expiry > time.time()
+        and isinstance(snapshot, dict)
+        and data.get("grant_generation")
+        and snapshot.get("generation") == data["grant_generation"]
+        and data.get("verified_at")
+        and snapshot.get("verified_at") == data["verified_at"]
+    )
+
+
 def status(data=None):
     data = load() if data is None else data
     tokens = data.get("tokens") or {}
@@ -62,17 +123,136 @@ def status(data=None):
         "authentication": "oauth_pkce",
         "authorized": bool(tokens),
         "scope": SCOPE,
-        "verified_at": data.get("verified_at"),
-        "needs_authorization": bool(data.get("needs_authorization")),
+        "verified_at": data.get("verified_at") if verified_snapshot(data) else None,
+        "needs_authorization": bool(
+            data.get("needs_authorization") or (tokens and not usable_grant(data))
+        ),
         "hermes_connected": False,
     }
+
+
+def channel_state():
+    """Sanitized observations of a grant, never ownership of a project profile."""
+    try:
+        data = load()
+    except HTTPException as error:
+        if error.detail != "zernio_not_configured":
+            raise
+        data = {}
+    public = status(data)
+    oauth = {
+        key: public[key]
+        for key in ("available", "authorized", "needs_authorization", "verified_at")
+    }
+    snapshot = data.get("account_observations") or {}
+    same_grant = (
+        isinstance(snapshot, dict)
+        and data.get("grant_generation")
+        and snapshot.get("generation") == data["grant_generation"]
+    )
+    accounts = snapshot.get("accounts", []) if same_grant else []
+    if not isinstance(accounts, list) or len(accounts) > MAX_ACCOUNTS:
+        raise HTTPException(503, "zernio_configuration_unavailable")
+    connected = verified_snapshot(data)
+    entries = []
+    for account in accounts:
+        if (
+            not isinstance(account, dict)
+            or account.get("platform") not in PLATFORMS
+            or not isinstance(account.get("id"), str)
+            or not re.fullmatch(r"[a-f0-9]{24}", account["id"])
+            or not isinstance(account.get("username"), str)
+            or not 1 <= len(account["username"]) <= 160
+        ):
+            raise HTTPException(503, "zernio_configuration_unavailable")
+        entries.append(
+            {
+                "id": account["id"],
+                "platform": account["platform"],
+                "username": account["username"],
+                "display_name": account["username"],
+                "status": "connected" if connected else "unverified",
+                "connected_at": None,
+                "source": "oauth",
+            }
+        )
+    return {
+        "oauth": oauth,
+        "connections": entries,
+        "can_sync": bool(enabled() and usable_grant(data)),
+        "observed_at": snapshot.get("verified_at") if same_grant else None,
+        "warning": (
+            "oauth_verification_required"
+            if accounts and not connected
+            else "oauth_unsupported_platforms_filtered"
+            if same_grant and snapshot.get("filtered_count")
+            else None
+        ),
+    }
+
+
+def parse_accounts(result):
+    """Accept only the documented core accounts_list text, with exact completeness."""
+
+    def invalid():
+        raise HTTPException(502, "zernio_mcp_verification_failed")
+
+    content = result.get("content")
+    if (
+        result.get("isError")
+        or not isinstance(content, list)
+        or not 1 <= len(content) <= 8
+        or any(
+            not isinstance(part, dict)
+            or part.get("type") != "text"
+            or not isinstance(part.get("text"), str)
+            for part in content
+        )
+    ):
+        invalid()
+    text = "\n".join(part["text"] for part in content).strip()
+    if len(text.encode()) > MAX_ACCOUNT_TEXT:
+        invalid()
+    if text in (
+        "No accounts connected",
+        "No accounts connected.",
+        "No accounts connected. Connect accounts at https://zernio.com",
+    ):
+        return [], 0
+    lines = [line for line in text.splitlines() if line.strip()]
+    header = (
+        re.fullmatch(r"Found ([1-9][0-9]{0,2}) connected account(?:\(s\)|s)?:", lines[0])
+        if lines
+        else None
+    )
+    if not header or not 1 <= int(header[1]) <= MAX_ACCOUNTS or len(lines) != int(header[1]) + 1:
+        invalid()
+    seen, accounts, filtered = set(), [], 0
+    for line in lines[1:]:
+        match = re.fullmatch(
+            r"- ([a-z][a-z0-9_]{0,31}): ([^\r\n]{1,160}) \(ID: ([a-fA-F0-9]{24})\)", line
+        )
+        if not match or match[1] not in KNOWN_PLATFORMS:
+            invalid()
+        platform, username, account_id = match[1], match[2], match[3].lower()
+        if account_id in seen or any(ord(char) < 32 or ord(char) == 127 for char in username):
+            invalid()
+        seen.add(account_id)
+        if platform in PLATFORMS:
+            accounts.append({"id": account_id, "platform": platform, "username": username})
+        else:
+            filtered += 1
+    return accounts, filtered
 
 
 def exchange(host, path, method="GET", payload=None, headers=None):
     """No redirects, arbitrary endpoints, ambient proxy settings or vendor error bodies."""
     if (host, path, method) not in PATHS:
         raise HTTPException(502, "zernio_mcp_unavailable")
-    connection = http.client.HTTPSConnection(host, timeout=3)
+    try:
+        connection = https_connection(host, timeout=3)
+    except (OSError, ValueError, http.client.HTTPException):
+        raise HTTPException(502, "zernio_mcp_unavailable") from None
     headers = {"Accept": "application/json, text/event-stream", **(headers or {})}
     body = None
     if payload is not None:
@@ -259,6 +439,8 @@ def complete(admin, state, code, issuer, error):
         if status_code != 200:
             raise HTTPException(502, "zernio_mcp_token_failed")
         data["tokens"] = validated_tokens(result)
+        data["grant_generation"] = secrets.token_urlsafe(24)
+        data.pop("account_observations", None)
         data["client"] = client
         data.pop("verified_at", None)
         data.pop("needs_authorization", None)
@@ -298,6 +480,8 @@ def access_token(data):
             raise HTTPException(409, "zernio_mcp_sign_in_required")
         raise HTTPException(502, "zernio_mcp_unavailable")
     data["tokens"] = validated_tokens(result, refresh)
+    # A refreshed access token is not a successful new account observation.
+    data.pop("verified_at", None)
     store(data)
     return data["tokens"]["access_token"]
 
@@ -363,24 +547,25 @@ def check():
                 session=session,
                 request_id=2,
             )
-            content = result.get("content") or []
-            texts = [
-                part["text"]
-                for part in content
-                if isinstance(part, dict)
-                and part.get("type") == "text"
-                and isinstance(part.get("text"), str)
-            ]
-            if (
-                result.get("isError")
-                or not texts
-                or not any(
-                    re.match(r"^(No accounts connected\b|Found \d+ connected account)", t)
-                    for t in texts
-                )
-            ):
+            accounts, filtered = parse_accounts(result)
+            verified_at = int(time.time())
+            generation = data.get("grant_generation") or secrets.token_urlsafe(24)
+            snapshot = {
+                "generation": generation,
+                "verified_at": verified_at,
+                "accounts": accounts,
+                "filtered_count": filtered,
+            }
+            candidate = {
+                **data,
+                "grant_generation": generation,
+                "account_observations": snapshot,
+                "verified_at": verified_at,
+            }
+            # store_private uses JSON ASCII escaping; honor its on-disk read bound too.
+            if len(json.dumps(candidate)) > 65536:
                 raise HTTPException(502, "zernio_mcp_verification_failed")
-            data["verified_at"] = int(time.time())
+            data.update(candidate)
             store(data)
         except HTTPException as error:
             data.pop("verified_at", None)

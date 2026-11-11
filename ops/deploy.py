@@ -36,9 +36,13 @@ def git(*args, **kwargs):
     return run(["git", "--git-dir", str(ROOT / "repository.git"), *args], **kwargs)
 
 
-def compose(sha, *args):
+def compose(sha, *args, **kwargs):
     # Retain the foundation policy for previously healthy pre-CRM images.
-    policy = "crm.compose.yaml" if (ROOT / "crm-releases" / sha).is_file() else "compose.yaml"
+    policy = (
+        "crm.compose.yaml"
+        if (ROOT / "crm-releases" / sha).is_file()
+        else "compose.yaml"
+    )
     return subprocess.run(
         [
             "docker",
@@ -52,6 +56,7 @@ def compose(sha, *args):
         env={**ENV, "RELEASE": sha},
         check=True,
         cwd=ROOT,
+        **kwargs,
     )
 
 
@@ -78,6 +83,7 @@ def activate(sha):
         ]
     )
     refresh_operator()
+    refresh_zernio(sha)
 
 
 def refresh_operator():
@@ -96,7 +102,32 @@ def refresh_operator():
         if "hermes-bridge" in active:
             run([*command, "restart", "--no-deps", "hermes-bridge"])
     except (subprocess.CalledProcessError, OSError):
-        print("Application ready; optional Hermes operator refresh failed", file=sys.stderr)
+        print(
+            "Application ready; optional Hermes operator refresh failed",
+            file=sys.stderr,
+        )
+
+
+def refresh_zernio(sha):
+    # Keep an optional relay on the release image without enabling a stopped one.
+    if not (ROOT / "zernio-policy" / "egress.py").is_file():
+        return
+    try:
+        active = compose(
+            sha,
+            "ps",
+            "--status",
+            "running",
+            "--services",
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+        if "zernio-egress" in active:
+            compose(sha, "up", "-d", "--no-deps", "zernio-egress")
+    except (subprocess.CalledProcessError, OSError):
+        print(
+            "Application ready; optional Zernio relay refresh failed", file=sys.stderr
+        )
 
 
 def verify_builder():

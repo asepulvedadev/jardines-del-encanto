@@ -372,6 +372,7 @@ export function SettingsModal({
                   connections={catalog?.connections ?? []}
                   connectionPending={pending}
                   onToggleConnection={toggle}
+                  onStateChanged={load}
                 />
               )}
             </section>

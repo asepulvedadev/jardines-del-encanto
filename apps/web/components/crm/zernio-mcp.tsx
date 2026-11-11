@@ -4,12 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IntegrationIcon } from "./integration-icon";
 
-type Connection = {
-  available: boolean;
-  authorized: boolean;
-  needs_authorization: boolean;
-  verified_at: number | null;
-};
+import type { SocialOAuth as Connection } from "./social-types";
 
 const messages: Record<string, string> = {
   zernio_mcp_disabled:
@@ -27,9 +22,13 @@ const messages: Record<string, string> = {
 export function ZernioMcp({
   csrf,
   enabled = true,
+  onStateChanged,
+  onStateInvalidated,
 }: {
   csrf: string;
   enabled?: boolean;
+  onStateChanged?: () => Promise<void>;
+  onStateInvalidated?: () => Promise<void>;
 }) {
   const router = useRouter();
   const [connection, setConnection] = useState<Connection | null>(null);
@@ -40,6 +39,21 @@ export function ZernioMcp({
   const [disconnecting, setDisconnecting] = useState(false);
   const started = useRef(false);
   const busy = useRef(false);
+  const stateChanged = useRef(onStateChanged);
+  const stateInvalidated = useRef(onStateInvalidated);
+  useEffect(() => {
+    stateChanged.current = onStateChanged;
+    stateInvalidated.current = onStateInvalidated;
+  }, [onStateChanged, onStateInvalidated]);
+  const notifyStateChanged = useCallback(async () => {
+    try {
+      await stateChanged.current?.();
+    } catch {
+      setError(
+        "La autorización cambió, pero no pudimos actualizar los canales. Actualiza el catálogo; no repitas la autorización.",
+      );
+    }
+  }, []);
 
   const request = useCallback(
     async <T,>(action: string, payload?: unknown): Promise<T> => {
@@ -115,6 +129,7 @@ export function ZernioMcp({
             issuer: values.iss,
             error: values.error,
           });
+          await notifyStateChanged();
           setNotice(
             "Autorización guardada. Pulsa Verificar conexión para comprobar el acceso real.",
           );
@@ -139,9 +154,12 @@ export function ZernioMcp({
       }
     })();
     // Run once per mount: replaying a callback would reuse a consumed authorization code.
-  }, [request]);
+  }, [request, notifyStateChanged]);
 
-  async function perform(action: () => Promise<void>) {
+  async function perform(
+    action: () => Promise<void>,
+    refreshAfterFailure = false,
+  ) {
     if (busy.current || pending) return;
     busy.current = true;
     setPending(true);
@@ -155,10 +173,19 @@ export function ZernioMcp({
           ? cause.message
           : "No pudimos contactar a Zernio.",
       );
+      if (refreshAfterFailure)
+        setConnection((old) => (old ? { ...old, verified_at: null } : old));
       try {
         setConnection(await request<Connection>("status"));
       } catch {
-        /* Keep prior state. */
+        /* Preserve unverified local state when the status refresh also fails. */
+      }
+      if (refreshAfterFailure) {
+        try {
+          await stateInvalidated.current?.();
+        } catch {
+          /* Keep the failed verification error visible. */
+        }
       }
     } finally {
       busy.current = false;
@@ -174,20 +201,24 @@ export function ZernioMcp({
     >
       <div className="social-section-heading">
         <div>
-          <h2 id="zernio-mcp-heading">
+          <h2 id="zernio-mcp-heading" tabIndex={-1}>
             <IntegrationIcon name="zernio" /> Acceso a Zernio
           </h2>
         </div>
         <span
-          className={`social-status ${connection?.verified_at ? "social-status-good" : ""}`}
+          className={`social-status ${connection?.available && connection.authorized && !connection.needs_authorization && connection.verified_at ? "social-status-good" : ""}`}
         >
-          {connection?.needs_authorization
-            ? "Requiere autorización"
-            : connection?.verified_at
-              ? "Verificado"
-              : connection?.authorized
-                ? "Autorizado"
-                : "Sin conectar"}
+          {pending
+            ? "Consultando…"
+            : connection?.needs_authorization
+              ? "Requiere autorización"
+              : connection && !connection.available
+                ? "No disponible"
+                : connection?.authorized && connection.verified_at
+                  ? "Verificado"
+                  : connection?.authorized
+                    ? "Autorizado"
+                    : "Sin conectar"}
         </span>
       </div>
       {error && (
@@ -234,6 +265,7 @@ export function ZernioMcp({
       )}
       <div className="social-actions">
         <button
+          id="zernio-authorize"
           className="crm-button"
           disabled={
             pending ||
@@ -268,14 +300,15 @@ export function ZernioMcp({
           <>
             <button
               className="crm-button crm-secondary"
-              disabled={pending || !connection.available}
+              disabled={pending || !enabled || !connection.available}
               onClick={() =>
                 void perform(async () => {
                   setConnection(await request<Connection>("check"));
+                  await notifyStateChanged();
                   setNotice(
                     "Acceso MCP comprobado con una consulta real de cuentas. No se modificó ninguna red social.",
                   );
-                })
+                }, true)
               }
             >
               Verificar conexión
@@ -314,6 +347,7 @@ export function ZernioMcp({
             onClick={() =>
               void perform(async () => {
                 setConnection(await request<Connection>("disconnect"));
+                await notifyStateChanged();
                 setDisconnecting(false);
                 setReplace(false);
                 setNotice(

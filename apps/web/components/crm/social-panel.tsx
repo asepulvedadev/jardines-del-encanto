@@ -163,11 +163,13 @@ export function SocialPanel({
   connections: preferences,
   connectionPending,
   onToggleConnection,
+  onStateChanged,
 }: {
   csrf: string;
   connections: Connection[];
   connectionPending: boolean;
   onToggleConnection: (connection: Connection) => Promise<void>;
+  onStateChanged?: () => Promise<void>;
 }) {
   const router = useRouter();
   const [editingPlatform, setEditingPlatform] = useState<SocialPlatform | null>(
@@ -188,6 +190,7 @@ export function SocialPanel({
   const busy = useRef(false);
   const mounted = useRef(false);
   const callbackHandled = useRef(false);
+  const settingsRevision = useRef(0);
 
   const request = useCallback(
     async <T,>(
@@ -241,12 +244,18 @@ export function SocialPanel({
   useEffect(() => {
     mounted.current = true;
     const controller = new AbortController();
+    const revision = ++settingsRevision.current;
     request<SocialSettings>("settings", "GET", undefined, controller.signal)
       .then((result) => {
-        if (mounted.current && !controller.signal.aborted) setSettings(result);
+        if (
+          mounted.current &&
+          !controller.signal.aborted &&
+          revision === settingsRevision.current
+        )
+          setSettings(result);
       })
       .catch((cause) => {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted && revision === settingsRevision.current)
           setError(cause instanceof Error ? cause.message : socialError(null));
       })
       .finally(() => {
@@ -258,6 +267,44 @@ export function SocialPanel({
       if (keyInput.current) keyInput.current.value = "";
     };
   }, [request]);
+
+  const reloadAfterMcpChange = useCallback(async () => {
+    const revision = ++settingsRevision.current;
+    const outcomes = await Promise.allSettled([
+      request<SocialSettings>("settings").then((result) => {
+        if (mounted.current && revision === settingsRevision.current)
+          setSettings(result);
+      }),
+      (async () => {
+        await onStateChanged?.();
+      })(),
+    ]);
+    if (outcomes.some((outcome) => outcome.status === "rejected"))
+      throw new Error(
+        "La autorización cambió, pero no pudimos actualizar todos los canales.",
+      );
+  }, [request, onStateChanged]);
+
+  const invalidateAfterMcpFailure = useCallback(async () => {
+    setSettings((old) =>
+      old ? { ...old, oauth: { ...old.oauth, verified_at: null } } : old,
+    );
+    try {
+      await reloadAfterMcpChange();
+    } catch {
+      setError(
+        "No pudimos actualizar la verificación de los canales. Las cuentas OAuth siguen pendientes de comprobación.",
+      );
+    }
+  }, [reloadAfterMcpChange]);
+
+  function focusAuthorization() {
+    const target =
+      document.querySelector<HTMLElement>("#zernio-authorize:not(:disabled)") ??
+      document.querySelector<HTMLElement>("#zernio-mcp-heading");
+    target?.scrollIntoView({ block: "nearest" });
+    target?.focus();
+  }
 
   async function perform(action: () => Promise<void>) {
     if (busy.current) return;
@@ -440,6 +487,8 @@ export function SocialPanel({
     <div className="crm-social" aria-busy={pending || loading}>
       <ZernioMcp
         csrf={csrf}
+        onStateChanged={reloadAfterMcpChange}
+        onStateInvalidated={invalidateAfterMcpFailure}
         enabled={
           preferences.find((item) => item.key === "zernio")?.enabled ?? false
         }
@@ -451,15 +500,28 @@ export function SocialPanel({
           disabled={
             pending ||
             loading ||
-            !settings?.configured ||
+            !settings?.can_sync ||
             preferences.some((item) => item.key === "zernio" && !item.enabled)
           }
           onClick={() =>
             void perform(async () => {
-              const result = await request<SocialSettings>("sync", "POST");
+              let result: SocialSettings;
+              try {
+                result = await request<SocialSettings>("sync", "POST");
+              } catch (cause) {
+                if (!settings?.configured) await invalidateAfterMcpFailure();
+                throw cause;
+              }
               if (mounted.current) {
                 setSettings(result);
                 setNotice("Estado de las conexiones actualizado.");
+              }
+              try {
+                await onStateChanged?.();
+              } catch {
+                setError(
+                  "Canales actualizados, pero no pudimos actualizar el catálogo. No repitas la autorización.",
+                );
               }
             })
           }
@@ -609,8 +671,9 @@ export function SocialPanel({
           </details>
           {settings.sync_warning ? (
             <p className="social-warning" role="status">
-              La última consulta no pudo verificar todos los canales. Actualiza
-              las conexiones antes de confiar en su estado.
+              {settings.sync_warning === "oauth_unsupported_platforms_filtered"
+                ? "Otras conexiones de Zernio no forman parte de estas redes sociales."
+                : "La última consulta no pudo verificar todos los canales. Actualiza las conexiones antes de confiar en su estado."}
             </p>
           ) : null}
           {intent ? (
@@ -699,6 +762,17 @@ export function SocialPanel({
                 const connections = settings.connections.filter(
                   (connection) => connection.platform === platform,
                 );
+                const oauthUsable =
+                  settings.oauth.available &&
+                  settings.oauth.authorized &&
+                  !settings.oauth.needs_authorization &&
+                  settings.oauth.verified_at !== null;
+                const observedStatus = (
+                  connection: SocialSettings["connections"][number],
+                ) =>
+                  connection.source === "oauth" && !oauthUsable
+                    ? "unverified"
+                    : connection.status;
                 return (
                   <li className="social-channel" key={platform}>
                     <IntegrationIcon name={platform} />
@@ -718,9 +792,12 @@ export function SocialPanel({
                                   "Cuenta sin nombre disponible"}
                               </span>
                               <span
-                                className={`social-status ${connection.status === "connected" || connection.status === "active" ? "social-status-good" : ""}`}
+                                className={`social-status ${observedStatus(connection) === "connected" || observedStatus(connection) === "active" ? "social-status-good" : ""}`}
                               >
-                                {statusLabel(connection.status)}
+                                {statusLabel(observedStatus(connection))}
+                                {connection.source === "oauth"
+                                  ? " · OAuth"
+                                  : ""}
                               </span>
                             </li>
                           ))}
@@ -754,26 +831,77 @@ export function SocialPanel({
                     </div>
                     {editingPlatform === platform && (
                       <div className="settings-social-edit">
-                        <button
-                          className="crm-button crm-secondary"
-                          disabled={
-                            pending ||
-                            !settings.configured ||
-                            !preference?.enabled ||
-                            preferences.some(
-                              (item) => item.key === "zernio" && !item.enabled,
-                            )
-                          }
-                          onClick={() => void connect(platform)}
-                          aria-label={`${connections.length ? "Volver a conectar" : "Conectar"} ${name}`}
-                        >
-                          {connections.length
-                            ? "Volver a conectar"
-                            : "Conectar"}
-                        </button>
+                        {settings.connect_mode === "vendor_dashboard" &&
+                        settings.dashboard_url ===
+                          "https://zernio.com/dashboard" &&
+                        !pending &&
+                        !connectionPending &&
+                        preference?.enabled &&
+                        !preferences.some(
+                          (item) => item.key === "zernio" && !item.enabled,
+                        ) ? (
+                          <a
+                            className="crm-button crm-secondary"
+                            href="https://zernio.com/dashboard"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`${connections.length ? "Gestionar en Zernio" : "Conectar en Zernio"}: ${name} (nueva pestaña)`}
+                          >
+                            {connections.length
+                              ? "Gestionar en Zernio"
+                              : "Conectar en Zernio"}
+                          </a>
+                        ) : settings.connect_mode === "api" ? (
+                          <button
+                            className="crm-button crm-secondary"
+                            disabled={
+                              pending ||
+                              connectionPending ||
+                              !settings.configured ||
+                              !preference?.enabled ||
+                              preferences.some(
+                                (item) =>
+                                  item.key === "zernio" && !item.enabled,
+                              )
+                            }
+                            onClick={() => void connect(platform)}
+                            aria-label={`${connections.length ? "Volver a conectar" : "Conectar"} ${name}`}
+                          >
+                            {connections.length
+                              ? "Volver a conectar"
+                              : "Conectar"}
+                          </button>
+                        ) : (
+                          <button
+                            className="crm-button crm-secondary"
+                            disabled={
+                              pending ||
+                              connectionPending ||
+                              settings.connect_mode === "vendor_dashboard" ||
+                              !preference?.enabled ||
+                              preferences.some(
+                                (item) =>
+                                  item.key === "zernio" && !item.enabled,
+                              )
+                            }
+                            onClick={focusAuthorization}
+                          >
+                            {settings.connect_mode === "vendor_dashboard"
+                              ? connections.length
+                                ? "Gestionar en Zernio"
+                                : "Conectar en Zernio"
+                              : "Autorizar Zernio"}
+                          </button>
+                        )}
                         <p className="settings-meta">
-                          La vinculación requiere autorización real del
-                          proveedor.
+                          {!preference?.enabled ||
+                          preferences.some(
+                            (item) => item.key === "zernio" && !item.enabled,
+                          )
+                            ? "Conexión pausada. Actívala para continuar."
+                            : settings.connect_mode === "vendor_dashboard"
+                              ? "Gestiona la cuenta en Zernio y actualiza aquí. OAuth permite consultar cuentas, no publicar ni enviar mensajes."
+                              : "La vinculación requiere autorización real del proveedor."}
                         </p>
                       </div>
                     )}

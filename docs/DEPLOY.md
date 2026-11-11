@@ -210,6 +210,7 @@ Templates are in `ops/nginx/`; CI must not install privileged host policy.
    Use a verified owner email instead of the no-email flag when one is supplied.
    Never invent an address. The existing `certbot.timer` must remain active; inspect
    the project certificate expiry and renewal hook without exposing account secrets.
+
 5. Replace only this project's bootstrap vhost with `jardines-preview.conf`. Test
    with `nginx -t` before reloading. If the test fails, restore the previous project
    file and do not reload. Existing workers continue serving sibling projects.
@@ -220,3 +221,51 @@ To remove the preview, remove only its enabled symlink after confirming the path
 run `nginx -t`, then reload. Do not alter sibling vhosts, shared firewall/SSH settings
 or application port bindings. Certificate removal requires a separate deliberate
 cleanup; renewal failure must not trigger broad host changes.
+
+## Zernio OAuth production activation — owner authorized
+
+The owner explicitly authorized moving only the local Jardines Zernio grant to
+this project's VPS on 2026-11-11. This is not a general credential-copy operation.
+Keep `accounts:read`; do not reuse an MCP token as a REST API key or request new
+write scopes. Accounts visible through this grant are observations, not proof of
+project/profile ownership or permission to send/publish.
+
+Before enabling the production flag:
+
+1. Record the healthy release, sibling container IDs/start times and other vhost
+   hashes; retain root-only copies of the project policy/gate/vhost and a logical
+   backup. Do not use a negated Docker label filter as evidence of sibling state.
+2. Install the reviewed project Nginx template. Its access log excludes query and
+   referrer; exact `/crm` errors are discarded because upstream errors can contain
+   OAuth query strings. Run `nginx -t`, reload (not restart), then verify synthetic
+   callback markers do not enter access/error logs. Preserve other vhosts.
+3. Install `ops/zernio/egress.py` root-owned0644 beneath the root-only directory
+   `/srv/jardines-del-encanto/zernio-policy/`. Install the reviewed root-owned CRM
+   Compose/gate. Start only the explicitly authorized `zernio-egress` service with
+   the current API release image. It has no host ports, credentials or DB mounts;
+   only this relay receives external networking. API remains on internal app/data.
+4. Deploy the verified release through existing GitHub Actions. API's fixed
+   `ZERNIO_HTTPS_PROXY=http://zernio-egress:8080` preserves TLS to the vendor.
+   The gate refreshes a running relay onto the release image, never starts a relay
+   intentionally left stopped, and keeps optional failures separate from CRM health.
+5. Stream only allowlisted durable grant fields from the known local project API
+   through the authorized encrypted SSH stdin into the production API container.
+   `ops/zernio/migrate_grant.py` validates the bounded JSON, locks private storage,
+   refuses an existing grant/pending authorization, and discards pending verifier,
+   session/actor, observations and old verification. No plaintext token file, shell
+   token argument, CI secret, log or terminal output is permitted. Do not run this
+   importer through an application endpoint, Hermes or an arbitrary-code adapter.
+6. Perform the exact read-only MCP probe. Verify channel counts/platforms without
+   printing identities or tokens; verify the UI refresh and Hermes catalog reflect
+   the effective state. Do not disconnect/reconnect WhatsApp or send test messages.
+
+A moved refresh grant must not be refreshed concurrently from two environments.
+Hold the source configuration lock and park its grant as needing authorization
+BEFORE export, retaining the original only in the source process for a confirmed
+pre-import refusal. A successful/uncertain import followed by a failed probe leaves
+the source parked: the destination might already have rotated the refresh token.
+Only successful destination verification retires the matching local grant. Never
+restore an old source token after a possible destination refresh or remove a newer
+replacement grant. Retain a failure as unverified and preserve recoverable state.
+A vendor revocation requires fresh owner authorization, not fabricated connectivity.
+Root-owned policies are not updated by CI; retain their checkpoint for rollback.

@@ -7,6 +7,8 @@ from urllib.parse import urlparse
 
 from fastapi import HTTPException
 
+from .transport import https_connection
+
 PLATFORMS = frozenset({"facebook", "instagram", "tiktok", "whatsapp", "telegram"})
 MAX_RESPONSE = 1024 * 1024
 _ALLOWED = re.compile(
@@ -17,7 +19,10 @@ _ALLOWED = re.compile(
 def request(credentials, method, path, payload=None):
     if not _ALLOWED.fullmatch(path) or method not in {"GET", "PATCH"}:
         raise HTTPException(502, "zernio_unavailable")
-    connection = http.client.HTTPSConnection("zernio.com", timeout=4)
+    try:
+        connection = https_connection("zernio.com", timeout=4)
+    except (OSError, ValueError, http.client.HTTPException):
+        raise HTTPException(502, "zernio_unavailable") from None
     try:
         headers = {
             "Authorization": "Bearer " + credentials["api_key"],

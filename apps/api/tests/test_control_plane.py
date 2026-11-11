@@ -417,7 +417,10 @@ def test_paused_zernio_parent_marks_available_children_ineffective(controlled, m
     monkeypatch.setattr(
         routes,
         "settings",
-        lambda *_: {"connections": [{"platform": "facebook", "status": "connected"}]},
+        lambda *_: {
+            "configured": True,
+            "connections": [{"platform": "facebook", "status": "connected"}],
+        },
     )
     before = client.get("/crm/control/catalog").json()["connections"]
     assert next(row for row in before if row["key"] == "facebook")["effective"]
