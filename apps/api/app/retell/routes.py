@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..control.models import Empty
 from ..crm import security
@@ -18,6 +18,18 @@ Admin = Annotated[dict, Depends(security.session)]
 def settings(admin: Admin):
     with connect() as db:
         return service.settings(db)
+
+
+@router.get("/results")
+async def results(request: Request, admin: Admin):
+    if request.query_params:
+        raise HTTPException(422, "invalid_input")
+    # Reject the first nonempty chunk without buffering an unbounded GET body.
+    async for chunk in request.stream():
+        if chunk:
+            raise HTTPException(422, "invalid_input")
+    with connect() as db:
+        return service.results(db, admin)
 
 
 @router.post("/settings")

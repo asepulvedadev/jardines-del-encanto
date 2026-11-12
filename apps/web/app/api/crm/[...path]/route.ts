@@ -20,6 +20,7 @@ const rules: [RegExp, string[]][] = [
   [/^sara\/attachments$/, ["POST"]],
   [/^sara\/attachments\/[0-9a-f-]{36}\/content$/, ["GET"]],
   [/^retell\/settings$/, ["GET", "POST"]],
+  [/^retell\/results$/, ["GET"]],
   [/^retell\/(catalog|schema|disconnect)$/, ["POST"]],
   [
     /^retell\/sessions\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/claim$/,
@@ -101,6 +102,8 @@ async function proxy(
   const voice = endpoint.startsWith("voice/");
   const retell = endpoint.startsWith("retell/");
   if ((voice || retell) && new URL(request.url).searchParams.size)
+    return fail(422, "invalid_input");
+  if (endpoint === "retell/results" && request.body !== null)
     return fail(422, "invalid_input");
   if (sara) {
     const params = new URL(request.url).searchParams;

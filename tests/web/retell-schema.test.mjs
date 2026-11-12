@@ -118,3 +118,22 @@ test("defaults only populate fields that exist and outbound stays exact", () => 
   assert.equal(retellOutbound("createSmsChat"), true);
   assert.equal(retellOutbound("getCall"), false);
 });
+test("JSON to guided conversion preserves contextual identity instead of provider defaults", () => {
+  const contextual = {
+    type: "object",
+    required: ["agent_id"],
+    properties: { agent_id: { type: "string" } },
+  };
+  assert.deepEqual(
+    module.exports.retellGuidedArguments(contextual, '{"agent_id":"agent-B"}'),
+    { agent_id: "agent-B" },
+  );
+  assert.throws(
+    () =>
+      module.exports.retellGuidedArguments(
+        contextual,
+        '{"agent_id":"agent-B","extra":{"prompt":"keep"}}',
+      ),
+    /JSON/,
+  );
+});

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "./icon";
+import { VoiceWorkspace } from "./voice-workspace";
 import { SaraPanel } from "./sara-panel";
 import { SettingsModal } from "./settings-modal";
 import { Empty, StageSelect, TaskRow } from "./workspace-parts";
@@ -29,6 +30,7 @@ import {
 const navigation = [
   ["overview", "home"],
   ["sara", "message"],
+  ["voice", "microphone"],
   ["pipeline", "board"],
   ["contacts", "people"],
   ["tasks", "task"],
@@ -47,9 +49,9 @@ export function Workspace({
   const [data, setData] = useState(initialData);
   const [view, setView] = useState<View>("overview");
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<"social" | "customizations">(
-    "social",
-  );
+  const [settingsTab, setSettingsTab] = useState<
+    "social" | "connections" | "customizations"
+  >("social");
   const [socialCallback, setSocialCallback] = useState(false);
   const [query, setQuery] = useState("");
   const [list, setList] = useState(false);
@@ -398,11 +400,13 @@ export function Workspace({
                   <p>
                     {view === "overview"
                       ? "Las conversaciones y próximos pasos de tu equipo, en un solo lugar."
-                      : view === "pipeline"
-                        ? "Una vista clara de cada conversación y su siguiente paso."
-                        : view === "contacts"
-                          ? "Solo lo importante: nombre, celular y de dónde llega cada cliente."
-                          : "Que ninguna conversación se quede sin un siguiente paso."}
+                      : view === "voice"
+                        ? "Agentes, voces y conversaciones, conectados con Sara IA."
+                        : view === "pipeline"
+                          ? "Una vista clara de cada conversación y su siguiente paso."
+                          : view === "contacts"
+                            ? "Solo lo importante: nombre, celular y de dónde llega cada cliente."
+                            : "Que ninguna conversación se quede sin un siguiente paso."}
                   </p>
                 </div>
                 <div className="crm-heading-actions">
@@ -434,7 +438,7 @@ export function Workspace({
           >
             {pending ? "Guardando cambios…" : notice}
           </p>
-          {data.limited && view !== "sara" && (
+          {data.limited && view !== "sara" && view !== "voice" && (
             <p className="crm-limit-note">
               Esta vista muestra hasta 500 registros por sección. Los totales
               incluyen todos los registros. Se requiere paginación antes de
@@ -443,6 +447,16 @@ export function Workspace({
           )}
           {view === "sara" ? (
             <SaraPanel csrf={csrf} onChanged={refresh} />
+          ) : view === "voice" ? (
+            <VoiceWorkspace
+              csrf={csrf}
+              active={!settingsOpen}
+              onChanged={refresh}
+              onOpenConnection={() => {
+                setSettingsTab("connections");
+                setSettingsOpen(true);
+              }}
+            />
           ) : view === "overview" ? (
             <>
               <div className="crm-stat-strip">

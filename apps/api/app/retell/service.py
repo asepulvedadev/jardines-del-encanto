@@ -5,6 +5,7 @@ import re
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
+from uuid import UUID
 
 from fastapi import HTTPException
 from pydantic import ValidationError
@@ -63,6 +64,65 @@ def state():
 def settings(db):
     pref = db.execute("SELECT enabled FROM crm.control_connections WHERE key='retell'").fetchone()
     return {**state(), "enabled": bool(pref and pref["enabled"])}
+
+
+def results(db, admin):
+    """Recover partial approved snapshots locally; never initiate a provider read."""
+    rows = db.execute(
+        """SELECT p.id,p.created_at,p.arguments->>'endpoint' AS endpoint,p.revisions,p.result
+        FROM crm.hermes_proposals p
+        JOIN crm.control_connections c ON c.key='retell' AND c.enabled
+          AND p.revisions->'connection:retell'=to_jsonb(c.version)
+        WHERE p.actor_id=%s AND p.session_hash=%s
+          AND p.action='retell.execute' AND p.status='approved'
+          AND p.result->>'provider'='retell' AND p.result->>'status'='completed'
+          AND p.arguments->>'endpoint'=p.result->>'endpoint'
+        ORDER BY p.created_at DESC,p.id DESC LIMIT 96""",
+        (admin["id"], admin["token_hash"]),
+    ).fetchall()
+    snapshots, seen = [], set()
+    reviewed = registry()
+    for row in rows[:96]:
+        try:
+            endpoint, value, frozen = row["endpoint"], row["result"], row["revisions"]
+            if not isinstance(endpoint, str) or endpoint in seen:
+                continue
+            metadata = reviewed.get(endpoint)
+            if not metadata or metadata["risk"] != "read" or not metadata["available"]:
+                continue
+            if (
+                not isinstance(value, dict)
+                or value.get("provider") != "retell"
+                or value.get("status") != "completed"
+                or value.get("endpoint") != endpoint
+                or "data" not in value
+                or not isinstance(frozen, dict)
+            ):
+                continue
+            revision = frozen.get("provider:retell")
+            if type(revision) is not int or revision < 0:
+                continue
+            data = safe_result(value["data"])
+            if len(json.dumps(data, allow_nan=False).encode()) > 16384:
+                continue
+            if not isinstance(row["created_at"], datetime):
+                continue
+            snapshots.append(
+                {
+                    "id": str(UUID(str(row["id"]))),
+                    "endpoint": endpoint,
+                    "created_at": row["created_at"].isoformat(),
+                    "provider_revision": revision,
+                    "data": data,
+                }
+            )
+            seen.add(endpoint)
+        except (KeyError, TypeError, ValueError):
+            # Malformed historical rows are not a reason to disclose raw stored payloads.
+            continue
+        if len(snapshots) == 32:
+            break
+    return {"snapshots": snapshots, "partial": True}
 
 
 def require_state(revision=None):

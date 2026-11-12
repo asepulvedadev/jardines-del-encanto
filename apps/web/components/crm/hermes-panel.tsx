@@ -26,8 +26,10 @@ export function ActionProposals({
   proposals,
   request,
   onChanged,
+  onResult,
 }: {
   proposals: Proposal[];
+  onResult?: (result: Record<string, unknown>) => void | Promise<void>;
   request: SettingsRequest;
   onChanged: () => Promise<void>;
 }) {
@@ -62,7 +64,15 @@ export function ActionProposals({
       setDecisions((old) => ({ ...old, [proposal.id]: result.proposal }));
       if (result.result)
         setResults((old) => ({ ...old, [proposal.id]: result.result! }));
-      await onChanged();
+      // Provider execution has finished. A failed view refresh must never replay it.
+      try {
+        if (result.result) await onResult?.(result.result);
+        await onChanged();
+      } catch {
+        setError(
+          "La acción ya respondió. No la repitas; actualiza la vista para revisar el resultado.",
+        );
+      }
     } catch (cause) {
       setError(settingsError(cause));
     } finally {
@@ -182,7 +192,9 @@ export function ActionOutput({
   value,
   request,
   onChanged,
+  onResult,
 }: {
+  onResult?: (result: Record<string, unknown>) => void | Promise<void>;
   value: ActionResult;
   request: SettingsRequest;
   onChanged: () => Promise<void>;
@@ -197,6 +209,7 @@ export function ActionOutput({
           proposals={value.proposals}
           request={request}
           onChanged={onChanged}
+          onResult={onResult}
         />
       )}
     </>

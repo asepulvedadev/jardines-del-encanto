@@ -10,6 +10,7 @@ import {
   retellArguments,
   retellFields,
   retellInitialArguments,
+  retellGuidedArguments,
   retellOutbound,
   type RetellSchema,
 } from "./retell-schema";
@@ -90,11 +91,17 @@ export function RetellPanel({
   onChanged,
   active,
   connectionEnabled,
+  operationsOnly = false,
+  initialOperation,
+  onResult,
 }: {
   request: SettingsRequest;
   onChanged: () => Promise<void>;
   active: boolean;
   connectionEnabled?: boolean;
+  operationsOnly?: boolean;
+  initialOperation?: { endpoint: string; arguments: Record<string, unknown> };
+  onResult?: (result: Record<string, unknown>) => void | Promise<void>;
 }) {
   const [state, setState] = useState<State | null>(null),
     [defaults, setDefaults] = useState<Defaults>(empty);
@@ -120,6 +127,7 @@ export function RetellPanel({
     lock = useRef(false),
     generation = useRef(0),
     selection = useRef(0);
+  const seeded = useRef(false);
   useEffect(() => {
     mounted.current = true;
     const run = ++generation.current;
@@ -134,6 +142,19 @@ export function RetellPanel({
           if (mounted.current && run === generation.current) {
             setState(value);
             setDefaults({ ...empty, ...value.defaults });
+            if (operationsOnly && value.available && value.configured) {
+              void request<Catalog>("retell/catalog", "POST", {
+                revision: value.revision,
+              })
+                .then((catalog) => {
+                  if (mounted.current && run === generation.current)
+                    setCatalog(catalog);
+                })
+                .catch((cause) => {
+                  if (mounted.current && run === generation.current)
+                    setError(settingsError(cause));
+                });
+            }
           }
         })
         .catch((cause) => {
@@ -149,7 +170,20 @@ export function RetellPanel({
       generation.current++;
       selection.current++;
     };
-  }, [request, active]);
+  }, [request, active, operationsOnly]);
+  useEffect(() => {
+    if (
+      !active ||
+      !initialOperation ||
+      !catalog ||
+      !state ||
+      busy ||
+      seeded.current
+    )
+      return;
+    seeded.current = true;
+    void choose(initialOperation.endpoint, initialOperation.arguments);
+  }, [active, initialOperation, catalog, state, busy]);
   async function act(task: (current: () => boolean) => Promise<void>) {
     if (lock.current) return;
     lock.current = true;
@@ -222,7 +256,7 @@ export function RetellPanel({
       }
     });
   }
-  async function choose(value: string) {
+  async function choose(value: string, seed?: Record<string, unknown>) {
     if (lock.current) return;
     const run = ++selection.current;
     setEndpoint(value);
@@ -256,6 +290,20 @@ export function RetellPanel({
               : {}),
           }),
         );
+        if (seed) {
+          setAdvanced(true);
+          setJson(JSON.stringify(seed, null, 2));
+          try {
+            setValues(
+              retellGuidedArguments(
+                definition.input_schema,
+                JSON.stringify(seed),
+              ),
+            );
+          } catch {
+            setValues({});
+          }
+        }
         setContacts(workspace.contacts);
       }
     });
@@ -367,85 +415,99 @@ export function RetellPanel({
           {error}
         </p>
       )}
-      <div className="retell-form">
-        <label htmlFor="retell-key">
-          Clave de API
-          <input
-            id="retell-key"
-            type="password"
-            autoComplete="new-password"
-            value={key}
-            maxLength={512}
-            onChange={(event) => {
-              setKey(event.target.value);
-              setReplaceKey(false);
-            }}
-            disabled={busy || loading || !state?.available}
-            placeholder={
-              state?.configured
-                ? "Guardada · escribe solo para reemplazar"
-                : "Nueva clave"
-            }
-          />
-        </label>
-        {key && state?.configured && (
-          <label className="retell-replace" htmlFor="retell-replace">
+      {!operationsOnly && (
+        <div className="retell-form">
+          <label htmlFor="retell-key">
+            Clave de API
             <input
-              id="retell-replace"
-              type="checkbox"
-              checked={replaceKey}
-              onChange={(event) => setReplaceKey(event.target.checked)}
-              disabled={busy}
+              id="retell-key"
+              type="password"
+              autoComplete="new-password"
+              value={key}
+              maxLength={512}
+              onChange={(event) => {
+                setKey(event.target.value);
+                setReplaceKey(false);
+              }}
+              disabled={busy || loading || !state?.available}
+              placeholder={
+                state?.configured
+                  ? "Guardada · escribe solo para reemplazar"
+                  : "Nueva clave"
+              }
             />
-            Reemplazar la clave guardada
           </label>
-        )}
-        <div className="retell-fields">
-          {(Object.keys(defaultsLabels) as (keyof Defaults)[]).map((field) => (
-            <label key={field} htmlFor={`retell-${field}`}>
-              {defaultsLabels[field]}
+          {key && state?.configured && (
+            <label className="retell-replace" htmlFor="retell-replace">
               <input
-                id={`retell-${field}`}
-                value={defaults[field]}
-                maxLength={128}
-                onChange={(event) =>
-                  setDefaults((previous) => ({
-                    ...previous,
-                    [field]: event.target.value,
-                  }))
-                }
-                disabled={busy || loading}
+                id="retell-replace"
+                type="checkbox"
+                checked={replaceKey}
+                onChange={(event) => setReplaceKey(event.target.checked)}
+                disabled={busy}
               />
+              Reemplazar la clave guardada
             </label>
-          ))}
+          )}
+          <div className="retell-fields">
+            {(Object.keys(defaultsLabels) as (keyof Defaults)[]).map(
+              (field) => (
+                <label key={field} htmlFor={`retell-${field}`}>
+                  {defaultsLabels[field]}
+                  <input
+                    id={`retell-${field}`}
+                    value={defaults[field]}
+                    maxLength={128}
+                    onChange={(event) =>
+                      setDefaults((previous) => ({
+                        ...previous,
+                        [field]: event.target.value,
+                      }))
+                    }
+                    disabled={busy || loading}
+                  />
+                </label>
+              ),
+            )}
+          </div>
+          <div className="social-actions">
+            <button
+              type="button"
+              className="crm-button"
+              disabled={busy || loading || !state?.available}
+              onClick={() => void save()}
+            >
+              Guardar conexión
+            </button>
+            <button
+              type="button"
+              className="crm-button crm-secondary"
+              disabled={busy || loading || !state?.configured}
+              onClick={() => void refresh()}
+            >
+              Consultar catálogo
+            </button>
+            <button
+              type="button"
+              className="crm-button crm-secondary"
+              disabled={busy || !state?.configured}
+              onClick={() => setDisconnect(true)}
+            >
+              Desconectar
+            </button>
+          </div>
         </div>
-        <div className="social-actions">
-          <button
-            type="button"
-            className="crm-button"
-            disabled={busy || loading || !state?.available}
-            onClick={() => void save()}
-          >
-            Guardar conexión
-          </button>
-          <button
-            type="button"
-            className="crm-button crm-secondary"
-            disabled={busy || loading || !state?.configured}
-            onClick={() => void refresh()}
-          >
-            Consultar catálogo
-          </button>
-          <button
-            type="button"
-            className="crm-button crm-secondary"
-            disabled={busy || !state?.configured}
-            onClick={() => setDisconnect(true)}
-          >
-            Desconectar
-          </button>
-        </div>
-      </div>
+      )}
+      {operationsOnly && (
+        <button
+          type="button"
+          className="crm-button crm-secondary"
+          disabled={busy || loading || !state?.configured}
+          onClick={() => void refresh()}
+        >
+          Actualizar catálogo
+        </button>
+      )}
       {disconnect && (
         <div
           className="retell-confirm"
@@ -600,7 +662,18 @@ export function RetellPanel({
                         type="button"
                         aria-pressed={!advanced}
                         disabled={busy}
-                        onClick={() => setAdvanced(false)}
+                        onClick={() => {
+                          if (!advanced) return;
+                          try {
+                            setValues(
+                              retellGuidedArguments(schema.input_schema, json),
+                            );
+                            setAdvanced(false);
+                            setError("");
+                          } catch (cause) {
+                            setError(settingsError(cause));
+                          }
+                        }}
                       >
                         Campos
                       </button>
@@ -783,6 +856,7 @@ export function RetellPanel({
               value={output}
               request={request}
               onChanged={onChanged}
+              onResult={onResult}
             />
           )}
         </div>

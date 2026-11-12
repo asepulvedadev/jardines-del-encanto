@@ -128,3 +128,43 @@ export function retellArguments(
   safe(result);
   return result;
 }
+
+/** Switch modes only when the current JSON can be represented without losing data. */
+export function retellGuidedArguments(
+  schema: RetellSchema,
+  json: string,
+): Record<string, string> {
+  const args = retellArguments(schema, {}, json);
+  const values: Record<string, string> = {};
+  for (const field of retellFields(schema)) {
+    const value =
+      field.path.startsWith("requestBody.") && plain(args.requestBody)
+        ? args.requestBody[field.name]
+        : args[field.path];
+    if (["string", "number", "boolean"].includes(typeof value))
+      values[field.path] = String(value);
+  }
+  const canonical = (value: unknown): string =>
+    JSON.stringify(
+      plain(value)
+        ? Object.fromEntries(
+            Object.keys(value)
+              .sort()
+              .map((key) => [key, JSON.parse(canonical(value[key]))]),
+          )
+        : value,
+    );
+  let rebuilt: Record<string, unknown>;
+  try {
+    rebuilt = retellArguments(schema, values);
+  } catch {
+    throw new Error(
+      "Conserva JSON avanzado: estos argumentos no se pueden representar en Campos.",
+    );
+  }
+  if (canonical(args) !== canonical(rebuilt))
+    throw new Error(
+      "Conserva JSON avanzado: cambiar a Campos descartaría argumentos.",
+    );
+  return values;
+}

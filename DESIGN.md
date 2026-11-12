@@ -198,7 +198,7 @@ density. No full-bleed photographs, oversized promotional typography or decorati
 
 - Desktop shell: approximately 224px quiet navigation, a 64px header, and a flexible
   content area. Active navigation uses label weight and a clear selected surface.
-- Implemented navigation begins with “Dashboard”, then “Sara IA”, followed by
+- Implemented navigation begins with “Dashboard”, then “Sara IA” and “Voz”, followed by
   “Pipeline”, “Clientes” and “Seguimientos”; “Configuraciones” stays at the bottom.
   Show only authorized, implemented modules.
 - The home view prioritizes next actions and overdue follow-ups. Metrics must answer
