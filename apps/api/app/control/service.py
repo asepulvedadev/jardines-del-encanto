@@ -173,6 +173,8 @@ def connection_views(db):
     parent_enabled = next(row["enabled"] for row in preferences if row["key"] == "zernio")
     for pref in preferences:
         key = pref["key"]
+        if key not in CONNECTION_NAMES:
+            continue
         available = (
             bool(voice["available"] and voice["verified"])
             if key == "elevenlabs"
