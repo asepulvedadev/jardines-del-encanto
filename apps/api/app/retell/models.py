@@ -53,6 +53,71 @@ class Revision(Input):
     revision: int = Field(ge=0, strict=True)
 
 
+INVENTORY_ENDPOINTS = (
+    "listAgents",
+    "listVoices",
+    "listCalls",
+    "listPhoneNumbers",
+    "listKnowledgeBases",
+    "listTestCaseDefinitions",
+    "listRetellLLM",
+    "listConversationFlows",
+    "listChats",
+    "listContacts",
+    "listApps",
+)
+AUTOMATIC_READ_ENDPOINTS = frozenset(INVENTORY_ENDPOINTS) | frozenset(
+    {
+        "getAgent",
+        "getVoice",
+        "getCall",
+        "getPhoneNumber",
+        "getKnowledgeBase",
+        "getTestCaseDefinition",
+        "getRetellLLM",
+        "getConversationFlow",
+        "getChat",
+        "getContact",
+        "getApp",
+        "listAgentVersions",
+    }
+)
+
+
+def check_read_arguments(value):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if (
+                re.search(r"url|uri|consent", key, re.IGNORECASE)
+                or sensitive(re.sub(r"\W", "_", key))
+                or sensitive(re.sub(r"[^A-Za-z0-9]", "", key))
+            ):
+                raise ValueError("automatic_read_argument_denied")
+            check_read_arguments(child)
+    elif isinstance(value, list):
+        for child in value:
+            check_read_arguments(child)
+    elif isinstance(value, str) and (
+        value.lstrip().startswith("//") or re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", value.lstrip())
+    ):
+        raise ValueError("automatic_read_url_denied")
+
+
+class AutomaticRead(Revision):
+    endpoint: Endpoint
+    arguments: dict
+
+    @model_validator(mode="after")
+    def bounded_read(self):
+        if self.endpoint not in AUTOMATIC_READ_ENDPOINTS:
+            raise ValueError("automatic_read_operation_denied")
+        check_arguments(self.arguments)
+        check_read_arguments(self.arguments)
+        if len(json.dumps(self.arguments, allow_nan=False).encode()) > 12000:
+            raise ValueError("arguments_too_large")
+        return self
+
+
 class Configure(Revision):
     api_key: SecretStr | None = None
     defaults: Defaults | None = None

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from ..control.models import Empty
 from ..crm import security
 from ..crm.database import connect
-from . import models, service
+from . import inventory, models, service
 
 router = APIRouter(prefix="/crm/retell")
 Admin = Annotated[dict, Depends(security.session)]
@@ -57,3 +57,17 @@ def schema(data: models.Schema, admin: Admin):
 @router.post("/sessions/{proposal_id}/claim")
 def claim(proposal_id: UUID, data: Empty, admin: Admin):
     return service.claim(proposal_id, admin)
+
+
+@router.post("/inventory")
+def automatic_inventory(data: models.Revision, request: Request, admin: Admin):
+    if request.query_params:
+        raise HTTPException(422, "invalid_input")
+    return inventory.synchronize(data, admin)
+
+
+@router.post("/read")
+def automatic_read(data: models.AutomaticRead, request: Request, admin: Admin):
+    if request.query_params:
+        raise HTTPException(422, "invalid_input")
+    return inventory.read(data, admin)

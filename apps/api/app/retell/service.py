@@ -331,7 +331,7 @@ def validate_contacts(db, args):
             raise HTTPException(409, "retell_contact_changed")
 
 
-def preflight(db, args, revision=None):
+def preflight(db, args, revision=None, *, timeout=65):
     from ..control import service as control
 
     control.require_connections(db, "retell")
@@ -341,7 +341,7 @@ def preflight(db, args, revision=None):
     result = bridge.request(
         "/prepare",
         {"revision": provider["revision"], "endpoint": args.endpoint, "arguments": args.arguments},
-        timeout=65,
+        timeout=timeout,
     )
     if (
         result.get("revision") != provider["revision"]
@@ -367,10 +367,10 @@ def freeze(db, args, admin):
     }
 
 
-def prepare(db, row, args, admin, consent_confirmed):
+def prepare(db, row, args, admin, consent_confirmed, *, timeout=65):
     if requires_consent(args.endpoint) and consent_confirmed is not True:
         raise HTTPException(422, "retell_consent_required")
-    revision, digest = preflight(db, args, row["revisions"]["provider:retell"])
+    revision, digest = preflight(db, args, row["revisions"]["provider:retell"], timeout=timeout)
     if (
         digest != row["revisions"]["retell:schema_hash"]
         or row["revisions"].get("retell:requires_consent") is not requires_consent(args.endpoint)
@@ -420,8 +420,8 @@ def safe_result(value, depth=0, budget=None):
     raise ValueError("invalid_retell_result")
 
 
-def execute_reserved(payload, admin):
-    value = bridge.request("/execute", payload, timeout=65)
+def execute_reserved(payload, admin, *, timeout=65):
+    value = bridge.request("/execute", payload, timeout=timeout)
     if payload["endpoint"] == "createWebCall" and value.get("status") == "ready":
         if (
             set(value) - {"status", "session_id", "call_id"}
