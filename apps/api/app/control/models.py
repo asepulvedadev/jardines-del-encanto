@@ -116,7 +116,15 @@ class ConnectionUpdate(Input):
 
 class ConnectionActionUpdate(ConnectionUpdate):
     key: Literal[
-        "hermes", "zernio", "facebook", "instagram", "tiktok", "whatsapp", "telegram", "elevenlabs"
+        "hermes",
+        "zernio",
+        "facebook",
+        "instagram",
+        "tiktok",
+        "whatsapp",
+        "telegram",
+        "elevenlabs",
+        "retell",
     ]
 
 

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SocialPanel } from "./social-panel";
 import { ElevenLabsPanel } from "./elevenlabs-panel";
+import { RetellPanel } from "./retell-panel";
 import { HermesPanel } from "./hermes-panel";
 import { Customizations } from "./customizations";
 import { Icon } from "./icon";
@@ -31,6 +32,20 @@ const errors: Record<string, string> = {
     "Sara IA no está disponible. Revisa su configuración y proveedor.",
   hermes_disabled: "Sara IA está desactivada.",
   connection_disabled: "La conexión está pausada.",
+  retell_unavailable:
+    "Retell no está disponible. Revisa la conexión y la clave.",
+  retell_provider_changed:
+    "La configuración de Retell cambió. Actualiza y prepara una nueva propuesta.",
+  retell_schema_changed:
+    "La función de Retell cambió. Actualiza su esquema antes de continuar.",
+  retell_consent_required:
+    "Confirma los permisos y el alcance de la operación antes de aprobar.",
+  retell_route_confirmation_required:
+    "Confirma en Retell una ruta telefónica compatible con el destinatario.",
+  retell_sensitive_arguments:
+    "Configura credenciales y secretos directamente en Retell, no en los argumentos de Sara.",
+  retell_operation_unavailable:
+    "Esta función no está habilitada en el adaptador actual. Revisa su estado en Retell.",
   item_disabled: "La customización está desactivada.",
   proposal_expired: "La propuesta venció. Solicita una nueva.",
   proposal_changed:
@@ -93,6 +108,7 @@ export function SettingsModal({
         signal: AbortSignal.timeout(
           path === "hermes/chat" ||
             path.startsWith("voice/") ||
+            path.startsWith("retell/") ||
             /^hermes\/proposals\/[^/]+\/approve$/.test(path)
             ? 95000
             : 25000,
@@ -180,13 +196,19 @@ export function SettingsModal({
   }, [open, load]);
   useEffect(() => {
     if (tab !== "connections") return;
-    if (["hermes", "elevenlabs", "zernio"].includes(editingConnection ?? "")) {
+    if (
+      ["hermes", "elevenlabs", "retell", "zernio"].includes(
+        editingConnection ?? "",
+      )
+    ) {
       const prompt = dialog.current?.querySelector<HTMLElement>(
-        editingConnection === "elevenlabs"
-          ? "#elevenlabs-key"
-          : editingConnection === "zernio"
-            ? "#zernio-mcp-heading"
-            : "#hermes-message",
+        editingConnection === "retell"
+          ? "#retell-key"
+          : editingConnection === "elevenlabs"
+            ? "#elevenlabs-key"
+            : editingConnection === "zernio"
+              ? "#zernio-mcp-heading"
+              : "#hermes-message",
       );
       prompt?.scrollIntoView({ block: "nearest" });
       prompt?.focus();
@@ -244,9 +266,11 @@ export function SettingsModal({
             aria-controls={
               connection.key === "hermes"
                 ? "hermes-connection-editor"
-                : connection.key === "elevenlabs"
-                  ? "elevenlabs-connection-editor"
-                  : "zernio-connection-editor"
+                : connection.key === "retell"
+                  ? "retell-connection-editor"
+                  : connection.key === "elevenlabs"
+                    ? "elevenlabs-connection-editor"
+                    : "zernio-connection-editor"
             }
             onClick={() => {
               setEditingConnection((old) =>
@@ -405,7 +429,9 @@ export function SettingsModal({
             >
               {catalog?.connections
                 .filter((item) =>
-                  ["hermes", "zernio", "elevenlabs"].includes(item.key),
+                  ["hermes", "zernio", "elevenlabs", "retell"].includes(
+                    item.key,
+                  ),
                 )
                 .map(connectionRow)}
               <div
@@ -434,6 +460,22 @@ export function SettingsModal({
                       request={request}
                       onChanged={onChanged}
                       active={open && tab === "connections"}
+                    />
+                  </div>
+                )}
+              {open &&
+                tab === "connections" &&
+                editingConnection === "retell" && (
+                  <div id="retell-connection-editor">
+                    <RetellPanel
+                      request={request}
+                      onChanged={onChanged}
+                      active={open && tab === "connections"}
+                      connectionEnabled={
+                        catalog?.connections.find(
+                          (item) => item.key === "retell",
+                        )?.enabled ?? false
+                      }
                     />
                   </div>
                 )}

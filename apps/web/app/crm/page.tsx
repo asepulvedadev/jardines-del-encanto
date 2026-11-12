@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { crmSession, crmWorkspace } from "../../lib/crm-server";
 import { Workspace } from "../../components/crm/workspace";
 import "./crm.css";
+import "./retell.css";
 
 export const dynamic = "force-dynamic";
 export const metadata = {

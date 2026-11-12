@@ -7,6 +7,14 @@ import {
   type SettingsRequest,
 } from "./settings-types";
 import { ElevenLabsVoiceResult } from "./elevenlabs-result";
+import { RetellVoiceResult } from "./retell-result";
+
+function requiresConsent(proposal: Proposal) {
+  return proposal.action === "retell.execute"
+    ? (proposal.requirements?.consent ?? true)
+    : proposal.action === "voice.execute" &&
+        proposal.arguments.operation === "outbound_call";
+}
 type HermesStatus = {
   configured: boolean;
   available: boolean;
@@ -32,9 +40,7 @@ export function ActionProposals({
   const [error, setError] = useState("");
   const [consents, setConsents] = useState<Record<string, boolean>>({});
   async function decide(proposal: Proposal, decision: "approve" | "reject") {
-    const outbound =
-      proposal.action === "voice.execute" &&
-      proposal.arguments.operation === "outbound_call";
+    const outbound = requiresConsent(proposal);
     if (
       lock.current ||
       (decision === "approve" && outbound && !consents[proposal.id])
@@ -95,34 +101,33 @@ export function ActionProposals({
                 request={request}
               />
             )}
-            {proposal.status === "pending" &&
-              proposal.action === "voice.execute" &&
-              proposal.arguments.operation === "outbound_call" && (
-                <label className="elevenlabs-consent">
-                  <input
-                    type="checkbox"
-                    checked={consents[proposal.id] === true}
-                    onChange={(event) =>
-                      setConsents((old) => ({
-                        ...old,
-                        [proposal.id]: event.target.checked,
-                      }))
-                    }
-                    disabled={!!pending}
-                  />
-                  Confirmo que el destinatario indicado autorizó recibir esta
-                  llamada.
-                </label>
-              )}
+            {proposal.status === "pending" && requiresConsent(proposal) && (
+              <label className="elevenlabs-consent">
+                <input
+                  type="checkbox"
+                  checked={consents[proposal.id] === true}
+                  onChange={(event) =>
+                    setConsents((old) => ({
+                      ...old,
+                      [proposal.id]: event.target.checked,
+                    }))
+                  }
+                  disabled={!!pending}
+                />
+                {proposal.action === "retell.execute"
+                  ? proposal.requirements?.kind === "recipient"
+                    ? "Confirmo que todos los destinatarios indicados autorizaron este contacto y acepto los cargos que pueda generar."
+                    : "Revisé los argumentos exactos y autorizo los cambios, accesos, eliminaciones o cargos indicados para esta operación."
+                  : "Confirmo que el destinatario indicado autorizó recibir esta llamada."}
+              </label>
+            )}
             {proposal.status === "pending" && (
               <div className="social-actions">
                 <button
                   className="crm-button"
                   disabled={
                     !!pending ||
-                    (proposal.action === "voice.execute" &&
-                      proposal.arguments.operation === "outbound_call" &&
-                      !consents[proposal.id])
+                    (requiresConsent(proposal) && !consents[proposal.id])
                   }
                   onClick={() => void decide(proposal, "approve")}
                 >
@@ -163,7 +168,12 @@ export function ActionResultDetails({
           estado con el proveedor.
         </p>
       )}
-      <ElevenLabsVoiceResult result={result} request={request} />
+      {(result.provider === undefined || result.provider === "elevenlabs") && (
+        <ElevenLabsVoiceResult result={result} request={request} />
+      )}
+      {result.provider === "retell" && (
+        <RetellVoiceResult result={result} request={request} />
+      )}
       <pre className="settings-result">{JSON.stringify(result, null, 2)}</pre>
     </details>
   );

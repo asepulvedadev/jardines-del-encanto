@@ -234,6 +234,51 @@ class DeploymentStateTests(unittest.TestCase):
             module.compose(self.target, "config", "--quiet")
             self.assertIn(str(self.root / "crm.compose.yaml"), run.call_args.args[0])
 
+    def enable_retell_policy(self):
+        overlay = self.root / "retell-policy" / "compose.yaml"
+        overlay.parent.mkdir(exist_ok=True)
+        overlay.touch()
+        markers = self.root / "crm-releases"
+        markers.mkdir(exist_ok=True)
+        (markers / self.target).touch()
+        source = self.root / "releases" / self.target / "apps/api/app/retell/models.py"
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.touch()
+        return overlay
+
+    def test_retell_overlay_coexists_with_voice_and_retains_crm_recovery(self):
+        voice = self.enable_voice_policy()
+        retell = self.enable_retell_policy()
+        with patch.object(module.subprocess, "run") as run:
+            module.compose(self.target, "up", "-d", "api")
+            command = run.call_args.args[0]
+            self.assertEqual(command.count("-f"), 3)
+            self.assertIn(str(voice), command)
+            self.assertIn(str(retell), command)
+            module.compose(self.previous, "config", "--quiet")
+            self.assertNotIn(str(retell), run.call_args.args[0])
+            (self.root / "crm-releases" / self.previous).touch()
+            module.compose(self.previous, "up", "-d", "api")
+            self.assertIn(str(retell), run.call_args.args[0])
+
+    def test_retell_refresh_never_starts_stopped_gateway_or_reverts_to_incompatible_image(self):
+        self.enable_retell_policy()
+        with patch.object(module, "compose") as compose:
+            module.refresh_retell(self.previous)
+            compose.assert_not_called()
+            compose.return_value.stdout = "api\nweb\ndb\n"
+            module.refresh_retell(self.target)
+            self.assertEqual(compose.call_count, 1)
+            compose.reset_mock()
+            compose.return_value.stdout = "retell-gateway\napi\n"
+            module.refresh_retell(self.target)
+            self.assertEqual(compose.call_args.args, (self.target, "up", "-d", "--no-deps", "retell-gateway"))
+
+    def test_optional_retell_refresh_failure_does_not_fail_crm_health(self):
+        self.enable_retell_policy()
+        with patch.object(module, "compose", side_effect=OSError):
+            module.refresh_retell(self.target)
+
     def enable_voice_policy(self):
         overlay = self.root / "elevenlabs-policy" / "compose.yaml"
         overlay.parent.mkdir(exist_ok=True)

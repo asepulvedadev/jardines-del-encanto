@@ -1,0 +1,123 @@
+.retell-panel,
+.retell-form,
+.retell-workspace,
+.retell-operation-form {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.retell-panel label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--crm-ink, #062619);
+}
+.retell-panel input,
+.retell-panel select,
+.retell-panel textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #062619;
+  font: inherit;
+  font-size: 16px;
+}
+.retell-panel textarea {
+  resize: vertical;
+  font-family: ui-monospace, monospace;
+}
+.retell-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+.retell-workspace {
+  padding-top: 20px;
+  border-top: 1px solid #d9e1d5;
+}
+.retell-operation-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.retell-operation-meta code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.retell-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.retell-mode button {
+  min-height: 44px;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #fff;
+  color: #062619;
+}
+.retell-mode button[aria-pressed="true"] {
+  background: #eef3e8;
+  font-weight: 700;
+}
+.retell-confirm {
+  display: grid;
+  gap: 12px;
+  border-left: 3px solid #855708;
+  padding: 12px;
+  background: #fff4db;
+}
+.retell-confirm p {
+  margin: 0;
+}
+.retell-result {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.retell-panel a {
+  color: #507010;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.retell-panel :is(input, select, textarea, button, a, summary):focus-visible,
+.retell-result button:focus-visible {
+  outline: 2px solid #507010;
+  outline-offset: 2px;
+}
+.retell-panel :disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.retell-discovery {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.retell-discovery summary {
+  min-height: 44px;
+  align-content: center;
+  cursor: pointer;
+}
+
+.retell-panel label.retell-replace {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.retell-panel input[type="checkbox"] {
+  width: 20px;
+  min-height: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: #062619;
+}

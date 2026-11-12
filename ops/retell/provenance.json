@@ -1,0 +1,28 @@
+{
+  "source": "https://docs.retellai.com/openapi.yaml",
+  "source_sha256": "d2f02a2b9e0f0f35ad02da94c2757e38b1b0a3ad5106aff21f0157d73a2bfebc",
+  "json_sha256": "1dded4b43de66dd26d3b179f1cc9d0725099c6afe26b4aaaf0a85aae6415c831",
+  "info": {
+    "title": "Retell SDK",
+    "version": "3.0.0",
+    "x-retell-spec-revision": "2026-11-12-f8c7226",
+    "contact": {
+      "name": "Retell Support",
+      "url": "https://www.retellai.com/",
+      "email": "support@retellai.com"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.html"
+    }
+  },
+  "operation_count": 112,
+  "mcp_count": 112,
+  "remote_refs": [],
+  "schema_source": "https://mcp.retellai.com/",
+  "schema_meta_tool": "get_api_endpoint_schema",
+  "reviewed_date": "2026-11-12",
+  "schema_count": 112,
+  "registry_sha256": "c7a56a2584c9441cc0b4461ccc00ea0265a6fac226b26359cde462cc5bf6bb62",
+  "schemas_sha256": "4287175563da468ab8a9c948b3fb185d5cf6171edc1e9362240983a92b6c5920"
+}

@@ -1,0 +1,64 @@
+# Administrator-installed overlay; merge with the project's root-owned CRM policy.
+# This file is not activated by an application release or by saving a provider key.
+services:
+  api:
+    environment:
+      RETELL_GATEWAY_URL: http://retell-gateway:8093
+      RETELL_GATEWAY_TOKEN_FILE: /run/secrets/retell_gateway_token
+    secrets: [retell_gateway_token]
+    networks: [retell]
+  retell-gateway:
+    image: jardines-api:${RELEASE:?A verified release is required}
+    user: "10001:10001"
+    entrypoint: [python, /policy/retell_gateway.py]
+    command: []
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 32
+    cpus: 0.5
+    mem_limit: 192m
+    memswap_limit: 192m
+    restart: unless-stopped
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      RETELL_GATEWAY_TOKEN_FILE: /run/secrets/retell_gateway_token
+      RETELL_STATE_DIR: /var/lib/jardines-retell
+    volumes:
+      - type: bind
+        source: /srv/jardines-del-encanto/retell-policy/gateway.py
+        target: /policy/retell_gateway.py
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: /srv/jardines-del-encanto/retell-policy/registry.json
+        target: /policy/registry.json
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: /srv/jardines-del-encanto/retell-policy/schemas.json
+        target: /policy/schemas.json
+        read_only: true
+        bind: { create_host_path: false }
+      - retell_config:/var/lib/jardines-retell
+    secrets: [retell_gateway_token]
+    networks: [retell, retell_egress]
+    tmpfs: ["/tmp:size=4m,mode=1777,noexec,nosuid,nodev"]
+    expose: ["8093"]
+    logging:
+      driver: json-file
+      options: { max-size: "1m", max-file: "2" }
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8093/health/live', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+networks:
+  retell: { internal: true }
+  retell_egress: {}
+volumes:
+  retell_config:
+    name: jardines_retell_config
+secrets:
+  retell_gateway_token:
+    file: /srv/jardines-del-encanto/secrets/retell-gateway.token

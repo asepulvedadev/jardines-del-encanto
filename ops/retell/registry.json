@@ -1,0 +1,1015 @@
+{
+  "addCommunityVoice": {
+    "available": true,
+    "endpoint": "addCommunityVoice",
+    "group": "voices",
+    "method": "POST",
+    "path": "/add-community-voice",
+    "risk": "paid",
+    "summary": "Add a community voice to the voice library"
+  },
+  "addKnowledgeBaseSources": {
+    "available": false,
+    "blocked_reason": "requires_file_adapter",
+    "endpoint": "addKnowledgeBaseSources",
+    "group": "knowledge",
+    "method": "POST",
+    "path": "/add-knowledge-base-sources/{knowledge_base_id}",
+    "risk": "write",
+    "summary": "Add sources to a knowledge base"
+  },
+  "agentPlaygroundCompletion": {
+    "available": true,
+    "endpoint": "agentPlaygroundCompletion",
+    "group": "account",
+    "method": "POST",
+    "path": "/agent-playground-completion/{agent_id}",
+    "risk": "paid",
+    "summary": "Stateless playground completion. Send the full conversation history (same shape as chat completion messages) and receive only the newly generated messages. Nothing is persisted server-side \u2014 the caller manages conversati"
+  },
+  "backfillContactAnalysisData": {
+    "available": true,
+    "endpoint": "backfillContactAnalysisData",
+    "group": "contacts",
+    "method": "POST",
+    "path": "/backfill-contact-analysis-data",
+    "risk": "paid",
+    "summary": "Trigger a backfill job that re-applies analysis data mappings to contacts using historical call and SMS chat data. Only one backfill job can run per organization at a time. Select contact_memory to rewrite memory from ma"
+  },
+  "cloneVoice": {
+    "available": false,
+    "blocked_reason": "requires_file_adapter",
+    "endpoint": "cloneVoice",
+    "group": "voices",
+    "method": "POST",
+    "path": "/clone-voice",
+    "risk": "paid",
+    "summary": "Clone a voice from audio files"
+  },
+  "createAgent": {
+    "available": true,
+    "endpoint": "createAgent",
+    "group": "agents",
+    "method": "POST",
+    "path": "/create-agent",
+    "risk": "write",
+    "summary": "Create a new agent"
+  },
+  "createAgentVersion": {
+    "available": true,
+    "endpoint": "createAgentVersion",
+    "group": "agents",
+    "method": "POST",
+    "path": "/create-agent-version/{agent_id}",
+    "risk": "write",
+    "summary": "Create a new draft agent version from a base version."
+  },
+  "createApp": {
+    "available": true,
+    "endpoint": "createApp",
+    "group": "apps",
+    "method": "POST",
+    "path": "/create-app",
+    "risk": "security",
+    "summary": "Create an App: the connection to one external system (a CRM, calendar, support desk, and so on), holding its credentials and settings. Providers with caller-managed credentials accept auth_config. Providers using OAuth m"
+  },
+  "createAsset": {
+    "available": false,
+    "blocked_reason": "requires_file_adapter",
+    "endpoint": "createAsset",
+    "group": "assets",
+    "method": "POST",
+    "path": "/create-asset",
+    "risk": "write",
+    "summary": "Upload an image or audio asset. Audio is normalized to headerless mono PCM16 at 24 kHz and can be referenced by `custom_on_hold_music_asset_id` on warm and agentic-warm transfer options. Accepted audio formats are MP3, W"
+  },
+  "createBatchCall": {
+    "available": true,
+    "endpoint": "createBatchCall",
+    "group": "calls",
+    "method": "POST",
+    "path": "/create-batch-call",
+    "risk": "paid",
+    "summary": "Create a batch call"
+  },
+  "createBatchTest": {
+    "available": true,
+    "endpoint": "createBatchTest",
+    "group": "testing",
+    "method": "POST",
+    "path": "/create-batch-test",
+    "risk": "paid",
+    "summary": "Create a batch test to run multiple test cases"
+  },
+  "createChat": {
+    "available": true,
+    "endpoint": "createChat",
+    "group": "chat",
+    "method": "POST",
+    "path": "/create-chat",
+    "risk": "write",
+    "summary": "Create a chat session"
+  },
+  "createChatAgent": {
+    "available": true,
+    "endpoint": "createChatAgent",
+    "group": "chat",
+    "method": "POST",
+    "path": "/create-chat-agent",
+    "risk": "write",
+    "summary": "Create a new chat agent"
+  },
+  "createChatCompletion": {
+    "available": true,
+    "endpoint": "createChatCompletion",
+    "group": "chat",
+    "method": "POST",
+    "path": "/create-chat-completion",
+    "risk": "paid",
+    "summary": "Create a chat completion message"
+  },
+  "createContact": {
+    "available": true,
+    "endpoint": "createContact",
+    "group": "contacts",
+    "method": "POST",
+    "path": "/create-contact",
+    "risk": "write",
+    "summary": "Create a new contact."
+  },
+  "createContactImport": {
+    "available": true,
+    "endpoint": "createContactImport",
+    "group": "contacts",
+    "method": "POST",
+    "path": "/create-contact-import",
+    "risk": "write",
+    "summary": "Start an incremental contact import from an uploaded CSV: creates new contacts and updates existing ones matched by phone number. Mapped columns overwrite the matched contact's fields; unmapped columns are ignored. Runs "
+  },
+  "createConversationFlow": {
+    "available": true,
+    "endpoint": "createConversationFlow",
+    "group": "flows",
+    "method": "POST",
+    "path": "/create-conversation-flow",
+    "risk": "write",
+    "summary": "Create a new Conversation Flow that can be attached to an agent. This is used to generate response output for the agent."
+  },
+  "createConversationFlowComponent": {
+    "available": true,
+    "endpoint": "createConversationFlowComponent",
+    "group": "flows",
+    "method": "POST",
+    "path": "/create-conversation-flow-component",
+    "risk": "write",
+    "summary": "Create a new shared conversation flow component"
+  },
+  "createKnowledgeBase": {
+    "available": false,
+    "blocked_reason": "requires_file_adapter",
+    "endpoint": "createKnowledgeBase",
+    "group": "knowledge",
+    "method": "POST",
+    "path": "/create-knowledge-base",
+    "risk": "write",
+    "summary": "Create a new knowledge base"
+  },
+  "createPhoneCall": {
+    "available": true,
+    "endpoint": "createPhoneCall",
+    "group": "calls",
+    "method": "POST",
+    "path": "/v2/create-phone-call",
+    "risk": "paid",
+    "summary": "Create a new outbound phone call."
+  },
+  "createPhoneNumber": {
+    "available": true,
+    "endpoint": "createPhoneNumber",
+    "group": "telephony",
+    "method": "POST",
+    "path": "/create-phone-number",
+    "risk": "paid",
+    "summary": "Buy a new phone number & Bind agents"
+  },
+  "createRetellLLM": {
+    "available": true,
+    "endpoint": "createRetellLLM",
+    "group": "llm",
+    "method": "POST",
+    "path": "/create-retell-llm",
+    "risk": "write",
+    "summary": "Create a new Retell LLM Response Engine that can be attached to an agent. This is used to generate response output for the agent."
+  },
+  "createSmsChat": {
+    "available": true,
+    "endpoint": "createSmsChat",
+    "group": "chat",
+    "method": "POST",
+    "path": "/create-sms-chat",
+    "risk": "paid",
+    "summary": "Start an outbound SMS chat conversation with a phone number using the specified agent. The agent must be configured for chat mode. The initial SMS message will be automatically generated and sent based on the agent's con"
+  },
+  "createTestCaseDefinition": {
+    "available": true,
+    "endpoint": "createTestCaseDefinition",
+    "group": "testing",
+    "method": "POST",
+    "path": "/create-test-case-definition",
+    "risk": "write",
+    "summary": "Create a new test case definition"
+  },
+  "createWebCall": {
+    "available": true,
+    "endpoint": "createWebCall",
+    "group": "calls",
+    "method": "POST",
+    "path": "/v3/create-web-call",
+    "risk": "paid",
+    "summary": "Create a new web call and return browser connection details."
+  },
+  "deleteAgent": {
+    "available": true,
+    "endpoint": "deleteAgent",
+    "group": "agents",
+    "method": "DELETE",
+    "path": "/delete-agent/{agent_id}",
+    "risk": "destructive",
+    "summary": "Delete an existing agent"
+  },
+  "deleteAgentVersion": {
+    "available": true,
+    "endpoint": "deleteAgentVersion",
+    "group": "agents",
+    "method": "DELETE",
+    "path": "/delete-agent-version/{agent_id}",
+    "risk": "destructive",
+    "summary": "Delete a specific agent version."
+  },
+  "deleteApp": {
+    "available": true,
+    "endpoint": "deleteApp",
+    "group": "apps",
+    "method": "DELETE",
+    "path": "/delete-app/{app_id}",
+    "risk": "security",
+    "summary": "Delete an App. Fails when agents, knowledge bases, or alert rules still reference it, unless force_delete is set. If a CRM config is linked to this App, the link is cleared."
+  },
+  "deleteCall": {
+    "available": true,
+    "endpoint": "deleteCall",
+    "group": "calls",
+    "method": "DELETE",
+    "path": "/v2/delete-call/{call_id}",
+    "risk": "destructive",
+    "summary": "Delete a specific call and its associated data"
+  },
+  "deleteChat": {
+    "available": true,
+    "endpoint": "deleteChat",
+    "group": "chat",
+    "method": "DELETE",
+    "path": "/delete-chat/{chat_id}",
+    "risk": "destructive",
+    "summary": "Delete an existing chat"
+  },
+  "deleteChatAgent": {
+    "available": true,
+    "endpoint": "deleteChatAgent",
+    "group": "chat",
+    "method": "DELETE",
+    "path": "/delete-chat-agent/{agent_id}",
+    "risk": "destructive",
+    "summary": "Delete an existing chat agent"
+  },
+  "deleteContact": {
+    "available": true,
+    "endpoint": "deleteContact",
+    "group": "contacts",
+    "method": "DELETE",
+    "path": "/delete-contact/{contact_id}",
+    "risk": "destructive",
+    "summary": "Delete a contact. A contact linked to a record in a connected CRM cannot be deleted while two-way sync is active \u2014 unlink the CRM app first, otherwise the next sync would recreate it."
+  },
+  "deleteConversationFlow": {
+    "available": true,
+    "endpoint": "deleteConversationFlow",
+    "group": "flows",
+    "method": "DELETE",
+    "path": "/delete-conversation-flow/{conversation_flow_id}",
+    "risk": "destructive",
+    "summary": "Delete a conversation flow and all its versions"
+  },
+  "deleteConversationFlowComponent": {
+    "available": true,
+    "endpoint": "deleteConversationFlowComponent",
+    "group": "flows",
+    "method": "DELETE",
+    "path": "/delete-conversation-flow-component/{conversation_flow_component_id}",
+    "risk": "destructive",
+    "summary": "Delete a shared conversation flow component. When deleting a shared component, creates local copies for all linked conversation flows."
+  },
+  "deleteKnowledgeBase": {
+    "available": true,
+    "endpoint": "deleteKnowledgeBase",
+    "group": "knowledge",
+    "method": "DELETE",
+    "path": "/delete-knowledge-base/{knowledge_base_id}",
+    "risk": "destructive",
+    "summary": "Delete an existing knowledge base"
+  },
+  "deleteKnowledgeBaseSource": {
+    "available": true,
+    "endpoint": "deleteKnowledgeBaseSource",
+    "group": "knowledge",
+    "method": "DELETE",
+    "path": "/delete-knowledge-base-source/{knowledge_base_id}/source/{source_id}",
+    "risk": "destructive",
+    "summary": "Delete an existing source from knowledge base"
+  },
+  "deletePhoneNumber": {
+    "available": true,
+    "endpoint": "deletePhoneNumber",
+    "group": "telephony",
+    "method": "DELETE",
+    "path": "/delete-phone-number/{phone_number}",
+    "risk": "destructive",
+    "summary": "Delete an existing phone number"
+  },
+  "deleteRetellLLM": {
+    "available": true,
+    "endpoint": "deleteRetellLLM",
+    "group": "llm",
+    "method": "DELETE",
+    "path": "/delete-retell-llm/{llm_id}",
+    "risk": "destructive",
+    "summary": "Delete an existing Retell LLM Response Engine"
+  },
+  "deleteTestCaseDefinition": {
+    "available": true,
+    "endpoint": "deleteTestCaseDefinition",
+    "group": "testing",
+    "method": "DELETE",
+    "path": "/delete-test-case-definition/{test_case_definition_id}",
+    "risk": "destructive",
+    "summary": "Delete a test case definition"
+  },
+  "endChat": {
+    "available": true,
+    "endpoint": "endChat",
+    "group": "chat",
+    "method": "PATCH",
+    "path": "/end-chat/{chat_id}",
+    "risk": "write",
+    "summary": "End an ongoing chat"
+  },
+  "getAgent": {
+    "available": true,
+    "endpoint": "getAgent",
+    "group": "agents",
+    "method": "GET",
+    "path": "/get-agent/{agent_id}",
+    "risk": "read",
+    "summary": "Retrieve details of a specific agent"
+  },
+  "getApiKeyInfo": {
+    "available": true,
+    "endpoint": "getApiKeyInfo",
+    "group": "account",
+    "method": "GET",
+    "path": "/get-api-key-info",
+    "risk": "read",
+    "summary": "Get info about the API key used to authenticate, and the org that owns it."
+  },
+  "getApp": {
+    "available": true,
+    "endpoint": "getApp",
+    "group": "apps",
+    "method": "GET",
+    "path": "/get-app/{app_id}",
+    "risk": "read",
+    "summary": "Get an App by id."
+  },
+  "getAppToolSchema": {
+    "available": true,
+    "endpoint": "getAppToolSchema",
+    "group": "apps",
+    "method": "POST",
+    "path": "/get-app-tool-schema/{app_id}",
+    "risk": "read",
+    "summary": "One round of multi-step schema resolution for an app tool template against a connected App. parameters is the input parameters resolved so far, with properties configured by const or description, and is empty on the firs"
+  },
+  "getBackfillContactJobStatus": {
+    "available": true,
+    "endpoint": "getBackfillContactJobStatus",
+    "group": "contacts",
+    "method": "GET",
+    "path": "/get-backfill-contact-job-status",
+    "risk": "read",
+    "summary": "Get the status of the contact analysis data backfill job."
+  },
+  "getBatchTest": {
+    "available": true,
+    "endpoint": "getBatchTest",
+    "group": "testing",
+    "method": "GET",
+    "path": "/get-batch-test/{test_case_batch_job_id}",
+    "risk": "read",
+    "summary": "Get a batch test job by ID"
+  },
+  "getCall": {
+    "available": true,
+    "endpoint": "getCall",
+    "group": "calls",
+    "method": "GET",
+    "path": "/v2/get-call/{call_id}",
+    "risk": "read",
+    "summary": "Retrieve details of a specific call"
+  },
+  "getChat": {
+    "available": true,
+    "endpoint": "getChat",
+    "group": "chat",
+    "method": "GET",
+    "path": "/get-chat/{chat_id}",
+    "risk": "read",
+    "summary": "Retrieve details of a specific chat"
+  },
+  "getChatAgent": {
+    "available": true,
+    "endpoint": "getChatAgent",
+    "group": "chat",
+    "method": "GET",
+    "path": "/get-chat-agent/{agent_id}",
+    "risk": "read",
+    "summary": "Retrieve details of a specific chat agent"
+  },
+  "getConcurrency": {
+    "available": true,
+    "endpoint": "getConcurrency",
+    "group": "account",
+    "method": "GET",
+    "path": "/get-concurrency",
+    "risk": "read",
+    "summary": "Get the current concurrency and concurrency limit of the org"
+  },
+  "getContact": {
+    "available": true,
+    "endpoint": "getContact",
+    "group": "contacts",
+    "method": "GET",
+    "path": "/get-contact/{contact_id}",
+    "risk": "read",
+    "summary": "Retrieve a contact by ID."
+  },
+  "getContactByPhone": {
+    "available": true,
+    "endpoint": "getContactByPhone",
+    "group": "contacts",
+    "method": "GET",
+    "path": "/get-contact-by-phone/{phone_number}",
+    "risk": "read",
+    "summary": "Retrieve a contact by phone number. At most one contact exists per phone number in an organization."
+  },
+  "getContactImport": {
+    "available": true,
+    "endpoint": "getContactImport",
+    "group": "contacts",
+    "method": "GET",
+    "path": "/get-contact-import",
+    "risk": "read",
+    "summary": "Status and counts for the org's current or latest contact import."
+  },
+  "getConversationFlow": {
+    "available": true,
+    "endpoint": "getConversationFlow",
+    "group": "flows",
+    "method": "GET",
+    "path": "/get-conversation-flow/{conversation_flow_id}",
+    "risk": "read",
+    "summary": "Retrieve details of a specific Conversation Flow"
+  },
+  "getConversationFlowComponent": {
+    "available": true,
+    "endpoint": "getConversationFlowComponent",
+    "group": "flows",
+    "method": "GET",
+    "path": "/get-conversation-flow-component/{conversation_flow_component_id}",
+    "risk": "read",
+    "summary": "Get a shared conversation flow component"
+  },
+  "getCrmConfig": {
+    "available": true,
+    "endpoint": "getCrmConfig",
+    "group": "crm",
+    "method": "GET",
+    "path": "/get-crm-config",
+    "risk": "read",
+    "summary": "Get the organization's CRM configuration: which CRM app is linked, the custom contact fields defined for it, and how post-call analysis data is written back to contacts. Returns an empty configuration when nothing has be"
+  },
+  "getCrmSchema": {
+    "available": true,
+    "endpoint": "getCrmSchema",
+    "group": "crm",
+    "method": "GET",
+    "path": "/get-crm-schema",
+    "risk": "read",
+    "summary": "Get the contact schema of the connected CRM: the fields available on its contact object, which are the values that sync mappings can reference."
+  },
+  "getKnowledgeBase": {
+    "available": true,
+    "endpoint": "getKnowledgeBase",
+    "group": "knowledge",
+    "method": "GET",
+    "path": "/get-knowledge-base/{knowledge_base_id}",
+    "risk": "read",
+    "summary": "Retrieve details of a specific knowledge base"
+  },
+  "getMCPTools": {
+    "available": true,
+    "endpoint": "getMCPTools",
+    "group": "account",
+    "method": "GET",
+    "path": "/get-mcp-tools/{agent_id}",
+    "risk": "security",
+    "summary": "Get MCP tools for a specific agent"
+  },
+  "getPhoneNumber": {
+    "available": true,
+    "endpoint": "getPhoneNumber",
+    "group": "telephony",
+    "method": "GET",
+    "path": "/get-phone-number/{phone_number}",
+    "risk": "read",
+    "summary": "Retrieve details of a specific phone number"
+  },
+  "getRetellLLM": {
+    "available": true,
+    "endpoint": "getRetellLLM",
+    "group": "llm",
+    "method": "GET",
+    "path": "/get-retell-llm/{llm_id}",
+    "risk": "read",
+    "summary": "Retrieve details of a specific Retell LLM Response Engine"
+  },
+  "getSyncJobStatus": {
+    "available": true,
+    "endpoint": "getSyncJobStatus",
+    "group": "crm",
+    "method": "GET",
+    "path": "/get-sync-job-status",
+    "risk": "read",
+    "summary": "Get the status of the organization's contact sync, whether it was started manually or by the schedule. Returns status `idle` when no sync is running."
+  },
+  "getTestCaseDefinition": {
+    "available": true,
+    "endpoint": "getTestCaseDefinition",
+    "group": "testing",
+    "method": "GET",
+    "path": "/get-test-case-definition/{test_case_definition_id}",
+    "risk": "read",
+    "summary": "Get a test case definition by ID"
+  },
+  "getTestRun": {
+    "available": true,
+    "endpoint": "getTestRun",
+    "group": "testing",
+    "method": "GET",
+    "path": "/get-test-run/{test_case_job_id}",
+    "risk": "read",
+    "summary": "Get a test case job (test run) by ID"
+  },
+  "getVoice": {
+    "available": true,
+    "endpoint": "getVoice",
+    "group": "voices",
+    "method": "GET",
+    "path": "/get-voice/{voice_id}",
+    "risk": "read",
+    "summary": "Retrieve details of a specific voice"
+  },
+  "importPhoneNumber": {
+    "available": true,
+    "endpoint": "importPhoneNumber",
+    "group": "telephony",
+    "method": "POST",
+    "path": "/import-phone-number",
+    "risk": "security",
+    "summary": "Import a phone number from custom telephony & Bind agents"
+  },
+  "listAgentVersions": {
+    "available": true,
+    "endpoint": "listAgentVersions",
+    "group": "agents",
+    "method": "GET",
+    "path": "/list-agent-versions/{agent_id}",
+    "risk": "read",
+    "summary": "List stored versions of a voice or chat agent with pagination."
+  },
+  "listAgents": {
+    "available": true,
+    "endpoint": "listAgents",
+    "group": "agents",
+    "method": "POST",
+    "path": "/v2/list-agents",
+    "risk": "read",
+    "summary": "List unique agents with pagination."
+  },
+  "listAppTemplates": {
+    "available": true,
+    "endpoint": "listAppTemplates",
+    "group": "apps",
+    "method": "GET",
+    "path": "/list-app-templates",
+    "risk": "read",
+    "summary": "List the static catalog of available integration apps \u2014 provider, display name, description, and the tools each exposes. Not the organization's connected Apps."
+  },
+  "listAppUsages": {
+    "available": true,
+    "endpoint": "listAppUsages",
+    "group": "apps",
+    "method": "GET",
+    "path": "/list-app-usages/{app_id}",
+    "risk": "read",
+    "summary": "List the agents, knowledge bases, and alert rules referencing an App, most recently configured first by default."
+  },
+  "listApps": {
+    "available": true,
+    "endpoint": "listApps",
+    "group": "apps",
+    "method": "GET",
+    "path": "/list-apps",
+    "risk": "read",
+    "summary": "List Apps in the organization (paginated)."
+  },
+  "listBatchTests": {
+    "available": true,
+    "endpoint": "listBatchTests",
+    "group": "testing",
+    "method": "GET",
+    "path": "/v2/list-batch-tests",
+    "risk": "read",
+    "summary": "List batch test jobs with pagination"
+  },
+  "listCalls": {
+    "available": true,
+    "endpoint": "listCalls",
+    "group": "calls",
+    "method": "POST",
+    "path": "/v3/list-calls",
+    "risk": "read",
+    "summary": "List calls with unified cursor pagination response."
+  },
+  "listChats": {
+    "available": true,
+    "endpoint": "listChats",
+    "group": "chat",
+    "method": "POST",
+    "path": "/v3/list-chats",
+    "risk": "read",
+    "summary": "List chats with unified cursor pagination response."
+  },
+  "listContactConversations": {
+    "available": true,
+    "endpoint": "listContactConversations",
+    "group": "contacts",
+    "method": "GET",
+    "path": "/list-contact-conversations/{contact_id}",
+    "risk": "read",
+    "summary": "List a contact's conversations (inbound calls, outbound calls, and chats) merged into a single timeline, most recent first. Results are matched by the contact's phone number. Use the returned `pagination_key` to fetch th"
+  },
+  "listContacts": {
+    "available": true,
+    "endpoint": "listContacts",
+    "group": "contacts",
+    "method": "POST",
+    "path": "/list-contacts",
+    "risk": "read",
+    "summary": "List contacts, newest created first by default, with the total count of matches alongside the page. Page through results with `pagination_key`; `skip` is available for offset-style paging but is slower on large contact s"
+  },
+  "listConversationFlowComponents": {
+    "available": true,
+    "endpoint": "listConversationFlowComponents",
+    "group": "flows",
+    "method": "GET",
+    "path": "/v2/list-conversation-flow-components",
+    "risk": "read",
+    "summary": "List shared conversation flow components with pagination"
+  },
+  "listConversationFlows": {
+    "available": true,
+    "endpoint": "listConversationFlows",
+    "group": "flows",
+    "method": "GET",
+    "path": "/v2/list-conversation-flows",
+    "risk": "read",
+    "summary": "List conversation flows with pagination"
+  },
+  "listExportRequests": {
+    "available": true,
+    "endpoint": "listExportRequests",
+    "group": "account",
+    "method": "GET",
+    "path": "/v2/list-export-requests",
+    "risk": "read",
+    "summary": "List export requests with pagination"
+  },
+  "listKnowledgeBases": {
+    "available": true,
+    "endpoint": "listKnowledgeBases",
+    "group": "knowledge",
+    "method": "GET",
+    "path": "/list-knowledge-bases",
+    "risk": "read",
+    "summary": "List all knowledge bases"
+  },
+  "listPhoneNumbers": {
+    "available": true,
+    "endpoint": "listPhoneNumbers",
+    "group": "telephony",
+    "method": "GET",
+    "path": "/v2/list-phone-numbers",
+    "risk": "read",
+    "summary": "List phone numbers with pagination"
+  },
+  "listRetellLLM": {
+    "available": true,
+    "endpoint": "listRetellLLM",
+    "group": "llm",
+    "method": "GET",
+    "path": "/v2/list-retell-llms",
+    "risk": "read",
+    "summary": "List Retell LLM Response Engines with pagination"
+  },
+  "listTestCaseDefinitions": {
+    "available": true,
+    "endpoint": "listTestCaseDefinitions",
+    "group": "testing",
+    "method": "GET",
+    "path": "/v2/list-test-case-definitions",
+    "risk": "read",
+    "summary": "List test case definitions with pagination"
+  },
+  "listTestRuns": {
+    "available": true,
+    "endpoint": "listTestRuns",
+    "group": "testing",
+    "method": "GET",
+    "path": "/v2/list-test-runs/{test_case_batch_job_id}",
+    "risk": "read",
+    "summary": "List test case jobs (test runs) for a batch test job with pagination"
+  },
+  "listVoices": {
+    "available": true,
+    "endpoint": "listVoices",
+    "group": "voices",
+    "method": "GET",
+    "path": "/list-voices",
+    "risk": "read",
+    "summary": "List all voices available to the user"
+  },
+  "listenLiveCall": {
+    "available": true,
+    "endpoint": "listenLiveCall",
+    "group": "calls",
+    "method": "POST",
+    "path": "/v2/listen-live-call/{call_id}",
+    "risk": "paid",
+    "summary": "Mint a subscribe-only access token for an in-progress call so a client can listen to live audio. The returned token grants join + subscribe on the call's existing audio room; it cannot publish. The call must be in ONGOIN"
+  },
+  "publishAgentVersion": {
+    "available": true,
+    "endpoint": "publishAgentVersion",
+    "group": "agents",
+    "method": "POST",
+    "path": "/publish-agent-version/{agent_id}",
+    "risk": "write",
+    "summary": "Publish an existing draft version in place."
+  },
+  "recordChatMessage": {
+    "available": true,
+    "endpoint": "recordChatMessage",
+    "group": "chat",
+    "method": "POST",
+    "path": "/record-chat-message/{chat_id}",
+    "risk": "write",
+    "summary": "Record a user or human transfer-target message in an ongoing escalated chat. SMS chats accept only transfer_target and send SMS before recording. API chats only record; delivery is the customer's responsibility. Idempote"
+  },
+  "refreshKnowledgeBase": {
+    "available": true,
+    "endpoint": "refreshKnowledgeBase",
+    "group": "knowledge",
+    "method": "POST",
+    "path": "/refresh-knowledge-base/{knowledge_base_id}",
+    "risk": "paid",
+    "summary": "Manually refresh a knowledge base"
+  },
+  "registerPhoneCall": {
+    "available": true,
+    "endpoint": "registerPhoneCall",
+    "group": "calls",
+    "method": "POST",
+    "path": "/v2/register-phone-call",
+    "risk": "paid",
+    "summary": "Register a new phone call for custom telephony"
+  },
+  "repairAgent": {
+    "available": true,
+    "endpoint": "repairAgent",
+    "group": "agents",
+    "method": "POST",
+    "path": "/repair-agent/{agent_id}",
+    "risk": "write",
+    "summary": "Remove references to resources that no longer exist in your workspace from an agent draft version and its response engine \u2014 tools whose app connection has been deleted, unknown knowledge bases, and deleted shared compone"
+  },
+  "rerunCallAnalysis": {
+    "available": true,
+    "endpoint": "rerunCallAnalysis",
+    "group": "calls",
+    "method": "PUT",
+    "path": "/rerun-call-analysis/{call_id}",
+    "risk": "paid",
+    "summary": "Rerun post-call analysis for a specific call. This operation incurs charges."
+  },
+  "rerunChatAnalysis": {
+    "available": true,
+    "endpoint": "rerunChatAnalysis",
+    "group": "chat",
+    "method": "PUT",
+    "path": "/rerun-chat-analysis/{chat_id}",
+    "risk": "paid",
+    "summary": "Rerun post-chat analysis for a specific chat. This operation incurs charges."
+  },
+  "runSyncJob": {
+    "available": true,
+    "endpoint": "runSyncJob",
+    "group": "crm",
+    "method": "POST",
+    "path": "/run-sync-job",
+    "risk": "paid",
+    "summary": "Start a contact sync with the linked CRM app immediately, instead of waiting for the scheduled sync. One sync runs per organization at a time: starting another while one is in flight is rejected. Poll get-sync-job-status"
+  },
+  "searchCommunityVoice": {
+    "available": true,
+    "endpoint": "searchCommunityVoice",
+    "group": "voices",
+    "method": "POST",
+    "path": "/search-community-voice",
+    "risk": "read",
+    "summary": "Search for community voices from voice providers"
+  },
+  "stopCall": {
+    "available": true,
+    "endpoint": "stopCall",
+    "group": "calls",
+    "method": "POST",
+    "path": "/v2/stop-call/{call_id}",
+    "risk": "write",
+    "summary": "Stop an ongoing call."
+  },
+  "takeOverLiveCall": {
+    "available": true,
+    "endpoint": "takeOverLiveCall",
+    "group": "calls",
+    "method": "POST",
+    "path": "/v2/take-over-live-call/{call_id}",
+    "risk": "paid",
+    "summary": "Take over an in-progress call from the AI agent. The agent stops responding and the specified live-listen participant is allowed to speak directly to the caller. The call must be in ONGOING status. Calls cannot be taken "
+  },
+  "testAppAuth": {
+    "available": true,
+    "endpoint": "testAppAuth",
+    "group": "apps",
+    "method": "POST",
+    "path": "/test-app-auth/{app_id}",
+    "risk": "security",
+    "summary": "Probe the App's stored credentials by making a minimal authenticated call to the provider. Returns success=true on a successful round-trip, and records the outcome on the App's connection_status either way."
+  },
+  "updateAgent": {
+    "available": true,
+    "endpoint": "updateAgent",
+    "group": "agents",
+    "method": "PATCH",
+    "path": "/update-agent/{agent_id}",
+    "risk": "write",
+    "summary": "Update an existing agent's latest draft version"
+  },
+  "updateApp": {
+    "available": true,
+    "endpoint": "updateApp",
+    "group": "apps",
+    "method": "PATCH",
+    "path": "/update-app/{app_id}",
+    "risk": "security",
+    "summary": "Partially update an App. Omitted fields remain unchanged. Updating auth_config or tenant metadata invalidates the cached provider token immediately. OAuth-only providers reject auth_config and must be reauthorized throug"
+  },
+  "updateCallMetadata": {
+    "available": true,
+    "endpoint": "updateCallMetadata",
+    "group": "calls",
+    "method": "PATCH",
+    "path": "/v2/update-call/{call_id}",
+    "risk": "write",
+    "summary": "Update metadata and sensitive data storage settings for an existing call."
+  },
+  "updateChatAgent": {
+    "available": true,
+    "endpoint": "updateChatAgent",
+    "group": "chat",
+    "method": "PATCH",
+    "path": "/update-chat-agent/{agent_id}",
+    "risk": "write",
+    "summary": "Update an existing chat agent"
+  },
+  "updateChatMetadata": {
+    "available": true,
+    "endpoint": "updateChatMetadata",
+    "group": "chat",
+    "method": "PATCH",
+    "path": "/update-chat/{chat_id}",
+    "risk": "write",
+    "summary": "Update metadata and sensitive data storage settings for an existing chat."
+  },
+  "updateContact": {
+    "available": true,
+    "endpoint": "updateContact",
+    "group": "contacts",
+    "method": "PATCH",
+    "path": "/update-contact/{contact_id}",
+    "risk": "write",
+    "summary": "Update an existing contact."
+  },
+  "updateConversationFlow": {
+    "available": true,
+    "endpoint": "updateConversationFlow",
+    "group": "flows",
+    "method": "PATCH",
+    "path": "/update-conversation-flow/{conversation_flow_id}",
+    "risk": "write",
+    "summary": "Update an existing conversation flow"
+  },
+  "updateConversationFlowComponent": {
+    "available": true,
+    "endpoint": "updateConversationFlowComponent",
+    "group": "flows",
+    "method": "PATCH",
+    "path": "/update-conversation-flow-component/{conversation_flow_component_id}",
+    "risk": "write",
+    "summary": "Update an existing shared conversation flow component"
+  },
+  "updateCrmConfig": {
+    "available": true,
+    "endpoint": "updateCrmConfig",
+    "group": "crm",
+    "method": "POST",
+    "path": "/update-crm-config",
+    "risk": "security",
+    "summary": "Update the organization's CRM configuration. Omitted fields stay as they are; a field that is sent replaces its stored value in full."
+  },
+  "updateLiveCall": {
+    "available": true,
+    "endpoint": "updateLiveCall",
+    "group": "calls",
+    "method": "PATCH",
+    "path": "/v2/update-live-call/{call_id}",
+    "risk": "write",
+    "summary": "Update an ongoing call at runtime. Supports overriding dynamic variables, metadata, and the data storage setting on the running call, and controlling the live agent (inject context, trigger a response). These overrides t"
+  },
+  "updatePhoneNumber": {
+    "available": true,
+    "endpoint": "updatePhoneNumber",
+    "group": "telephony",
+    "method": "PATCH",
+    "path": "/update-phone-number/{phone_number}",
+    "risk": "security",
+    "summary": "Update settings for a phone number. SIP codec preferences apply only to custom phone numbers."
+  },
+  "updateRetellLLM": {
+    "available": true,
+    "endpoint": "updateRetellLLM",
+    "group": "llm",
+    "method": "PATCH",
+    "path": "/update-retell-llm/{llm_id}",
+    "risk": "write",
+    "summary": "Update an existing Retell LLM Response Engine"
+  },
+  "updateTestCaseDefinition": {
+    "available": true,
+    "endpoint": "updateTestCaseDefinition",
+    "group": "testing",
+    "method": "PUT",
+    "path": "/update-test-case-definition/{test_case_definition_id}",
+    "risk": "write",
+    "summary": "Update a test case definition"
+  },
+  "uploadContactImportFile": {
+    "available": false,
+    "blocked_reason": "requires_file_adapter",
+    "endpoint": "uploadContactImportFile",
+    "group": "contacts",
+    "method": "POST",
+    "path": "/upload-contact-import-file",
+    "risk": "write",
+    "summary": "Upload a CSV file for a contact import. The file is stored privately and referenced by the returned upload_id in create-contact-import."
+  }
+}

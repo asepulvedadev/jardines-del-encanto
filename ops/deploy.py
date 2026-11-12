@@ -49,6 +49,12 @@ def compose(sha, *args, **kwargs):
         if policy == "crm.compose.yaml" and overlay.is_file()
         else []
     )
+    retell_overlay = ROOT / "retell-policy" / "compose.yaml"
+    retell_policy = (
+        ["-f", str(retell_overlay)]
+        if policy == "crm.compose.yaml" and retell_overlay.is_file()
+        else []
+    )
     return subprocess.run(
         [
             "docker",
@@ -58,6 +64,7 @@ def compose(sha, *args, **kwargs):
             "-f",
             str(ROOT / policy),
             *voice_policy,
+            *retell_policy,
             *args,
         ],
         env={**ENV, "RELEASE": sha},
@@ -92,6 +99,7 @@ def activate(sha):
     refresh_operator()
     refresh_zernio(sha)
     refresh_voice(sha)
+    refresh_retell(sha)
 
 
 def refresh_operator():
@@ -161,6 +169,33 @@ def refresh_voice(sha):
     except (subprocess.CalledProcessError, OSError):
         print(
             "Application ready; optional voice gateway refresh failed", file=sys.stderr
+        )
+
+
+def refresh_retell(sha):
+    # Older images lack the gateway's jsonschema dependency. Preserve an already
+    # running compatible gateway when rolling the application back to those images.
+    if not (
+        (ROOT / "retell-policy" / "compose.yaml").is_file()
+        and (ROOT / "crm-releases" / sha).is_file()
+        and (ROOT / "releases" / sha / "apps/api/app/retell/models.py").is_file()
+    ):
+        return
+    try:
+        active = compose(
+            sha,
+            "ps",
+            "--status",
+            "running",
+            "--services",
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+        if "retell-gateway" in active:
+            compose(sha, "up", "-d", "--no-deps", "retell-gateway")
+    except (subprocess.CalledProcessError, OSError):
+        print(
+            "Application ready; optional Retell gateway refresh failed", file=sys.stderr
         )
 
 

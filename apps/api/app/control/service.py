@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from ..crm import models as crm_models
 from ..crm import services
 from ..crm.database import connect
+from ..retell import models as retell_models
 from ..voice import models as voice_models
 from . import models
 
@@ -33,6 +34,9 @@ ACTION_MODELS = {
     "social.status": models.Empty,
     "voice.catalog": models.Empty,
     "voice.execute": voice_models.Execute,
+    "retell.catalog": models.Empty,
+    "retell.schema": retell_models.SchemaBrowse,
+    "retell.execute": retell_models.Execute,
     "social.sync": models.Empty,
     "social.connect": models.SocialConnect,
 }
@@ -42,6 +46,8 @@ READ_ACTIONS = {
     "control.catalog",
     "social.status",
     "voice.catalog",
+    "retell.catalog",
+    "retell.schema",
 }
 EXTENSION_ACTIONS = frozenset(
     {
@@ -61,6 +67,7 @@ CONNECTION_NAMES = {
     "whatsapp": "WhatsApp",
     "telegram": "Telegram",
     "elevenlabs": "ElevenLabs",
+    "retell": "Retell AI",
 }
 
 
@@ -164,6 +171,9 @@ def connection_views(db):
     from ..voice.service import state as voice_state
 
     voice = voice_state()
+    from ..retell.service import state as retell_state
+
+    retell = retell_state()
     try:
         state = settings()
     except HTTPException:
@@ -173,8 +183,12 @@ def connection_views(db):
     parent_enabled = next(row["enabled"] for row in preferences if row["key"] == "zernio")
     for pref in preferences:
         key = pref["key"]
+        if key not in CONNECTION_NAMES:
+            continue
         available = (
-            bool(voice["available"] and voice["verified"])
+            bool(retell["available"] and retell["configured"] and retell["verified"])
+            if key == "retell"
+            else bool(voice["available"] and voice["verified"])
             if key == "elevenlabs"
             else bridge["available"]
             if key == "hermes"
@@ -186,7 +200,7 @@ def connection_views(db):
             )
         )
         desired = pref["enabled"] and (
-            parent_enabled if key not in ("hermes", "zernio", "elevenlabs") else True
+            parent_enabled if key not in ("hermes", "zernio", "elevenlabs", "retell") else True
         )
         effective = bool(desired and available)
         output.append(
@@ -304,6 +318,10 @@ def update_connection(db, key, data, admin):
         from ..voice.service import require_state
 
         require_state()
+    if key == "retell" and data.enabled:
+        from ..retell.service import require_state
+
+        require_state()
     pref = db.execute(
         """UPDATE crm.control_connections SET enabled=%s,version=version+1
         WHERE key=%s AND version=%s RETURNING *""",
@@ -317,6 +335,14 @@ def update_connection(db, key, data, admin):
 
 def execute(db, action, args, admin):
     """Invoked only for reads, direct human configuration, or consumed proposals."""
+    if action == "retell.catalog":
+        from ..retell.service import catalog as retell_catalog
+
+        return retell_catalog(db)
+    if action == "retell.schema":
+        from ..retell.service import schema as retell_schema
+
+        return retell_schema(db, args)
     if action == "voice.catalog":
         from ..voice.service import catalog as voice_catalog
 
@@ -426,6 +452,14 @@ def check_revisions(db, frozen):
                 raise HTTPException(409, "connection_changed")
         elif key == "provider:elevenlabs":
             # The provider revision is checked by the voice preflight and gateway.
+            continue
+        elif key in {
+            "provider:retell",
+            "retell:schema_hash",
+            "retell:requires_consent",
+            "retell:risk",
+        }:
+            # Retell's preflight rechecks its pinned schema, policy and bound recipients.
             continue
         elif current.get(key) != value:
             raise HTTPException(409, "capability_changed")

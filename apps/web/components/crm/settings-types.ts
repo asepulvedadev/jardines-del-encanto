@@ -43,6 +43,7 @@ export type Proposal = {
   action: string;
   arguments: Record<string, unknown>;
   status: "pending" | "approved" | "rejected" | "expired";
+  requirements?: { consent: boolean; kind: "recipient" | "operation" };
   version: number;
 };
 export type ActionResult = {

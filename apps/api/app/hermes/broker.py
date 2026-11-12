@@ -15,7 +15,16 @@ from ..crm.database import connect
 
 
 def proposal_view(row):
-    return {key: row[key] for key in ("id", "action", "arguments", "status", "version")}
+    result = {key: row[key] for key in ("id", "action", "arguments", "status", "version")}
+    if row["action"] == "retell.execute":
+        result["requirements"] = {
+            "consent": row["revisions"].get("retell:requires_consent", True),
+            "kind": "recipient"
+            if row["arguments"].get("endpoint")
+            in {"createPhoneCall", "createSmsChat", "createBatchCall"}
+            else "operation",
+        }
+    return result
 
 
 def dispatch(db, action, arguments, admin, run_id=None, parent=None):
@@ -32,6 +41,10 @@ def dispatch(db, action, arguments, admin, run_id=None, parent=None):
         from ..voice import service as voice
 
         frozen.update(voice.freeze(db, args, admin))
+    if action == "retell.execute":
+        from ..retell import service as retell
+
+        frozen.update(retell.freeze(db, args, admin))
     if action == "social.connect":
         service.require_connections(db, args.platform)
         pref = db.execute(
@@ -128,6 +141,14 @@ def resolve(proposal_id, version, admin, approve, consent_confirmed=False):
 
                 external = ("voice.execute", voice.prepare(db, row, args, admin, consent_confirmed))
                 result = {"status": "dispatch_reserved", "retryable": False}
+            elif row["action"] == "retell.execute":
+                from ..retell import service as retell
+
+                external = (
+                    "retell.execute",
+                    retell.prepare(db, row, args, admin, consent_confirmed),
+                )
+                result = {"status": "dispatch_reserved", "retryable": False}
             elif row["action"] in service.SOCIAL_ACTIONS:
                 # Reserve before network dispatch. An uncertain external outcome is NOT retryable.
                 external = (row["action"], args)
@@ -142,6 +163,8 @@ def resolve(proposal_id, version, admin, approve, consent_confirmed=False):
         audit_arguments = {"action": row["action"], "arguments": row["arguments"]}
         if approve and row["action"] == "voice.execute" and args.operation == "outbound_call":
             audit_arguments["consent_confirmed"] = True
+        if approve and row["action"] == "retell.execute":
+            audit_arguments["consent_confirmed"] = consent_confirmed
         service.audit(
             db,
             admin,
@@ -156,6 +179,10 @@ def resolve(proposal_id, version, admin, approve, consent_confirmed=False):
             action, args = external
             if action == "voice.execute":
                 from ..voice.service import execute_reserved
+
+                result = execute_reserved(args, admin)
+            elif action == "retell.execute":
+                from ..retell.service import execute_reserved
 
                 result = execute_reserved(args, admin)
             else:
@@ -283,6 +310,9 @@ def tools(db):
         "desactiva, install habilita, test valida sin ejecutar. Nuevas extensiones solo en el próximo "
         "turno. Sin código, paquetes nativos, conexiones ni cambios de permisos. "
         "voice.catalog muestra opciones; voice.execute siempre propone una operación de pago. "
+        "retell.catalog lista operaciones revisadas; retell.schema consulta campos paginados. "
+        "retell.execute SIEMPRE crea una propuesta exacta, incluso para lecturas. "
+        "No enviar claves, headers ni secretos en argumentos; las funciones no disponibles no se ejecutan. "
         "Llamadas solo a contactos existentes con consentimiento humano explícito al aprobar. "
         "No inventar IDs ni versiones; "
         "consultar crm.workspace y crm.activities primero. custom tool combina defaults con arguments; "

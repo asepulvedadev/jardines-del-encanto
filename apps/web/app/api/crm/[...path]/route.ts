@@ -10,7 +10,7 @@ const rules: [RegExp, string[]][] = [
   [/^control\/items\/[0-9a-f-]{36}$/, ["PATCH"]],
   [/^control\/items\/[0-9a-f-]{36}\/run$/, ["POST"]],
   [
-    /^control\/connections\/(hermes|elevenlabs|zernio|facebook|instagram|tiktok|whatsapp|telegram)$/,
+    /^control\/connections\/(hermes|elevenlabs|retell|zernio|facebook|instagram|tiktok|whatsapp|telegram)$/,
     ["PATCH"],
   ],
   [/^sara\/(status|skills)$/, ["GET"]],
@@ -19,6 +19,12 @@ const rules: [RegExp, string[]][] = [
   [/^sara\/conversations\/[0-9a-f-]{36}\/messages$/, ["GET", "POST"]],
   [/^sara\/attachments$/, ["POST"]],
   [/^sara\/attachments\/[0-9a-f-]{36}\/content$/, ["GET"]],
+  [/^retell\/settings$/, ["GET", "POST"]],
+  [/^retell\/(catalog|schema|disconnect)$/, ["POST"]],
+  [
+    /^retell\/sessions\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/claim$/,
+    ["POST"],
+  ],
   [/^voice\/settings$/, ["GET", "POST"]],
   [/^voice\/(catalog|disconnect|attachments)$/, ["POST"]],
   [
@@ -93,7 +99,8 @@ async function proxy(
   let query = "";
   const sara = endpoint.startsWith("sara/");
   const voice = endpoint.startsWith("voice/");
-  if (voice && new URL(request.url).searchParams.size)
+  const retell = endpoint.startsWith("retell/");
+  if ((voice || retell) && new URL(request.url).searchParams.size)
     return fail(422, "invalid_input");
   if (sara) {
     const params = new URL(request.url).searchParams;
@@ -176,6 +183,7 @@ async function proxy(
   if (session) headers.set("cookie", `${session.name}=${session.value}`);
   const timeout =
     endpoint.startsWith("voice/") ||
+    endpoint.startsWith("retell/") ||
     /^hermes\/proposals\/[0-9a-f-]{36}\/approve$/.test(endpoint)
       ? 95000
       : /^sara\/conversations\/[0-9a-f-]{36}\/messages$/.test(endpoint) &&
@@ -208,7 +216,7 @@ async function proxy(
       resultHeaders.append("Set-Cookie", cookie);
     const retry = upstream.headers.get("retry-after");
     if (retry) resultHeaders.set("Retry-After", retry);
-    if (sara || voice) {
+    if (sara || voice || retell) {
       const voiceDownload =
         /^voice\/artifacts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/content$/.test(
           endpoint,

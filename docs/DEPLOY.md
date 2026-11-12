@@ -373,3 +373,13 @@ internal token, volume and root-owned policy. Do not downgrade just the gate whi
 leaving the overlay active. If prerequisite/policy installation fails before release
 activation, restore the consistent private checkpoint; never delete volumes or reverse
 migration010. Complete account connection only through the administrator UI later.
+
+## Retell (optional, not activated by the application release)
+
+Retell needs its own administrator-installed private gateway policy and the locked
+API Python dependencies. Do not copy a provider key into the API or Hermes environment.
+See [RETELL.md](RETELL.md) for the separate activation consent, compatibility rollback
+boundary required **before migration011**, private token/volume setup and read-only
+verification. Installed Retell and ElevenLabs overlays are retained together for CRM
+activation/recovery. A stopped Retell gateway is not auto-started. Older pre-Retell
+images do not replace its compatible gateway image during rollback.

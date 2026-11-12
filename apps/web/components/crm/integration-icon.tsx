@@ -2,6 +2,7 @@ import { Icon } from "./icon";
 const marks: Record<string, string> = {
   hermes: "H",
   elevenlabs: "Ⅱ",
+  retell: "R",
   zernio: "Z",
   facebook: "f",
   instagram: "IG",

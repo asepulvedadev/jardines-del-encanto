@@ -12,6 +12,7 @@ from .crm.landing import router as landing_router
 from .crm.routes import router as crm_router
 from .hermes.routes import internal_router
 from .hermes.routes import router as hermes_router
+from .retell.routes import router as retell_router
 from .sara.routes import router as sara_router
 from .social.mcp_routes import router as social_mcp_router
 from .social.routes import router as social_router
@@ -26,6 +27,7 @@ app.include_router(control_router)
 app.include_router(hermes_router)
 app.include_router(sara_router)
 app.include_router(voice_router)
+app.include_router(retell_router)
 app.include_router(internal_router)
 app.include_router(landing_router)
 app.include_router(social_router)
@@ -36,7 +38,14 @@ app.include_router(webhook_router)
 @app.middleware("http")
 async def private_response_headers(request: Request, call_next):
     private_control = request.url.path.startswith(
-        ("/crm/control/", "/crm/hermes/", "/internal/hermes/", "/crm/sara/", "/crm/voice/")
+        (
+            "/crm/control/",
+            "/crm/hermes/",
+            "/internal/hermes/",
+            "/crm/sara/",
+            "/crm/voice/",
+            "/crm/retell/",
+        )
     )
     if private_control and request.method in ("POST", "PATCH", "DELETE"):
         # Bound bytes before JSON/Pydantic parsing, including chunked requests.
