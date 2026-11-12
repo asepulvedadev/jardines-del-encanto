@@ -43,6 +43,12 @@ def compose(sha, *args, **kwargs):
         if (ROOT / "crm-releases" / sha).is_file()
         else "compose.yaml"
     )
+    overlay = ROOT / "elevenlabs-policy" / "compose.yaml"
+    voice_policy = (
+        ["-f", str(overlay)]
+        if policy == "crm.compose.yaml" and overlay.is_file()
+        else []
+    )
     return subprocess.run(
         [
             "docker",
@@ -51,6 +57,7 @@ def compose(sha, *args, **kwargs):
             "jardines",
             "-f",
             str(ROOT / policy),
+            *voice_policy,
             *args,
         ],
         env={**ENV, "RELEASE": sha},
@@ -84,6 +91,7 @@ def activate(sha):
     )
     refresh_operator()
     refresh_zernio(sha)
+    refresh_voice(sha)
 
 
 def refresh_operator():
@@ -127,6 +135,32 @@ def refresh_zernio(sha):
     except (subprocess.CalledProcessError, OSError):
         print(
             "Application ready; optional Zernio relay refresh failed", file=sys.stderr
+        )
+
+
+def refresh_voice(sha):
+    # Root installation selects the overlay for every CRM recreation, including
+    # recovery. Refresh only an already-running gateway; initial start is explicit.
+    if (
+        not (ROOT / "elevenlabs-policy" / "compose.yaml").is_file()
+        or not (ROOT / "crm-releases" / sha).is_file()
+    ):
+        return
+    try:
+        active = compose(
+            sha,
+            "ps",
+            "--status",
+            "running",
+            "--services",
+            capture_output=True,
+            text=True,
+        ).stdout.splitlines()
+        if "voice-gateway" in active:
+            compose(sha, "up", "-d", "--no-deps", "voice-gateway")
+    except (subprocess.CalledProcessError, OSError):
+        print(
+            "Application ready; optional voice gateway refresh failed", file=sys.stderr
         )
 
 

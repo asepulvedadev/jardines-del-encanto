@@ -337,3 +337,39 @@ new UUID automatically. A future timeout adjustment is project-vhost-only and
 requires its own reviewed configuration change. The existing1MiB proxy body cap
 accommodates Sara's768KiB JSON upload limit. Reassess the fixed transcription
 model before its documented February26,2027 deprecation; do not silently switch it.
+
+
+## Optional ElevenLabs gateway installation
+
+The root gate selects `/srv/jardines-del-encanto/elevenlabs-policy/compose.yaml`
+when it exists for a CRM release. This is a fixed administrator-owned overlay,
+never release-owned policy. The selection applies to migrations, activation and
+CRM rollback; historical pre-CRM releases retain their original foundation policy.
+Keep the existing CRM/Zernio policy unchanged.
+
+Before atomically installing the overlay, hold the deployment lock and retain the
+current gate, CRM/operator policies, release pointer and logical database backup.
+Install the reviewed gateway source, create a project-only internal service token
+readable by UID10001 with mode0400/0600, and initialize only `jardines_voice_config`
+as UID/GID10001 mode0700. Validate the merged Compose configuration without resolving
+or printing env-file values. The overlay file is the activation marker: never leave
+it installed with missing prerequisites. Existing foreign/unmanaged state must not
+be adopted or recursively chowned.
+
+Start `voice-gateway` explicitly once with the existing healthy project's API image;
+its standalone Python policy does not import application code. This does not enable
+the persisted ElevenLabs connection or supply a vendor key. Future gate activation
+refreshes an already-running gateway to the selected application image with
+`--no-deps`; it never starts a stopped gateway. An optional refresh failure is
+reported separately from otherwise healthy CRM readiness.
+
+Install the updated operator protocol in both existing operator services, plus the
+reviewed operator prompt, and recreate only those services before exposing the new
+broker manifest. Do not touch the separate text-only Hermes profile or its key.
+Then deploy the immutable reviewed main SHA through the normal locked gate.
+
+Rollback uses the same overlay-aware gate and retains the additive database schema,
+internal token, volume and root-owned policy. Do not downgrade just the gate while
+leaving the overlay active. If prerequisite/policy installation fails before release
+activation, restore the consistent private checkpoint; never delete volumes or reverse
+migration010. Complete account connection only through the administrator UI later.

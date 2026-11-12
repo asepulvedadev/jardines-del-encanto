@@ -150,9 +150,15 @@ class DeploymentStateTests(unittest.TestCase):
                 "refresh_zernio",
                 side_effect=lambda sha: events.append("zernio"),
             ),
+            patch.object(
+                module,
+                "refresh_voice",
+                create=True,
+                side_effect=lambda sha: events.append("voice"),
+            ),
         ):
             module.activate(self.target)
-        self.assertEqual(events, ["compose", "health", "operator", "zernio"])
+        self.assertEqual(events, ["compose", "health", "operator", "zernio", "voice"])
 
     def test_zernio_refresh_only_recreates_an_already_running_relay(self):
         policy = self.root / "zernio-policy" / "egress.py"
@@ -227,6 +233,60 @@ class DeploymentStateTests(unittest.TestCase):
             self.assertIn(str(self.root / "compose.yaml"), run.call_args.args[0])
             module.compose(self.target, "config", "--quiet")
             self.assertIn(str(self.root / "crm.compose.yaml"), run.call_args.args[0])
+
+    def enable_voice_policy(self):
+        overlay = self.root / "elevenlabs-policy" / "compose.yaml"
+        overlay.parent.mkdir(exist_ok=True)
+        overlay.touch()
+        markers = self.root / "crm-releases"
+        markers.mkdir(exist_ok=True)
+        (markers / self.target).touch()
+        return overlay
+
+    def test_voice_overlay_is_root_owned_and_retained_for_crm_recovery(self):
+        overlay = self.enable_voice_policy()
+        with patch.object(module.subprocess, "run") as run:
+            module.compose(self.target, "up", "-d", "api")
+            command = run.call_args.args[0]
+            self.assertEqual(command.count("-f"), 2)
+            self.assertIn(str(overlay), command)
+            self.assertEqual(command[-3:], ["up", "-d", "api"])
+            module.compose(self.previous, "config", "--quiet")
+            self.assertNotIn(str(overlay), run.call_args.args[0])
+            self.assertIn(str(self.root / "compose.yaml"), run.call_args.args[0])
+            (self.root / "crm-releases" / self.previous).touch()
+            module.compose(self.previous, "up", "-d", "api")
+            self.assertIn(str(overlay), run.call_args.args[0])
+
+    def test_voice_refresh_is_absent_without_installed_overlay_or_crm_marker(self):
+        with patch.object(module, "compose") as compose:
+            module.refresh_voice(self.target)
+            self.enable_voice_policy()
+            module.refresh_voice(self.previous)
+        compose.assert_not_called()
+
+    def test_voice_refresh_never_activates_a_stopped_gateway(self):
+        self.enable_voice_policy()
+        with patch.object(module, "compose") as compose:
+            compose.return_value.stdout = "api\nweb\ndb\n"
+            module.refresh_voice(self.target)
+            self.assertEqual(compose.call_count, 1)
+
+    def test_running_voice_gateway_uses_selected_release_without_dependencies(self):
+        self.enable_voice_policy()
+        with patch.object(module, "compose") as compose:
+            compose.return_value.stdout = "api\nvoice-gateway\n"
+            module.refresh_voice(self.target)
+            self.assertEqual(compose.call_count, 2)
+            self.assertEqual(
+                compose.call_args.args,
+                (self.target, "up", "-d", "--no-deps", "voice-gateway"),
+            )
+
+    def test_optional_voice_failure_keeps_healthy_crm_available(self):
+        self.enable_voice_policy()
+        with patch.object(module, "compose", side_effect=OSError):
+            module.refresh_voice(self.target)
 
     def test_migrations_complete_before_application_activation(self):
         events = []
