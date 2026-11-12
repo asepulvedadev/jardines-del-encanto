@@ -6,6 +6,7 @@ import {
   type Proposal,
   type SettingsRequest,
 } from "./settings-types";
+import { ElevenLabsVoiceResult } from "./elevenlabs-result";
 type HermesStatus = {
   configured: boolean;
   available: boolean;
@@ -29,8 +30,16 @@ export function ActionProposals({
   const [pending, setPending] = useState("");
   const lock = useRef(false);
   const [error, setError] = useState("");
+  const [consents, setConsents] = useState<Record<string, boolean>>({});
   async function decide(proposal: Proposal, decision: "approve" | "reject") {
-    if (lock.current) return;
+    const outbound =
+      proposal.action === "voice.execute" &&
+      proposal.arguments.operation === "outbound_call";
+    if (
+      lock.current ||
+      (decision === "approve" && outbound && !consents[proposal.id])
+    )
+      return;
     lock.current = true;
     setPending(proposal.id);
     setError("");
@@ -40,6 +49,9 @@ export function ActionProposals({
         result?: Record<string, unknown>;
       }>(`hermes/proposals/${proposal.id}/${decision}`, "POST", {
         version: proposal.version,
+        ...(decision === "approve" && outbound
+          ? { consent_confirmed: consents[proposal.id] === true }
+          : {}),
       });
       setDecisions((old) => ({ ...old, [proposal.id]: result.proposal }));
       if (result.result)
@@ -78,13 +90,40 @@ export function ActionProposals({
               {JSON.stringify(proposal.arguments, null, 2)}
             </pre>
             {results[proposal.id] && (
-              <ActionResultDetails result={results[proposal.id]} />
+              <ActionResultDetails
+                result={results[proposal.id]}
+                request={request}
+              />
             )}
+            {proposal.status === "pending" &&
+              proposal.action === "voice.execute" &&
+              proposal.arguments.operation === "outbound_call" && (
+                <label className="elevenlabs-consent">
+                  <input
+                    type="checkbox"
+                    checked={consents[proposal.id] === true}
+                    onChange={(event) =>
+                      setConsents((old) => ({
+                        ...old,
+                        [proposal.id]: event.target.checked,
+                      }))
+                    }
+                    disabled={!!pending}
+                  />
+                  Confirmo que el destinatario indicado autorizó recibir esta
+                  llamada.
+                </label>
+              )}
             {proposal.status === "pending" && (
               <div className="social-actions">
                 <button
                   className="crm-button"
-                  disabled={!!pending}
+                  disabled={
+                    !!pending ||
+                    (proposal.action === "voice.execute" &&
+                      proposal.arguments.operation === "outbound_call" &&
+                      !consents[proposal.id])
+                  }
                   onClick={() => void decide(proposal, "approve")}
                 >
                   Aprobar acción exacta
@@ -106,8 +145,10 @@ export function ActionProposals({
 }
 export function ActionResultDetails({
   result,
+  request,
 }: {
   result: Record<string, unknown>;
+  request?: SettingsRequest;
 }) {
   const uncertain = [
     "external_outcome_unconfirmed",
@@ -122,6 +163,7 @@ export function ActionResultDetails({
           estado con el proveedor.
         </p>
       )}
+      <ElevenLabsVoiceResult result={result} request={request} />
       <pre className="settings-result">{JSON.stringify(result, null, 2)}</pre>
     </details>
   );
@@ -137,7 +179,9 @@ export function ActionOutput({
 }) {
   return (
     <>
-      {value.result && <ActionResultDetails result={value.result} />}
+      {value.result && (
+        <ActionResultDetails result={value.result} request={request} />
+      )}
       {!!value.proposals?.length && (
         <ActionProposals
           proposals={value.proposals}

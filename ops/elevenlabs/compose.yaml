@@ -1,0 +1,54 @@
+# Administrator-installed overlay; merge with the project's root-owned CRM policy.
+# This file is not activated by an application release or by saving a provider key.
+services:
+  api:
+    environment:
+      ELEVENLABS_GATEWAY_URL: http://voice-gateway:8092
+      ELEVENLABS_GATEWAY_TOKEN_FILE: /run/secrets/elevenlabs_gateway_token
+    secrets: [elevenlabs_gateway_token]
+    networks: [voice]
+  voice-gateway:
+    image: jardines-api:${RELEASE:?A verified release is required}
+    user: "10001:10001"
+    entrypoint: [python, /policy/elevenlabs_gateway.py]
+    command: []
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 32
+    cpus: 0.5
+    mem_limit: 192m
+    memswap_limit: 192m
+    restart: unless-stopped
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      ELEVENLABS_GATEWAY_TOKEN_FILE: /run/secrets/elevenlabs_gateway_token
+      ELEVENLABS_STATE_DIR: /var/lib/jardines-elevenlabs
+    volumes:
+      - type: bind
+        source: /srv/jardines-del-encanto/elevenlabs-policy/gateway.py
+        target: /policy/elevenlabs_gateway.py
+        read_only: true
+        bind: { create_host_path: false }
+      - voice_config:/var/lib/jardines-elevenlabs
+    secrets: [elevenlabs_gateway_token]
+    networks: [voice, voice_egress]
+    tmpfs: ["/tmp:size=4m,mode=1777,noexec,nosuid,nodev"]
+    expose: ["8092"]
+    logging:
+      driver: json-file
+      options: { max-size: "1m", max-file: "2" }
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8092/health/live', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+networks:
+  voice: { internal: true }
+  voice_egress: {}
+volumes:
+  voice_config:
+    name: jardines_voice_config
+secrets:
+  elevenlabs_gateway_token:
+    file: /srv/jardines-del-encanto/secrets/elevenlabs-gateway.token

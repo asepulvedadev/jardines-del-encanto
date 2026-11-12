@@ -13,6 +13,6 @@
     "typecheck": "npm run typecheck --workspace=apps/web",
     "test:web": "node --test tests/landing.test.mjs tests/launch-cycle.test.mjs tests/masterplan.test.mjs tests/hero.test.mjs tests/seo.test.mjs",
     "test:crm": "uv run --project apps/api python ops/dev/crm.py test",
-    "test:crm:gateway": "node --test tests/crm-gateway.test.mjs tests/zernio-webhook-gateway.test.mjs tests/landing-registration-gateway.test.mjs tests/crm-pipeline.test.mjs tests/control-gateway.test.mjs tests/settings-ui.test.mjs tests/zernio-oauth-ui.test.mjs tests/sara-gateway.test.mjs tests/sara-navigation.test.mjs tests/sara-ui.test.mjs"
+    "test:crm:gateway": "node --test tests/crm-gateway.test.mjs tests/zernio-webhook-gateway.test.mjs tests/landing-registration-gateway.test.mjs tests/crm-pipeline.test.mjs tests/control-gateway.test.mjs tests/settings-ui.test.mjs tests/zernio-oauth-ui.test.mjs tests/sara-gateway.test.mjs tests/sara-navigation.test.mjs tests/sara-ui.test.mjs tests/web/elevenlabs-gateway.test.mjs tests/web/elevenlabs-ui.test.mjs tests/web/elevenlabs-session.test.mjs"
   }
 }

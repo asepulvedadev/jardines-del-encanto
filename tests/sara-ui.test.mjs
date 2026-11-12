@@ -479,3 +479,32 @@ test("skills management is absent from the top toolbar and history has confirmed
   assert.match(html, /Cancelar borrado/);
   assert.match(read("sara-panel.tsx"), /role="listbox"/);
 });
+
+test("Sara audio is an explicit bounded proposal control without playback on render", () => {
+  const { SaraVoiceOutput } = load("sara-voice-output.tsx");
+  let requests = 0;
+  const props = {
+    text: "Respuesta de Sara",
+    request: async () => {
+      requests++;
+      throw Error("No render requests allowed");
+    },
+    onChanged: async () => {},
+  };
+  const html = renderToStaticMarkup(
+    React.createElement(SaraVoiceOutput, props),
+  );
+  assert.match(html, /Proponer audio de esta respuesta con ElevenLabs/);
+  assert.match(html, /Crear audio/);
+  assert.doesNotMatch(html, /<audio|autoplay|<script/);
+  assert.equal(requests, 0);
+  for (const text of ["", " ", "x".repeat(1501)]) {
+    assert.equal(
+      renderToStaticMarkup(
+        React.createElement(SaraVoiceOutput, { ...props, text }),
+      ),
+      "",
+    );
+  }
+  assert.equal(requests, 0);
+});

@@ -264,7 +264,13 @@ This document does not activate Hermes, messaging, autonomous sales or privilege
 The owner-authorized settings surface is a native modal preserving the current CRM
 view. Use three concise tabs: **Redes sociales**, **Conexiones**, **Customizaciones**.
 Prefer application icons, short real-state labels, Edit and accessible on/off controls
-over explanatory cards. Customizations filter Skills, Tools, Plugins and Scripts;
+over explanatory cards. **Conexiones** owns provider applications (Zernio,
+ElevenLabs, Sara/Hermes and future application adapters), their authorization,
+credentials and provider diagnostics. **Redes sociales** contains only the brand's
+social channels connected through Zernio and their synchronization/linking controls.
+A channel that needs provider authorization opens Zernio's editor in Conexiones;
+keep one persistent callback consumer rather than mounting an OAuth flow per tab.
+Customizations filter Skills, Tools, Plugins and Scripts;
 creation/editing stays inline and starts disabled until explicitly enabled.
 
 The app and Hermes share the same typed capability registry. Scripts are bounded app
@@ -290,8 +296,10 @@ proposal consequences and approval controls separate and visible.
 Offer new conversations, title editing, history search and paging, project skills,
 documents and voice notes. An uploaded document is data, not agent instructions.
 Voice recording requires an explicit click and a local preview/discard step before
-upload/transcription; sending is a separate action. There is no live call or spoken
-reply in this scope. Show real unavailable states instead of a decorative active
+upload/transcription; sending is a separate action. This existing text/voice-note
+flow never starts a live call or spoken reply automatically. The separately
+activated shared voice provider is specified below. Show real unavailable states
+instead of a decorative active
 microphone or invented skills. Create an untitled conversation directly on first
 use or the new-chat action; renaming is secondary, not a prerequisite to writing.
 Enter sends, Shift+Enter inserts a line break, and IME composition never sends.
@@ -385,3 +393,17 @@ Primary accessibility references:
 [text contrast](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html),
 [non-text contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html),
 [minimum target size](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html).
+
+
+### Shared voice provider
+
+The owner subsequently requested ElevenLabs shared by the CRM and Hermes. Add it
+under Settings > Conexiones with the existing compact icon/edit/switch pattern.
+Sara stays Hermes; an ElevenLabs voice agent is a separate provider session, not a
+replacement model. Generating an audio response creates an exact proposal first;
+never start paid work or audio playback automatically. Voice-agent sessions require
+an explicit start button and microphone consent, with visible stop/mute controls.
+Calls require a separate exact-recipient consent checkbox. Provider credentials
+must never be prefilled, rendered in results or included in chat history. Use
+honest unavailable/paused/partially permitted states rather than fake connections.
+See [ELEVENLABS.md](docs/ELEVENLABS.md) for implemented scope and rollout limits.

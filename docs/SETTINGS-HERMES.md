@@ -123,7 +123,9 @@ Plugins, Scripts. Connection rows use app icons, concise state, Edit and labeled
 switches. CRUD/run/approval failures remain visible; switches reflect server state.
 Creation starts disabled. Invalid/inactive definitions cannot be reported running.
 
-OAuth/social callback markers auto-open Redes sociales. Keep exactly one callback
+Zernio OAuth callback markers open its editor in Conexiones; social-intent markers
+open Redes sociales. Provider applications and their credentials belong to
+Conexiones; Redes sociales contains their linked social channels. Keep exactly one callback
 consumer mounted through completion, even across tabs; scrub callback URL values and
 preserve existing replacement confirmations. Store no provider secrets in browser
 storage. Prefer inline editor/detail panels to nested dialogs. Preserve keyboard,

@@ -36,7 +36,7 @@ class TaskUpdate(TaskEdit):
 
 
 class SocialConnect(Input):
-    platform: Literal["facebook", "instagram", "tiktok", "whatsapp", "telegram"]
+    platform: Literal["facebook", "instagram", "tiktok", "whatsapp", "telegram", "elevenlabs"]
 
 
 class SkillDefinition(Input):
@@ -115,7 +115,9 @@ class ConnectionUpdate(Input):
 
 
 class ConnectionActionUpdate(ConnectionUpdate):
-    key: Literal["hermes", "zernio", "facebook", "instagram", "tiktok", "whatsapp", "telegram"]
+    key: Literal[
+        "hermes", "zernio", "facebook", "instagram", "tiktok", "whatsapp", "telegram", "elevenlabs"
+    ]
 
 
 class Action(Input):
@@ -136,6 +138,10 @@ class Run(Input):
 
 class Version(Input):
     version: int = Field(ge=1, strict=True)
+
+
+class Approval(Version):
+    consent_confirmed: bool = Field(default=False, strict=True)
 
 
 class Chat(Input):

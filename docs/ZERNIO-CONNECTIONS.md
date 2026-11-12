@@ -8,8 +8,9 @@ read-only scope, consent boundary and separate production activation. The API-ke
 flow below remains an independent advanced REST alternative; MCP authorization
 does not activate that flow or Hermes tools.
 
-The local CRM now has a **Conexiones** workspace for Facebook, Instagram, TikTok,
-WhatsApp and Telegram. It prepares secure credentials, profile-scoped account sync,
+The local CRM places provider setup in **Configuraciones → Conexiones → Zernio**
+and Facebook, Instagram, TikTok, WhatsApp and Telegram channels in **Redes sociales**.
+It prepares secure credentials, profile-scoped account sync,
 hosted consent/code flows and durable signed webhook receipts. It does not implement
 publishing, outbound messages, campaigns, automations or Hermes channel tools yet.
 The broader capability inventory remains in [ZERNIO-INTEGRATION.md](ZERNIO-INTEGRATION.md).

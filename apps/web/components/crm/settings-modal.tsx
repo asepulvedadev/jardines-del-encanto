@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SocialPanel } from "./social-panel";
+import { ElevenLabsPanel } from "./elevenlabs-panel";
 import { HermesPanel } from "./hermes-panel";
 import { Customizations } from "./customizations";
 import { Icon } from "./icon";
@@ -57,6 +58,7 @@ export function SettingsModal({
   const router = useRouter();
   const dialog = useRef<HTMLDialogElement>(null);
   const [tab, setTab] = useState<Tab>("social");
+  const [zernioTarget, setZernioTarget] = useState<HTMLDivElement | null>(null);
   const [visited, setVisited] = useState(false);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [pending, setPending] = useState(false);
@@ -73,7 +75,11 @@ export function SettingsModal({
       if (
         body &&
         new TextEncoder().encode(body).byteLength >
-          (/^control\/items(?:\/[^/]+)?$/.test(path) ? 65536 : 16384)
+          (path === "voice/attachments"
+            ? 768 * 1024
+            : /^control\/items(?:\/[^/]+)?$/.test(path)
+              ? 65536
+              : 16384)
       )
         throw new Error(
           "El contenido supera el tamaño permitido. Reduce la definición o los argumentos.",
@@ -84,7 +90,13 @@ export function SettingsModal({
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
         body,
-        signal: AbortSignal.timeout(path === "hermes/chat" ? 90000 : 25000),
+        signal: AbortSignal.timeout(
+          path === "hermes/chat" ||
+            path.startsWith("voice/") ||
+            /^hermes\/proposals\/[^/]+\/approve$/.test(path)
+            ? 95000
+            : 25000,
+        ),
       }).catch(() => {
         throw new Error(
           "No pudimos contactar al servidor. No se confirmó ningún cambio.",
@@ -139,8 +151,14 @@ export function SettingsModal({
   useEffect(() => {
     if (open) {
       setVisited(true);
-      if (initialSocial) setTab("social");
-      else setTab(initialTab);
+      if (initialSocial) {
+        if (
+          new URLSearchParams(window.location.search).has("zernio_callback")
+        ) {
+          setTab("connections");
+          setEditingConnection("zernio");
+        } else setTab("social");
+      } else setTab(initialTab);
       if (!dialog.current?.open) dialog.current?.showModal();
     } else if (dialog.current?.open) dialog.current.close();
   }, [open, initialSocial, initialTab]);
@@ -161,13 +179,19 @@ export function SettingsModal({
     };
   }, [open, load]);
   useEffect(() => {
-    if (editingConnection === "hermes") {
-      const prompt =
-        dialog.current?.querySelector<HTMLTextAreaElement>("#hermes-message");
+    if (tab !== "connections") return;
+    if (["hermes", "elevenlabs", "zernio"].includes(editingConnection ?? "")) {
+      const prompt = dialog.current?.querySelector<HTMLElement>(
+        editingConnection === "elevenlabs"
+          ? "#elevenlabs-key"
+          : editingConnection === "zernio"
+            ? "#zernio-mcp-heading"
+            : "#hermes-message",
+      );
       prompt?.scrollIntoView({ block: "nearest" });
       prompt?.focus();
     }
-  }, [editingConnection]);
+  }, [editingConnection, tab]);
   async function toggle(connection: Connection) {
     if (lock.current) return;
     lock.current = true;
@@ -220,19 +244,14 @@ export function SettingsModal({
             aria-controls={
               connection.key === "hermes"
                 ? "hermes-connection-editor"
-                : "zernio-mcp-heading"
+                : connection.key === "elevenlabs"
+                  ? "elevenlabs-connection-editor"
+                  : "zernio-connection-editor"
             }
             onClick={() => {
               setEditingConnection((old) =>
                 old === connection.key ? null : connection.key,
               );
-              dialog.current
-                ?.querySelector<HTMLElement>(
-                  connection.key === "hermes"
-                    ? "#hermes-message"
-                    : "#zernio-mcp-heading",
-                )
-                ?.scrollIntoView({ block: "nearest" });
             }}
           >
             Editar<span className="crm-sr-only"> {connection.name}</span>
@@ -340,7 +359,7 @@ export function SettingsModal({
             {loading && (
               <p role="status">Consultando el catálogo compartido…</p>
             )}
-            {!loading && (
+            {!loading && tab !== "social" && (
               <button
                 type="button"
                 className="settings-refresh"
@@ -362,15 +381,6 @@ export function SettingsModal({
               tabIndex={0}
               hidden={tab !== "social"}
             >
-              {catalog?.connections
-                .filter((item) => item.key === "zernio")
-                .map(connectionRow)}
-              {editingConnection === "zernio" && (
-                <p className="settings-meta">
-                  Pausar no revoca cuentas. Autoriza o revisa el acceso a
-                  continuación.
-                </p>
-              )}
               {visited && (
                 <SocialPanel
                   csrf={csrf}
@@ -378,6 +388,11 @@ export function SettingsModal({
                   connectionPending={pending}
                   onToggleConnection={toggle}
                   onStateChanged={load}
+                  providerTarget={zernioTarget}
+                  onOpenProvider={() => {
+                    setEditingConnection("zernio");
+                    setTab("connections");
+                  }}
                 />
               )}
             </section>
@@ -389,8 +404,15 @@ export function SettingsModal({
               hidden={tab !== "connections"}
             >
               {catalog?.connections
-                .filter((item) => item.key === "hermes")
+                .filter((item) =>
+                  ["hermes", "zernio", "elevenlabs"].includes(item.key),
+                )
                 .map(connectionRow)}
+              <div
+                id="zernio-connection-editor"
+                ref={setZernioTarget}
+                hidden={editingConnection !== "zernio"}
+              />
               <div
                 id="hermes-connection-editor"
                 hidden={editingConnection !== "hermes"}
@@ -404,6 +426,17 @@ export function SettingsModal({
                   />
                 )}
               </div>
+              {open &&
+                tab === "connections" &&
+                editingConnection === "elevenlabs" && (
+                  <div id="elevenlabs-connection-editor">
+                    <ElevenLabsPanel
+                      request={request}
+                      onChanged={onChanged}
+                      active={open && tab === "connections"}
+                    />
+                  </div>
+                )}
               <details
                 className="settings-adapters"
                 open={editingConnection === "application"}

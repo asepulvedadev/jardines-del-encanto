@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from ..crm import models as crm_models
 from ..crm import services
 from ..crm.database import connect
+from ..voice import models as voice_models
 from . import models
 
 ACTION_MODELS = {
@@ -30,14 +31,26 @@ ACTION_MODELS = {
     "control.item.update": models.ItemActionUpdate,
     "control.connection.update": models.ConnectionActionUpdate,
     "social.status": models.Empty,
+    "voice.catalog": models.Empty,
+    "voice.execute": voice_models.Execute,
     "social.sync": models.Empty,
     "social.connect": models.SocialConnect,
 }
-READ_ACTIONS = {"crm.workspace", "crm.activities", "control.catalog", "social.status"}
-EXTENSION_ACTIONS = frozenset({
-    "control.extension.create", "control.extension.update",
-    "control.extension.install", "control.extension.test",
-})
+READ_ACTIONS = {
+    "crm.workspace",
+    "crm.activities",
+    "control.catalog",
+    "social.status",
+    "voice.catalog",
+}
+EXTENSION_ACTIONS = frozenset(
+    {
+        "control.extension.create",
+        "control.extension.update",
+        "control.extension.install",
+        "control.extension.test",
+    }
+)
 SOCIAL_ACTIONS = {"social.sync", "social.connect"}
 CONNECTION_NAMES = {
     "hermes": "Sara IA",
@@ -47,6 +60,7 @@ CONNECTION_NAMES = {
     "tiktok": "TikTok",
     "whatsapp": "WhatsApp",
     "telegram": "Telegram",
+    "elevenlabs": "ElevenLabs",
 }
 
 
@@ -147,6 +161,9 @@ def connection_views(db):
     from ..social.routes import settings
 
     bridge = health()
+    from ..voice.service import state as voice_state
+
+    voice = voice_state()
     try:
         state = settings()
     except HTTPException:
@@ -157,7 +174,9 @@ def connection_views(db):
     for pref in preferences:
         key = pref["key"]
         available = (
-            bridge["available"]
+            bool(voice["available"] and voice["verified"])
+            if key == "elevenlabs"
+            else bridge["available"]
             if key == "hermes"
             else bool(state["configured"] or state.get("oauth", {}).get("verified_at"))
             if key == "zernio"
@@ -166,7 +185,9 @@ def connection_views(db):
                 for row in state["connections"]
             )
         )
-        desired = pref["enabled"] and (parent_enabled if key not in ("hermes", "zernio") else True)
+        desired = pref["enabled"] and (
+            parent_enabled if key not in ("hermes", "zernio", "elevenlabs") else True
+        )
         effective = bool(desired and available)
         output.append(
             {
@@ -220,7 +241,15 @@ def create_item(db, data, admin, *, origin="human"):
     result = db.execute(
         """INSERT INTO crm.control_items
         (actor_id,kind,name,description,definition,enabled,origin) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
-        (admin["id"], data.kind, data.name, data.description, Jsonb(data.definition), data.enabled, origin),
+        (
+            admin["id"],
+            data.kind,
+            data.name,
+            data.description,
+            Jsonb(data.definition),
+            data.enabled,
+            origin,
+        ),
     ).fetchone()
     audit(db, admin, "control.item.create", candidate)
     return item_view(db, result)
@@ -271,6 +300,10 @@ def update_connection(db, key, data, admin):
 
         if not health()["available"]:
             raise HTTPException(503, "hermes_unavailable")
+    if key == "elevenlabs" and data.enabled:
+        from ..voice.service import require_state
+
+        require_state()
     pref = db.execute(
         """UPDATE crm.control_connections SET enabled=%s,version=version+1
         WHERE key=%s AND version=%s RETURNING *""",
@@ -284,6 +317,10 @@ def update_connection(db, key, data, admin):
 
 def execute(db, action, args, admin):
     """Invoked only for reads, direct human configuration, or consumed proposals."""
+    if action == "voice.catalog":
+        from ..voice.service import catalog as voice_catalog
+
+        return voice_catalog(db)
     if action == "crm.workspace":
         state = services.workspace(db, admin)
         query = args.query.casefold()
@@ -387,5 +424,8 @@ def check_revisions(db, frozen):
             ).fetchone()
             if not pref or not pref["enabled"] or pref["version"] != value:
                 raise HTTPException(409, "connection_changed")
+        elif key == "provider:elevenlabs":
+            # The provider revision is checked by the voice preflight and gateway.
+            continue
         elif current.get(key) != value:
             raise HTTPException(409, "capability_changed")

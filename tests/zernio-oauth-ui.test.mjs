@@ -61,6 +61,7 @@ const modules = new Map();
 let renderSettings;
 let renderOptions;
 let stateIndex;
+let providerMarkup = null;
 function load(path) {
   const absolute = resolve(componentRoot, path);
   if (modules.has(absolute)) return modules.get(absolute).exports;
@@ -76,6 +77,13 @@ function load(path) {
   modules.set(absolute, module);
   const scopedRequire = (specifier) => {
     if (specifier.endsWith(".css")) return {};
+    if (specifier === "react-dom")
+      return {
+        createPortal: (node) => {
+          providerMarkup = node;
+          return null;
+        },
+      };
     if (specifier === "next/navigation")
       return { useRouter: () => ({ replace() {}, refresh() {} }) };
     if (specifier === "react" && absolute.endsWith("/social-panel.tsx"))
@@ -146,7 +154,11 @@ const oauthSettings = () => ({
   hermes: { connected: false, mode: "manual" },
   sync_warning: null,
 });
-function renderSocial(settings, { paused = false, pending = false } = {}) {
+function renderSocial(
+  settings,
+  { paused = false, pending = false, providerTarget } = {},
+) {
+  providerMarkup = null;
   renderSettings = settings;
   renderOptions = { pending };
   stateIndex = 0;
@@ -154,6 +166,7 @@ function renderSocial(settings, { paused = false, pending = false } = {}) {
   return renderToStaticMarkup(
     React.createElement(SocialPanel, {
       csrf: "fixture",
+      providerTarget,
       connections: ["zernio", "whatsapp"].map((key) => ({
         key,
         name: key,
@@ -250,4 +263,45 @@ test("filtered vendor-only account types are informational, not a failed verific
     renderSocial(settings),
     /La última consulta no pudo verificar todos los canales/,
   );
+});
+
+test("social channels exclude provider authorization and credentials when Settings supplies its Connections target", () => {
+  const settings = oauthSettings();
+  const html = renderSocial(settings, { providerTarget: {} });
+  assert.match(html, /Canales de la marca/);
+  assert.match(html, /Fixture WhatsApp/);
+  assert.doesNotMatch(
+    html,
+    /Acceso a Zernio|social-api-key|Conexión avanzada|Eventos recibidos/,
+  );
+  assert.ok(providerMarkup, "Provider editor was placed in Connections");
+  const provider = renderToStaticMarkup(providerMarkup);
+  assert.match(provider, /Acceso a Zernio/);
+  assert.match(provider, /Conexión avanzada con API key/);
+  assert.match(provider, /Eventos recibidos/);
+  assert.doesNotMatch(provider, /Canales de la marca|Fixture WhatsApp/);
+});
+
+test("deferred provider target does not mount a second inline authorization consumer", () => {
+  const html = renderSocial(oauthSettings(), { providerTarget: null });
+  assert.match(html, /Fixture WhatsApp/);
+  assert.doesNotMatch(html, /Acceso a Zernio|social-api-key/);
+  assert.equal(providerMarkup, null);
+});
+
+test("Zernio application row belongs to Connections beside Hermes and ElevenLabs", () => {
+  const source = read("settings-modal.tsx");
+  const social = source.slice(
+    source.indexOf('id="settings-panel-social"'),
+    source.indexOf('id="settings-panel-connections"'),
+  );
+  const connections = source.slice(
+    source.indexOf('id="settings-panel-connections"'),
+    source.indexOf('id="settings-panel-customizations"'),
+  );
+  assert.doesNotMatch(social, /map\(connectionRow\)|Acceso a Zernio/);
+  assert.match(social, /providerTarget=\{zernioTarget\}/);
+  assert.match(connections, /"zernio"/);
+  assert.match(connections, /"elevenlabs"/);
+  assert.match(connections, /id="zernio-connection-editor"/);
 });

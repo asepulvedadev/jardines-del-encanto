@@ -16,6 +16,7 @@ from .sara.routes import router as sara_router
 from .social.mcp_routes import router as social_mcp_router
 from .social.routes import router as social_router
 from .social.routes import webhook_router
+from .voice.routes import router as voice_router
 
 app = FastAPI(title="Jardines del Encanto API", docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -24,6 +25,7 @@ app.include_router(crm_router)
 app.include_router(control_router)
 app.include_router(hermes_router)
 app.include_router(sara_router)
+app.include_router(voice_router)
 app.include_router(internal_router)
 app.include_router(landing_router)
 app.include_router(social_router)
@@ -34,16 +36,20 @@ app.include_router(webhook_router)
 @app.middleware("http")
 async def private_response_headers(request: Request, call_next):
     private_control = request.url.path.startswith(
-        ("/crm/control/", "/crm/hermes/", "/internal/hermes/", "/crm/sara/")
+        ("/crm/control/", "/crm/hermes/", "/internal/hermes/", "/crm/sara/", "/crm/voice/")
     )
-    if private_control and request.method in ("POST", "PATCH"):
+    if private_control and request.method in ("POST", "PATCH", "DELETE"):
         # Bound bytes before JSON/Pydantic parsing, including chunked requests.
         large = request.url.path.startswith("/internal/hermes/") or (
             request.url.path.startswith("/crm/control/items")
             and not request.url.path.endswith("/run")
         )
         maximum = (
-            768 * 1024 if request.url.path == "/crm/sara/attachments" else 65536 if large else 16384
+            768 * 1024
+            if request.url.path in ("/crm/sara/attachments", "/crm/voice/attachments")
+            else 65536
+            if large
+            else 16384
         )
         chunks, size = [], 0
         async for chunk in request.stream():

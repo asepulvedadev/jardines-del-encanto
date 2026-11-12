@@ -17,8 +17,11 @@ The existing public landing remains unchanged. `DESIGN.md` governs private UI de
 Daily-work navigation contains Inicio, Pipeline, Clientes and Seguimientos.
 The footer entry **Configuraciones**, beside the administrator profile, replaces the
 public-site shortcut. It opens a modal without replacing the current CRM view, with
-**Redes sociales**, **Conexiones** and **Customizaciones** tabs. Zernio authorization
-callbacks reopen Redes sociales; their consumer survives tab switches and modal closing.
+**Redes sociales**, **Conexiones** and **Customizaciones** tabs. Provider applications
+(Sara/Hermes, Zernio, ElevenLabs and application adapters) belong to Conexiones;
+Redes sociales contains the brand's Zernio-linked channels. Zernio OAuth callbacks
+reopen its editor in Conexiones; social-intent callbacks reopen Redes sociales.
+Their single consumer survives tab switches and modal closing.
 Icon-led connection rows expose real server state, editing and pause/resume controls.
 Customizations share a typed registry with Hermes: Markdown skills, action aliases,
 action bundles and bounded workflows, not arbitrary host code. See
@@ -220,3 +223,13 @@ A disposable loopback-only API fixture verified the rendered Pipeline navigation
 three board/list stage choices, stage movement, removed heading action, retained
 empty-state creation and 390/893/1440 px reflow without page errors. No real CRM
 records or production session were used for that browser check.
+
+## Shared voice provider (local implementation)
+
+[ElevenLabs](ELEVENLABS.md) adds an independently configured and initially paused
+connection under Settings > Conexiones. The CRM and Sara use the same typed
+`voice.catalog` / `voice.execute` broker. Paid TTS, STT, voice-agent sessions and
+Twilio calls require exact approval; recipient calls also require explicit consent.
+Sara's model/runtime and existing OpenAI voice-note flow are unchanged. Missing
+ElevenLabs runtime/key must not block CRM or ordinary Sara use. This local feature
+does not activate the provider or deploy its new root-owned gateway automatically.

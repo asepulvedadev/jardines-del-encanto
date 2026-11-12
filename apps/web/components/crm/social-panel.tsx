@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createPortal } from "react-dom";
 import { Icon } from "./icon";
 import { ZernioMcp } from "./zernio-mcp";
 import { IntegrationIcon, SettingsSwitch } from "./integration-icon";
@@ -164,12 +165,16 @@ export function SocialPanel({
   connectionPending,
   onToggleConnection,
   onStateChanged,
+  providerTarget,
+  onOpenProvider,
 }: {
   csrf: string;
   connections: Connection[];
   connectionPending: boolean;
   onToggleConnection: (connection: Connection) => Promise<void>;
   onStateChanged?: () => Promise<void>;
+  providerTarget?: HTMLElement | null;
+  onOpenProvider?: () => void;
 }) {
   const router = useRouter();
   const [editingPlatform, setEditingPlatform] = useState<SocialPlatform | null>(
@@ -299,6 +304,10 @@ export function SocialPanel({
   }, [reloadAfterMcpChange]);
 
   function focusAuthorization() {
+    if (onOpenProvider) {
+      onOpenProvider();
+      return;
+    }
     const target =
       document.querySelector<HTMLElement>("#zernio-authorize:not(:disabled)") ??
       document.querySelector<HTMLElement>("#zernio-mcp-heading");
@@ -483,52 +492,8 @@ export function SocialPanel({
     socialPlatforms.find(([key]) => key === intent?.platform)?.[1] ??
     "el canal";
 
-  return (
-    <div className="crm-social" aria-busy={pending || loading}>
-      <ZernioMcp
-        csrf={csrf}
-        onStateChanged={reloadAfterMcpChange}
-        onStateInvalidated={invalidateAfterMcpFailure}
-        enabled={
-          preferences.find((item) => item.key === "zernio")?.enabled ?? false
-        }
-      />
-      <div className="social-overview">
-        <strong>Canales de la marca</strong>
-        <button
-          className="crm-button crm-secondary"
-          disabled={
-            pending ||
-            loading ||
-            !settings?.can_sync ||
-            preferences.some((item) => item.key === "zernio" && !item.enabled)
-          }
-          onClick={() =>
-            void perform(async () => {
-              let result: SocialSettings;
-              try {
-                result = await request<SocialSettings>("sync", "POST");
-              } catch (cause) {
-                if (!settings?.configured) await invalidateAfterMcpFailure();
-                throw cause;
-              }
-              if (mounted.current) {
-                setSettings(result);
-                setNotice("Estado de las conexiones actualizado.");
-              }
-              try {
-                await onStateChanged?.();
-              } catch {
-                setError(
-                  "Canales actualizados, pero no pudimos actualizar el catálogo. No repitas la autorización.",
-                );
-              }
-            })
-          }
-        >
-          Actualizar conexiones
-        </button>
-      </div>
+  const feedback = (
+    <>
       {error ? (
         <div className="crm-error" role="alert">
           {error}
@@ -554,7 +519,20 @@ export function SocialPanel({
           Volver a consultar
         </button>
       ) : null}
-      {settings ? (
+    </>
+  );
+  const provider = (
+    <div className="crm-social" aria-busy={pending || loading}>
+      <ZernioMcp
+        csrf={csrf}
+        onStateChanged={reloadAfterMcpChange}
+        onStateInvalidated={invalidateAfterMcpFailure}
+        enabled={
+          preferences.find((item) => item.key === "zernio")?.enabled ?? false
+        }
+      />
+      {feedback}
+      {settings && (
         <>
           <details>
             <summary>Conexión avanzada con API key (alternativa)</summary>
@@ -669,6 +647,113 @@ export function SocialPanel({
               )}
             </section>
           </details>
+          <details className="settings-events">
+            <summary>Eventos recibidos</summary>
+            <section
+              className="crm-panel social-events"
+              aria-labelledby="social-events-heading"
+            >
+              <div className="social-section-heading">
+                <div>
+                  <h2 id="social-events-heading">Eventos recibidos</h2>
+                  <p>
+                    {settings.webhook.configured
+                      ? "Recepción de webhooks configurada. Verifica eventos reales para confirmar su funcionamiento."
+                      : "La recepción de webhooks aún no está configurada en el servidor."}
+                  </p>
+                </div>
+                <span className="social-status">
+                  {settings.webhook.configured ? "Configurado" : "Pendiente"}
+                </span>
+              </div>
+              {settings.events.length ? (
+                <ul className="social-event-list">
+                  {settings.events.map((event) => (
+                    <li key={event.id}>
+                      <div>
+                        <strong>{event.event}</strong>
+                        <span>
+                          {socialPlatforms.find(
+                            ([key]) => key === event.platform,
+                          )?.[1] ?? "Canal no identificado"}{" "}
+                          · {statusLabel(event.status)}
+                        </span>
+                      </div>
+                      <time dateTime={event.received_at}>
+                        {dateLabel(event.received_at)}
+                      </time>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="social-empty">
+                  <Icon name="message" size={22} />
+                  <h3>Aún no se han recibido eventos.</h3>
+                  <p>
+                    Los eventos recibidos aparecerán aquí como un resumen. No se
+                    importan conversaciones ni se crean clientes
+                    automáticamente.
+                  </p>
+                </div>
+              )}
+            </section>
+          </details>
+          <p className="settings-meta">
+            Conectar no habilita publicaciones, campañas ni respuestas
+            automáticas. Hermes usa solo las acciones disponibles en el
+            catálogo.
+          </p>
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="crm-social" aria-busy={pending || loading}>
+      {providerTarget === undefined
+        ? provider
+        : providerTarget
+          ? createPortal(provider, providerTarget)
+          : null}
+      <div className="social-overview">
+        <strong>Canales de la marca</strong>
+        <button
+          className="crm-button crm-secondary"
+          disabled={
+            pending ||
+            loading ||
+            !settings?.can_sync ||
+            preferences.some((item) => item.key === "zernio" && !item.enabled)
+          }
+          onClick={() =>
+            void perform(async () => {
+              let result: SocialSettings;
+              try {
+                result = await request<SocialSettings>("sync", "POST");
+              } catch (cause) {
+                if (!settings?.configured) await invalidateAfterMcpFailure();
+                throw cause;
+              }
+              if (mounted.current) {
+                setSettings(result);
+                setNotice("Estado de las conexiones actualizado.");
+              }
+              try {
+                await onStateChanged?.();
+              } catch {
+                setError(
+                  "Canales actualizados, pero no pudimos actualizar el catálogo. No repitas la autorización.",
+                );
+              }
+            })
+          }
+        >
+          Actualizar conexiones
+        </button>
+      </div>
+      {feedback}
+      {settings ? (
+        <>
           {settings.sync_warning ? (
             <p className="social-warning" role="status">
               {settings.sync_warning === "oauth_unsupported_platforms_filtered"
@@ -921,62 +1006,6 @@ export function SocialPanel({
               </p>
             </details>
           </section>
-          <details className="settings-events">
-            <summary>Eventos recibidos</summary>
-            <section
-              className="crm-panel social-events"
-              aria-labelledby="social-events-heading"
-            >
-              <div className="social-section-heading">
-                <div>
-                  <h2 id="social-events-heading">Eventos recibidos</h2>
-                  <p>
-                    {settings.webhook.configured
-                      ? "Recepción de webhooks configurada. Verifica eventos reales para confirmar su funcionamiento."
-                      : "La recepción de webhooks aún no está configurada en el servidor."}
-                  </p>
-                </div>
-                <span className="social-status">
-                  {settings.webhook.configured ? "Configurado" : "Pendiente"}
-                </span>
-              </div>
-              {settings.events.length ? (
-                <ul className="social-event-list">
-                  {settings.events.map((event) => (
-                    <li key={event.id}>
-                      <div>
-                        <strong>{event.event}</strong>
-                        <span>
-                          {socialPlatforms.find(
-                            ([key]) => key === event.platform,
-                          )?.[1] ?? "Canal no identificado"}{" "}
-                          · {statusLabel(event.status)}
-                        </span>
-                      </div>
-                      <time dateTime={event.received_at}>
-                        {dateLabel(event.received_at)}
-                      </time>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="social-empty">
-                  <Icon name="message" size={22} />
-                  <h3>Aún no se han recibido eventos.</h3>
-                  <p>
-                    Los eventos recibidos aparecerán aquí como un resumen. No se
-                    importan conversaciones ni se crean clientes
-                    automáticamente.
-                  </p>
-                </div>
-              )}
-            </section>
-          </details>
-          <p className="settings-meta">
-            Conectar no habilita publicaciones, campañas ni respuestas
-            automáticas. Hermes usa solo las acciones disponibles en el
-            catálogo.
-          </p>
         </>
       ) : null}
     </div>

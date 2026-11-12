@@ -28,6 +28,10 @@ def dispatch(db, action, arguments, admin, run_id=None, parent=None):
         return run_item(db, item_id, arguments, admin, run_id)
     args = service.validate(action, arguments)
     frozen = service.revisions(db, [action], parent)
+    if action == "voice.execute":
+        from ..voice import service as voice
+
+        frozen.update(voice.freeze(db, args, admin))
     if action == "social.connect":
         service.require_connections(db, args.platform)
         pref = db.execute(
@@ -93,7 +97,7 @@ def run_item(db, item_id, arguments, admin, run_id=None):
     raise HTTPException(409, "item_not_executable")
 
 
-def resolve(proposal_id, version, admin, approve):
+def resolve(proposal_id, version, admin, approve, consent_confirmed=False):
     external = None
     with connect() as db:
         service.lock(db)
@@ -119,7 +123,12 @@ def resolve(proposal_id, version, admin, approve):
             args = service.validate(row["action"], row["arguments"])
             if row["action"] == "social.connect":
                 service.require_connections(db, args.platform)
-            if row["action"] in service.SOCIAL_ACTIONS:
+            if row["action"] == "voice.execute":
+                from ..voice import service as voice
+
+                external = ("voice.execute", voice.prepare(db, row, args, admin, consent_confirmed))
+                result = {"status": "dispatch_reserved", "retryable": False}
+            elif row["action"] in service.SOCIAL_ACTIONS:
                 # Reserve before network dispatch. An uncertain external outcome is NOT retryable.
                 external = (row["action"], args)
                 result = {"status": "dispatch_reserved", "retryable": False}
@@ -130,11 +139,14 @@ def resolve(proposal_id, version, admin, approve):
             result=%s WHERE id=%s RETURNING *""",
             ("approved" if approve else "rejected", Jsonb(jsonable_encoder(result)), proposal_id),
         ).fetchone()
+        audit_arguments = {"action": row["action"], "arguments": row["arguments"]}
+        if approve and row["action"] == "voice.execute" and args.operation == "outbound_call":
+            audit_arguments["consent_confirmed"] = True
         service.audit(
             db,
             admin,
             "proposal.approve" if approve else "proposal.reject",
-            {"action": row["action"], "arguments": row["arguments"]},
+            audit_arguments,
             proposal_id,
         )
     if external:
@@ -142,11 +154,16 @@ def resolve(proposal_id, version, admin, approve):
 
         try:
             action, args = external
-            result = (
-                routes.sync_settings(routes.EmptyInput(), admin)
-                if action == "social.sync"
-                else routes.start_connection(args.platform, routes.EmptyInput(), admin)
-            )
+            if action == "voice.execute":
+                from ..voice.service import execute_reserved
+
+                result = execute_reserved(args, admin)
+            else:
+                result = (
+                    routes.sync_settings(routes.EmptyInput(), admin)
+                    if action == "social.sync"
+                    else routes.start_connection(args.platform, routes.EmptyInput(), admin)
+                )
         except HTTPException:
             result = {"status": "external_outcome_unconfirmed", "retryable": False}
         except Exception:  # noqa: BLE001 - consumed external actions must remain fail-closed
@@ -265,6 +282,8 @@ def tools(db):
         "gestiona directamente definiciones declarativas propias: create crea borrador, update lo "
         "desactiva, install habilita, test valida sin ejecutar. Nuevas extensiones solo en el próximo "
         "turno. Sin código, paquetes nativos, conexiones ni cambios de permisos. "
+        "voice.catalog muestra opciones; voice.execute siempre propone una operación de pago. "
+        "Llamadas solo a contactos existentes con consentimiento humano explícito al aprobar. "
         "No inventar IDs ni versiones; "
         "consultar crm.workspace y crm.activities primero. custom tool combina defaults con arguments; "
         "plugin/connection usa arguments={action,arguments}; script usa arguments={}. "

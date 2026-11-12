@@ -2,7 +2,7 @@
 
 ## Implemented locally
 
-**Configuraciones → Conexiones → Conectar con Zernio** uses
+**Configuraciones → Conexiones → Zernio → Editar** uses
 `https://mcp.zernio.com/mcp` with browser OAuth authorization code flow, PKCE S256
 and refresh-token rotation. No global MCP, CLI, browser-session import or automatic
 consent is installed. Initial scope: **`accounts:read` only**.

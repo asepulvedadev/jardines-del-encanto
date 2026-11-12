@@ -5,6 +5,7 @@ import { Icon } from "./icon";
 import { ActionProposals, ActionResultDetails } from "./hermes-panel";
 import type { SettingsRequest } from "./settings-types";
 import { SaraRecorder, saraRecorderMime } from "./sara-audio";
+import { SaraVoiceOutput } from "./sara-voice-output";
 import {
   EMPTY_SARA_DRAFT,
   SARA_FILE_LIMIT,
@@ -260,6 +261,14 @@ export function SaraMessageView({
       {message.content && (
         <p className="sara-message-text">{message.content}</p>
       )}
+      {message.role === "assistant" && message.state === "completed" && (
+        <SaraVoiceOutput
+          key={message.id}
+          text={message.content}
+          request={request}
+          onChanged={onChanged}
+        />
+      )}
       {message.attachments.map((attachment) => (
         <SaraFile key={attachment.id} attachment={attachment} csrf={csrf} />
       ))}
@@ -270,7 +279,11 @@ export function SaraMessageView({
           </summary>
           <div>
             {message.results.map((result, index) => (
-              <ActionResultDetails key={index} result={result} />
+              <ActionResultDetails
+                key={index}
+                result={result}
+                request={request}
+              />
             ))}
           </div>
         </details>
@@ -408,7 +421,9 @@ export function SaraPanel({
           headers: { "Content-Type": "application/json", "X-CSRF-Token": csrf },
           body,
           signal: AbortSignal.timeout(
-            path.includes("/messages") || path === "sara/attachments"
+            path.includes("/messages") ||
+              path === "sara/attachments" ||
+              /^hermes\/proposals\/[0-9a-f-]+\/approve$/.test(path)
               ? 95000
               : 25000,
           ),

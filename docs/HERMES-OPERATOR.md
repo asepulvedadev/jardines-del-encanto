@@ -134,3 +134,18 @@ path can be supplied with `HERMES_OPENAI_SECRET_FILE`; its default is the existi
 production provider-secret location. Compose parsing does not read the key or
 activate services. Do not bring this stack up or copy credentials to a destination
 without explicit owner authorization for that destination and operation.
+
+## Shared ElevenLabs voice actions
+
+The local voice integration adds only `voice.catalog` and `voice.execute` to the
+existing `jardines_app` allowlist. Sara can inspect operation schemas and propose
+TTS, STT, a browser voice-agent session or an exact-recipient outbound call. The
+broker, not the model, owns confirmation, connection/config revisions and once-only
+dispatch. A generated audio artifact is an authenticated local reference; no vendor
+key or realtime token is returned to the operator. Native packages, MCP, arbitrary
+network/shell and application self-programming remain unavailable.
+
+Install the same updated protocol in both strict operator services during a
+separately authorized rollout. See [ELEVENLABS.md](ELEVENLABS.md) for connection
+setup, operation boundaries and activation requirements. This does not replace
+Hermes with an ElevenLabs conversational agent or change existing voice notes.

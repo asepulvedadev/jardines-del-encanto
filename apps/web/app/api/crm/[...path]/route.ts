@@ -10,7 +10,7 @@ const rules: [RegExp, string[]][] = [
   [/^control\/items\/[0-9a-f-]{36}$/, ["PATCH"]],
   [/^control\/items\/[0-9a-f-]{36}\/run$/, ["POST"]],
   [
-    /^control\/connections\/(hermes|zernio|facebook|instagram|tiktok|whatsapp|telegram)$/,
+    /^control\/connections\/(hermes|elevenlabs|zernio|facebook|instagram|tiktok|whatsapp|telegram)$/,
     ["PATCH"],
   ],
   [/^sara\/(status|skills)$/, ["GET"]],
@@ -19,6 +19,16 @@ const rules: [RegExp, string[]][] = [
   [/^sara\/conversations\/[0-9a-f-]{36}\/messages$/, ["GET", "POST"]],
   [/^sara\/attachments$/, ["POST"]],
   [/^sara\/attachments\/[0-9a-f-]{36}\/content$/, ["GET"]],
+  [/^voice\/settings$/, ["GET", "POST"]],
+  [/^voice\/(catalog|disconnect|attachments)$/, ["POST"]],
+  [
+    /^voice\/sessions\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/claim$/,
+    ["POST"],
+  ],
+  [
+    /^voice\/artifacts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/content$/,
+    ["GET"],
+  ],
   [/^hermes\/status$/, ["GET"]],
   [/^hermes\/(chat|actions)$/, ["POST"]],
   [/^hermes\/proposals\/[0-9a-f-]{36}\/(approve|reject)$/, ["POST"]],
@@ -82,6 +92,9 @@ async function proxy(
   }
   let query = "";
   const sara = endpoint.startsWith("sara/");
+  const voice = endpoint.startsWith("voice/");
+  if (voice && new URL(request.url).searchParams.size)
+    return fail(422, "invalid_input");
   if (sara) {
     const params = new URL(request.url).searchParams;
     const paginated =
@@ -121,12 +134,13 @@ async function proxy(
       (request.method === "POST" && endpoint === "control/items") ||
       (request.method === "PATCH" &&
         /^control\/items\/[0-9a-f-]{36}$/.test(endpoint));
-    const bodyLimit =
-      endpoint === "sara/attachments"
-        ? 768 * 1024
-        : definitionWrite
-          ? 65536
-          : 16384;
+    const bodyLimit = ["sara/attachments", "voice/attachments"].includes(
+      endpoint,
+    )
+      ? 768 * 1024
+      : definitionWrite
+        ? 65536
+        : 16384;
     if (!request.headers.get("content-type")?.startsWith("application/json"))
       return fail(415, "invalid_content_type");
     const reader = request.body?.getReader();
@@ -161,18 +175,22 @@ async function proxy(
     request.cookies.get("jardines_session");
   if (session) headers.set("cookie", `${session.name}=${session.value}`);
   const timeout =
-    /^sara\/conversations\/[0-9a-f-]{36}\/messages$/.test(endpoint) && mutation
+    endpoint.startsWith("voice/") ||
+    /^hermes\/proposals\/[0-9a-f-]{36}\/approve$/.test(endpoint)
       ? 95000
-      : endpoint === "sara/attachments"
-        ? 35000
-        : endpoint === "hermes/chat"
-          ? 90000
-          : endpoint.startsWith("hermes/") ||
-              /^control\/items\/[0-9a-f-]{36}\/run$/.test(endpoint)
-            ? 30000
-            : endpoint.startsWith("social/mcp/")
-              ? 20000
-              : 8000;
+      : /^sara\/conversations\/[0-9a-f-]{36}\/messages$/.test(endpoint) &&
+          mutation
+        ? 95000
+        : ["sara/attachments", "voice/attachments"].includes(endpoint)
+          ? 35000
+          : endpoint === "hermes/chat"
+            ? 90000
+            : endpoint.startsWith("hermes/") ||
+                /^control\/items\/[0-9a-f-]{36}\/run$/.test(endpoint)
+              ? 30000
+              : endpoint.startsWith("social/mcp/")
+                ? 20000
+                : 8000;
   try {
     const upstream = await fetch(`${base}/crm/${endpoint}${query}`, {
       method: request.method,
@@ -190,10 +208,15 @@ async function proxy(
       resultHeaders.append("Set-Cookie", cookie);
     const retry = upstream.headers.get("retry-after");
     if (retry) resultHeaders.set("Retry-After", retry);
-    if (sara) {
+    if (sara || voice) {
+      const voiceDownload =
+        /^voice\/artifacts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/content$/.test(
+          endpoint,
+        ) && upstream.ok;
       const download =
-        /^sara\/attachments\/[0-9a-f-]{36}\/content$/.test(endpoint) &&
-        upstream.ok;
+        voiceDownload ||
+        (/^sara\/attachments\/[0-9a-f-]{36}\/content$/.test(endpoint) &&
+          upstream.ok);
       const type = upstream.headers
         .get("content-type")
         ?.split(";")[0]
@@ -212,13 +235,16 @@ async function proxy(
         "audio/mp4",
       ];
       if (
-        (download && !media.includes(type ?? "")) ||
+        (download &&
+          !(voiceDownload
+            ? type === "audio/mpeg"
+            : media.includes(type ?? ""))) ||
         (!download && type !== "application/json")
       )
         return fail(502, "invalid_upstream_response");
       const raw = await boundedResult(
         upstream,
-        download ? 512 * 1024 : 2 * 1024 * 1024,
+        download && !voiceDownload ? 512 * 1024 : 2 * 1024 * 1024,
       );
       if (!raw) return fail(502, "upstream_response_too_large");
       resultHeaders.set("X-Content-Type-Options", "nosniff");

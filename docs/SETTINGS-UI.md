@@ -7,12 +7,15 @@ Home and End. The forest/light Manrope presentation follows `DESIGN.md`.
 
 ## Surfaces
 
-- **Redes sociales:** Zernio OAuth/REST setup and existing channel authorization,
-  with server-owned connection preferences. Pausing prevents new connection/sync
-  work; it does not revoke upstream authorization. Replacement confirmations and
-  local-versus-upstream disconnection remain explicit.
-- **Conexiones:** actual Hermes health, desired enablement, prompt, broker results
-  and exact proposals; typed local application adapters can also be created here.
+- **Redes sociales:** only the brand's Facebook, Instagram, TikTok, WhatsApp and
+  Telegram channels, their observed states, synchronization and linking controls.
+  A channel requiring Zernio authorization opens that provider's Connections editor.
+- **Conexiones:** all provider applications, including Sara/Hermes, Zernio and
+  ElevenLabs, plus typed application adapters. Zernio's OAuth authorization,
+  permissions, advanced REST credentials and webhook diagnostics live here.
+  Replacement confirmations and local-versus-upstream disconnection remain explicit.
+  Pausing prevents new work; it does not revoke upstream authorization. Hermes
+  keeps its health, enablement, prompt, broker results and exact proposals here.
 - **Customizaciones:** Skills, Tools, Plugins and Scripts share the private
   control catalog with Hermes. New items start disabled. Tools select a canonical
   app action and object defaults; plugins select actions with optional instructions;
@@ -28,7 +31,9 @@ an intent ID and platform, not credentials.
 
 The dialog lazily mounts exactly one `SocialPanel` after first opening and never
 unmounts it when changing tabs or closing. `ZernioMcp` remains its sole OAuth
-consumer. Social intent values are captured and scrubbed before the settings
+consumer. Its provider controls render through a stable portal target in Conexiones,
+not through a second consumer. Zernio OAuth callbacks open that editor; channel
+intent callbacks open Redes sociales. Social intent values are captured and scrubbed before the settings
 request; the completion request waits for server settings. Callback capture is
 idempotent under effect replay. Callback errors and authorization state remain
 available on reopening, even if the callback completes while the dialog is closed.
@@ -130,3 +135,14 @@ session storage empty. 390/1440 screenshots showed no horizontal modal overflow.
 A failed-check fixture retained the account observation as Por verificar, removed
 connected styling, preserved the actual error and reloaded settings/catalog once.
 These are disposable UI fixtures, not live provider/grant or deployment evidence.
+
+
+### Provider/channel separation (2026-11-12)
+
+Local synthetic browser checks at390/1440 confirmed provider editors only in
+Conexiones, social channels only in Redes sociales, independent application editing,
+and channel-to-provider navigation without starting authorization. Repeated tabs
+and modal close/reopen retained one status consumer. A delayed OAuth callback was
+scrubbed and completed exactly once in Conexiones; a social intent completed exactly
+once in Redes sociales. Keyboard tab navigation, Escape/focus return and mobile
+reflow passed. These checks did not use real accounts, credentials or providers.

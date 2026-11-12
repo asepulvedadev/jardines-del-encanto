@@ -44,8 +44,8 @@ def actions(data: models.Action, admin: Admin):
 
 
 @router.post("/proposals/{proposal_id}/approve")
-def approve(proposal_id: UUID, data: models.Version, admin: Admin):
-    return broker.resolve(proposal_id, data.version, admin, True)
+def approve(proposal_id: UUID, data: models.Approval, admin: Admin):
+    return broker.resolve(proposal_id, data.version, admin, True, data.consent_confirmed)
 
 
 @router.post("/proposals/{proposal_id}/reject")
