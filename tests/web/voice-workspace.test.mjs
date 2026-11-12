@@ -73,14 +73,24 @@ function harness(file, component, props = {}, transport) {
       if (path === "./voice-request") return { voiceRequest: () => request };
       if (path === "./settings-types")
         return { settingsError: (e) => e.message };
-      if (["./voice-workspace-data", "./retell-schema"].includes(path))
+      if (
+        [
+          "./voice-workspace-data",
+          "./retell-schema",
+          "./voice-summary",
+        ].includes(path)
+      )
         return load(
-          `${path.slice(2)}.${path === "./retell-schema" ? "tsx" : "ts"}`,
+          `${path.slice(2)}.${path === "./voice-workspace-data" ? "ts" : "tsx"}`,
         );
       if (path === "./retell-panel") return { RetellPanel: "RetellPanel" };
       if (path === "./voice-agent-editor")
         return { VoiceAgentEditor: "VoiceAgentEditor" };
-      if (path === "./hermes-panel") return { ActionOutput: "ActionOutput" };
+      if (path === "./hermes-panel")
+        return {
+          ActionOutput: "ActionOutput",
+          ActionResultDetails: "ActionResultDetails",
+        };
       if (path === "./elevenlabs-result")
         return { ElevenLabsVoiceResult: "ElevenLabsVoiceResult" };
       if (path === "./retell-result")
@@ -166,7 +176,7 @@ const catalog = {
     "getAgent",
   ].map((endpoint) => ({ endpoint, available: true, group: "agents" })),
 };
-test("opening Voz loads metadata and saved snapshots but never invokes provider operations", async () => {
+test("opening Voz automatically synchronizes all resource groups without broker proposals", async () => {
   const h = harness(
     "voice-workspace.tsx",
     "VoiceWorkspace",
@@ -179,7 +189,7 @@ test("opening Voz loads metadata and saved snapshots but never invokes provider 
     async (path) =>
       path === "retell/settings"
         ? state
-        : path === "retell/results"
+        : path === "retell/inventory"
           ? { snapshots: [], partial: true }
           : catalog,
   );
@@ -187,20 +197,18 @@ test("opening Voz loads metadata and saved snapshots but never invokes provider 
   h.render();
   assert.deepEqual(h.calls.map((c) => c[0]).sort(), [
     "retell/catalog",
-    "retell/results",
+    "retell/inventory",
     "retell/settings",
   ]);
-  h.click("Cargar agentes");
-  await tick();
-  h.render();
-  const sent = h.calls.find((c) => c[0] === "hermes/actions");
-  assert.deepEqual(sent[2], {
-    action: "retell.execute",
-    arguments: { endpoint: "listAgents", arguments: {} },
-  });
-  assert.equal(
-    h.nodes().find((n) => n.type === "ActionOutput").props.value,
-    catalog,
+  assert.ok(!h.calls.some((c) => c[0] === "hermes/actions"));
+  assert.ok(
+    !h
+      .nodes()
+      .some(
+        (n) =>
+          n.type === "button" &&
+          /Cargar agentes/.test(String(n.props.children)),
+      ),
   );
 });
 test("agent form uses current schemas, actual IDs and proposal handoff only", async () => {
@@ -216,7 +224,7 @@ test("agent form uses current schemas, actual IDs and proposal handoff only", as
     async (path) =>
       path === "retell/settings"
         ? state
-        : path === "retell/results"
+        : path === "retell/inventory"
           ? {
               snapshots: [
                 {
@@ -233,9 +241,16 @@ test("agent form uses current schemas, actual IDs and proposal handoff only", as
               ],
               partial: true,
             }
-          : path === "retell/schema"
-            ? { input_schema: { type: "object" } }
-            : catalog,
+          : path === "retell/read"
+            ? {
+                provider: "retell",
+                status: "completed",
+                endpoint: "getAgent",
+                data: { agent_id: "a", agent_name: "Existing" },
+              }
+            : path === "retell/schema"
+              ? { input_schema: { type: "object" } }
+              : catalog,
   );
   await tick();
   h.render();
@@ -384,7 +399,7 @@ test("a catalogue failure does not falsely disconnect a verified provider", asyn
     },
     async (path) => {
       if (path === "retell/settings") return state;
-      if (path === "retell/results") return { snapshots: [], partial: true };
+      if (path === "retell/inventory") return { snapshots: [], partial: true };
       throw new Error("No se pudo consultar el catálogo.");
     },
   );
@@ -412,4 +427,66 @@ test("Voz is a dedicated sidebar view and opens connection settings through the 
   assert.match(workspace, /\["voice", "microphone"\]/);
   assert.match(workspace, /<VoiceWorkspace/);
   assert.match(workspace, /setSettingsTab\("connections"\)/);
+});
+test("resource tabs use the initial automatic inventory, while detail reads never create approvals", async () => {
+  const h = harness(
+    "voice-workspace.tsx",
+    "VoiceWorkspace",
+    {
+      csrf: "x",
+      active: true,
+      onChanged: async () => {},
+      onOpenConnection: () => {},
+    },
+    async (path, method, payload) =>
+      path === "retell/settings"
+        ? state
+        : path === "retell/inventory"
+          ? {
+              snapshots: [
+                {
+                  endpoint: "listAgents",
+                  provider_revision: 1,
+                  data: [{ agent_id: "a", agent_name: "Existing" }],
+                },
+                {
+                  endpoint: "listVoices",
+                  provider_revision: 1,
+                  data: [{ voice_id: "v", voice_name: "Warm voice" }],
+                },
+              ],
+              partial: true,
+              errors: [],
+            }
+          : path === "retell/read"
+            ? {
+                provider: "retell",
+                status: "completed",
+                endpoint: payload.endpoint,
+                data: { agent_id: "a", agent_name: "Existing" },
+              }
+            : catalog,
+  );
+  await tick();
+  h.render();
+  h.click("Voces");
+  h.render();
+  assert.ok(
+    h.nodes().some((n) => n.type === "h3" && n.props.children === "Warm voice"),
+  );
+  assert.equal(h.calls.filter((c) => c[0] === "retell/inventory").length, 1);
+  h.click("Agentes");
+  h.render();
+  h.click("Consultar");
+  await tick();
+  h.render();
+  assert.equal(
+    h.calls.find((c) => c[0] === "retell/read")[2].endpoint,
+    "getAgent",
+  );
+  assert.ok(!h.calls.some((c) => c[0] === "hermes/actions"));
+  assert.equal(
+    h.nodes().find((n) => n.type === "ActionResultDetails").props.presentation,
+    "friendly",
+  );
 });

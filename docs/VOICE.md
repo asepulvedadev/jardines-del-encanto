@@ -16,18 +16,24 @@ the workspace does not handle keys.
   The five multipart-dependent operations remain disabled; new vendor endpoints require
   review. This does not claim complete parity with dashboard-only Retell features.
 
-Opening a view retrieves local approved snapshots and provider/schema catalogue metadata.
-It does **not** execute an account inventory query. Loading/updating a resource prepares
-an exact `retell.execute` proposal, including for reads. Approval is separate; mutations,
-paid operations and destructive actions retain explicit consent. Outbound operations
-continue to require the existing CRM recipient binding and route checks.
+Opening Voz automatically loads the eleven fixed resource inventories through the
+administrator-only `POST /crm/retell/inventory` endpoint. Tabs share that snapshot;
+there is no per-section load/approval step. A short actor/session-scoped cache bounds
+repeated requests; failures are isolated by resource. Narrow resource detail reads use
+`POST /crm/retell/read`. See `VOICE-INVENTORY.md` for the fixed allowlist and limits.
+
+This explicit automatic-read exception never auto-approves generic `retell.execute`.
+Other catalogue operations keep their existing broker policy. Mutations, paid operations
+and destructive actions retain exact proposals, explicit consent and recipient guards.
+Voz renders readable values/reviews by default; raw payloads are in closed technical
+details. Advanced JSON remains an explicit power-user choice rather than the main editor.
 
 `GET /crm/retell/results` restores only bounded, sanitized, approved read results for the
 current administrator **and session**, with the current enabled connection preference
-revision. See `VOICE-RESULTS.md`. A fresh login has no previous-session snapshots.
+revision. See `VOICE-RESULTS.md`. A fresh login has no previous-session approved snapshots; automatic reads obtain new data.
 Resource lists are partial snapshots, not authoritative totals or live synchronization.
 Results can contain at most 50 items and clipped text; advanced operations support
-explicit pagination. After external changes/deletions, request a fresh approved read.
+explicit pagination. The shared cache is invalidated by completed writes; external changes appear on the next synchronization.
 
 ## Safe forms
 
@@ -41,7 +47,7 @@ greetings are read-only partial previews. Replacing them requires an explicit sw
 and a blank full replacement draft; the cached fragment is never silently resent.
 Advanced configuration is available through the reviewed operation editor.
 
-Confirmed result callbacks update the resource view without redispatching. Failed view
+Confirmed result callbacks update the resource view without redispatching the write, then refresh only the fixed read inventories. Failed view
 refreshes do not turn a completed provider operation into a retry. Browser-call setup
 reuses the existing one-shot session component; microphone access and billing require
 explicit user actions. No voice preview is fetched automatically.

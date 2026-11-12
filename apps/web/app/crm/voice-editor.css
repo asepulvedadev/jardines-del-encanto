@@ -1,0 +1,186 @@
+/* Native Retell configuration controls; scope all density and disclosure rules. */
+.voice-schema-editor {
+  display: grid;
+  gap: 12px;
+  margin-block: 24px;
+  min-width: 0;
+}
+.voice-schema-editor :is(h4, h5, p) {
+  margin: 0;
+}
+.voice-schema-editor h4 {
+  font-size: 17px;
+}
+.voice-schema-editor h5 {
+  font-size: 15px;
+}
+.voice-schema-editor :is(input, textarea, select) {
+  width: 100%;
+  min-width: 0;
+}
+.voice-schema-editor input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+.voice-schema-sections {
+  display: grid;
+  gap: 10px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.voice-schema-section {
+  border: 1px solid #d9e1d5;
+  border-radius: 12px;
+  background: #fff;
+  min-width: 0;
+}
+.voice-schema-section > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 16px;
+  cursor: pointer;
+  color: #062619;
+  font-weight: 700;
+  list-style: none;
+}
+.voice-schema-section > summary::before {
+  content: "+";
+  font-size: 18px;
+}
+.voice-schema-section[open] > summary::before {
+  content: "−";
+}
+.voice-schema-section > summary span {
+  margin-inline-start: auto;
+  color: #526056;
+  font-size: 13px;
+  font-weight: 500;
+}
+.voice-schema-section[open] > summary {
+  border-bottom: 1px solid #d9e1d5;
+}
+.voice-schema-section-content {
+  padding-inline: 16px;
+}
+.voice-schema-field {
+  display: grid;
+  gap: 10px;
+  padding-block: 18px;
+  min-width: 0;
+}
+.voice-schema-field + .voice-schema-field {
+  border-top: 1px solid #d9e1d5;
+}
+.voice-schema-field > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.voice-schema-field code {
+  font-size: 12px;
+  color: #526056;
+  overflow-wrap: anywhere;
+}
+.voice-schema-control,
+.voice-schema-object,
+.voice-schema-child,
+.voice-schema-array,
+.voice-schema-map,
+.voice-schema-entry {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.voice-schema-object,
+.voice-schema-array {
+  padding-block: 6px;
+}
+.voice-schema-child + .voice-schema-child,
+.voice-schema-entry {
+  padding-block-start: 12px;
+  border-top: 1px solid #d9e1d5;
+}
+.voice-schema-item {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  margin: 0;
+  padding: 12px;
+  min-width: 0;
+}
+.voice-schema-item legend {
+  max-width: 100%;
+  padding-inline: 5px;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.voice-schema-editor .crm-button {
+  justify-self: start;
+}
+.voice-schema-editor .voice-checkbox {
+  min-height: 44px;
+  align-items: center;
+  font-weight: 500;
+}
+.voice-schema-preview,
+.voice-schema-reference {
+  font-size: 14px;
+  color: #526056;
+  overflow-wrap: anywhere;
+}
+.voice-schema-preview > summary,
+.voice-schema-reference > summary {
+  min-height: 44px;
+  align-content: center;
+  cursor: pointer;
+}
+.voice-schema-preview :is(ul, dl) {
+  padding-inline-start: 18px;
+  margin-block: 8px;
+}
+.voice-schema-preview dt {
+  font-weight: 600;
+}
+.voice-schema-preview dd {
+  margin-inline-start: 16px;
+}
+.voice-schema-reference p {
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow: auto;
+}
+.voice-schema-blocked,
+.voice-schema-warning {
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #855708;
+  background: #fff4db;
+  font-size: 14px;
+}
+.voice-schema-editor
+  :is(summary, input, select, textarea, button):focus-visible {
+  outline: 2px solid #507010;
+  outline-offset: 3px;
+}
+@media (max-width: 600px) {
+  .voice-schema-section > summary {
+    padding-inline: 12px;
+  }
+  .voice-schema-section-content {
+    padding-inline: 12px;
+  }
+  .voice-schema-item {
+    padding: 10px;
+  }
+}

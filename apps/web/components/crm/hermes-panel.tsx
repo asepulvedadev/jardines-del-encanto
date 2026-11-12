@@ -8,6 +8,13 @@ import {
 } from "./settings-types";
 import { ElevenLabsVoiceResult } from "./elevenlabs-result";
 import { RetellVoiceResult } from "./retell-result";
+import {
+  VoiceProposalSummary,
+  VoiceResultSummary,
+  voiceOperationTitle,
+} from "./voice-summary";
+
+export type ActionPresentation = "technical" | "friendly";
 
 function requiresConsent(proposal: Proposal) {
   return proposal.action === "retell.execute"
@@ -27,8 +34,10 @@ export function ActionProposals({
   request,
   onChanged,
   onResult,
+  presentation = "technical",
 }: {
   proposals: Proposal[];
+  presentation?: ActionPresentation;
   onResult?: (result: Record<string, unknown>) => void | Promise<void>;
   request: SettingsRequest;
   onChanged: () => Promise<void>;
@@ -91,7 +100,12 @@ export function ActionProposals({
         const proposal = decisions[original.id] ?? original;
         return (
           <article key={proposal.id} className="settings-proposal">
-            <strong>{proposal.action}</strong>
+            <strong>
+              {presentation === "friendly" &&
+              proposal.action === "retell.execute"
+                ? voiceOperationTitle(proposal.arguments.endpoint)
+                : proposal.action}
+            </strong>
             <span className="social-status">
               {
                 {
@@ -102,13 +116,19 @@ export function ActionProposals({
                 }[proposal.status]
               }
             </span>
-            <pre aria-label={`Argumentos exactos de ${proposal.action}`}>
-              {JSON.stringify(proposal.arguments, null, 2)}
-            </pre>
+            {presentation === "friendly" &&
+            proposal.action === "retell.execute" ? (
+              <VoiceProposalSummary proposal={proposal} />
+            ) : (
+              <pre aria-label={`Argumentos exactos de ${proposal.action}`}>
+                {JSON.stringify(proposal.arguments, null, 2)}
+              </pre>
+            )}
             {results[proposal.id] && (
               <ActionResultDetails
                 result={results[proposal.id]}
                 request={request}
+                presentation={presentation}
               />
             )}
             {proposal.status === "pending" && requiresConsent(proposal) && (
@@ -161,17 +181,19 @@ export function ActionProposals({
 export function ActionResultDetails({
   result,
   request,
+  presentation = "technical",
 }: {
   result: Record<string, unknown>;
   request?: SettingsRequest;
+  presentation?: ActionPresentation;
 }) {
   const uncertain = [
     "external_outcome_unconfirmed",
     "dispatch_reserved",
   ].includes(String(result.status));
-  return (
-    <details open>
-      <summary>Resultado de la acción</summary>
+  const friendly = presentation === "friendly";
+  const content = (
+    <>
       {uncertain && (
         <p className="social-warning" role="status">
           Resultado externo no confirmado. No repitas la acción; revisa su
@@ -184,7 +206,24 @@ export function ActionResultDetails({
       {result.provider === "retell" && (
         <RetellVoiceResult result={result} request={request} />
       )}
-      <pre className="settings-result">{JSON.stringify(result, null, 2)}</pre>
+      {friendly ? (
+        <VoiceResultSummary result={result} />
+      ) : (
+        <pre className="settings-result">{JSON.stringify(result, null, 2)}</pre>
+      )}
+    </>
+  );
+  return friendly ? (
+    <section
+      className="voice-result-summary"
+      aria-label="Resultado de la acción"
+    >
+      {content}
+    </section>
+  ) : (
+    <details open>
+      <summary>Resultado de la acción</summary>
+      {content}
     </details>
   );
 }
@@ -193,8 +232,10 @@ export function ActionOutput({
   request,
   onChanged,
   onResult,
+  presentation = "technical",
 }: {
   onResult?: (result: Record<string, unknown>) => void | Promise<void>;
+  presentation?: ActionPresentation;
   value: ActionResult;
   request: SettingsRequest;
   onChanged: () => Promise<void>;
@@ -202,7 +243,11 @@ export function ActionOutput({
   return (
     <>
       {value.result && (
-        <ActionResultDetails result={value.result} request={request} />
+        <ActionResultDetails
+          result={value.result}
+          request={request}
+          presentation={presentation}
+        />
       )}
       {!!value.proposals?.length && (
         <ActionProposals
@@ -210,6 +255,7 @@ export function ActionOutput({
           request={request}
           onChanged={onChanged}
           onResult={onResult}
+          presentation={presentation}
         />
       )}
     </>

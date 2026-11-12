@@ -11,6 +11,7 @@ const source = readFileSync(
 );
 const module = { exports: {} };
 new Function(
+  "require",
   "module",
   "exports",
   ts.transpileModule(source, {
@@ -19,7 +20,34 @@ new Function(
       target: ts.ScriptTarget.ES2022,
     },
   }).outputText,
-)(module, module.exports);
+)(
+  (name) => {
+    if (name !== "./voice-schema-model") throw new Error(name);
+    const model = { exports: {} };
+    new Function(
+      "module",
+      "exports",
+      ts.transpileModule(
+        readFileSync(
+          new URL(
+            "../../apps/web/components/crm/voice-schema-model.ts",
+            import.meta.url,
+          ),
+          "utf8",
+        ),
+        {
+          compilerOptions: {
+            module: ts.ModuleKind.CommonJS,
+            target: ts.ScriptTarget.ES2022,
+          },
+        },
+      ).outputText,
+    )(model, model.exports);
+    return model.exports;
+  },
+  module,
+  module.exports,
+);
 const {
   voiceEditorFields,
   voiceInitialValues,
@@ -303,4 +331,89 @@ test("numeric spelling changes are not dirty patches and legacy model edits reta
     }).arguments.requestBody,
     { model: "gpt-4.1-mini" },
   );
+});
+
+test("advanced native drafts extend core forms and explicit complete engines do not force Retell LLM", () => {
+  const advanced = {
+    response_engine: {
+      enabled: true,
+      branch: 2,
+      children: {
+        type: { enabled: true, raw: "conversation-flow" },
+        conversation_flow_id: { enabled: true, raw: "flow_1" },
+      },
+    },
+    enable_backchannel: { enabled: true, raw: "false" },
+  };
+  const created = voiceEditorArguments(
+    "agent",
+    schemas.createAgent,
+    undefined,
+    { agent_name: "Flow agent", voice_id: "voice_one" },
+    {},
+    advanced,
+  );
+  assert.deepEqual(created.arguments.requestBody.response_engine, {
+    type: "conversation-flow",
+    conversation_flow_id: "flow_1",
+  });
+  assert.equal(created.arguments.requestBody.enable_backchannel, false);
+  assert.throws(() =>
+    voiceEditorArguments(
+      "agent",
+      schemas.updateAgent,
+      { agent_id: "a" },
+      {},
+      {},
+      { unknown_security_override: { enabled: true, raw: "x" } },
+    ),
+  );
+});
+
+test("advanced creation cannot bypass explicit nonempty agent identity or voice", () => {
+  for (const key of ["agent_name", "voice_id"]) {
+    assert.throws(() =>
+      voiceEditorArguments(
+        "agent",
+        schemas.createAgent,
+        undefined,
+        { agent_name: "Agent", voice_id: "voice", llm_id: "llm" },
+        {},
+        { [key]: { enabled: true, raw: "" } },
+      ),
+    );
+  }
+});
+
+test("explicit full speech-to-speech model configuration does not require the convenience cascading model", () => {
+  const drafts = {
+    model_config: {
+      enabled: true,
+      branch: 1,
+      children: {
+        type: { enabled: true, raw: "s2s" },
+        primary: {
+          enabled: true,
+          children: { model: { enabled: true, raw: "gpt-realtime" } },
+        },
+        temperature: { enabled: true, raw: "0.5" },
+      },
+    },
+  };
+  const created = voiceEditorArguments(
+    "instructions",
+    schemas.createRetellLLM,
+    undefined,
+    { general_prompt: "Complete user instructions" },
+    {},
+    drafts,
+  );
+  assert.deepEqual(created.arguments.requestBody, {
+    general_prompt: "Complete user instructions",
+    model_config: {
+      type: "s2s",
+      primary: { model: "gpt-realtime" },
+      temperature: 0.5,
+    },
+  });
 });

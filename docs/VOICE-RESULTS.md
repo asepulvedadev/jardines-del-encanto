@@ -74,3 +74,11 @@ node --test tests/web/voice-results-gateway.test.mjs
 isolated CRM test runner, serially with other database suites. The fixture refuses
 to reset databases not named `jardines_crm_test`. No production execution, real
 provider read/write, credentials, paid call or microphone access is needed.
+
+## Automatic-read exception
+
+The existing GET contract above remains local, session-bound approved-history recovery.
+The owner subsequently requested automatic resource loading. Separate strictly
+allowlisted POST inventory/read endpoints now provide those reads without proposals;
+see VOICE-INVENTORY.md. This does not remove approvals from general Retell execution
+or permit automatic mutations, calls, security changes or paid operations.

@@ -4,6 +4,8 @@ import { Workspace } from "../../components/crm/workspace";
 import "./crm.css";
 import "./retell.css";
 import "./voice-workspace.css";
+import "./voice-summary.css";
+import "./voice-editor.css";
 
 export const dynamic = "force-dynamic";
 export const metadata = {

@@ -1,0 +1,87 @@
+.voice-summary {
+  min-width: 0;
+  color: #062619;
+}
+.voice-summary p {
+  margin: 8px 0 16px;
+}
+.voice-summary-notice {
+  color: #526056;
+  font-size: 14px;
+}
+.voice-summary-fields {
+  margin: 0;
+}
+.voice-summary-field {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr);
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #d9e1d5;
+}
+.voice-summary-field dt {
+  color: #526056;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.voice-summary-field dd {
+  min-width: 0;
+  margin: 0;
+}
+.voice-summary-field .voice-summary-field {
+  grid-template-columns: minmax(100px, 1fr) minmax(0, 2fr);
+}
+.voice-summary-value {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.voice-summary-empty {
+  color: #526056;
+  font-style: italic;
+}
+.voice-summary-list {
+  margin: 0;
+  padding-inline-start: 24px;
+}
+.voice-summary-list > li {
+  padding: 8px 0;
+}
+.voice-technical {
+  min-width: 0;
+  margin-block-start: 16px;
+  border-top: 1px solid #d9e1d5;
+}
+.voice-technical > summary {
+  display: list-item;
+  min-height: 44px;
+  padding-block: 12px;
+  color: #526056;
+  cursor: pointer;
+  font-size: 14px;
+}
+.voice-technical > summary:focus-visible {
+  outline: 2px solid #507010;
+  outline-offset: 2px;
+}
+.voice-technical pre {
+  max-width: 100%;
+  margin: 0;
+  padding: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #f6f7f1;
+  font-size: 13px;
+}
+.voice-result-summary {
+  min-width: 0;
+  margin-block: 16px;
+}
+@media (max-width: 640px) {
+  .voice-summary-field,
+  .voice-summary-field .voice-summary-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}

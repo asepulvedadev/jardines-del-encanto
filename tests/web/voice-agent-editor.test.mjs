@@ -60,6 +60,10 @@ function harness(overrides = {}) {
             jsxs: (type, props) => ({ type, props }),
           };
         if (name === "./voice-agent-model") return load("voice-agent-model.ts");
+        if (name === "./voice-schema-model")
+          return load("voice-schema-model.ts");
+        if (name === "./voice-schema-editor")
+          return { VoiceSchemaEditor: "VoiceSchemaEditor" };
         throw new Error(`Unexpected runtime dependency: ${name}`);
       },
       module,
@@ -263,4 +267,45 @@ test("pending review handoff is single-flight and user draft remains intact", as
   await Promise.all([first, second]);
   h.render();
   assert.equal(h.field("agent_name").props.value, "Sara");
+});
+
+test("voice picker presents names and keeps manual identifiers in a closed disclosure", () => {
+  const h = harness({
+    record: { agent_id: "a", agent_name: "Sara", voice_id: "v-current" },
+    voices: [{ voice_id: "v", voice_name: "Voz de prueba" }],
+  });
+  assert.equal(h.field("voice_id").type, "select");
+  assert(
+    h
+      .all()
+      .some(
+        (node) =>
+          node.type === "option" &&
+          node.props.value === "v" &&
+          node.props.children === "Voz de prueba",
+      ),
+  );
+  assert(
+    h
+      .all()
+      .some(
+        (node) =>
+          node.type === "option" &&
+          node.props.value === "v-current" &&
+          node.props.children === "Voz actual",
+      ),
+  );
+  const manual = h
+    .all()
+    .find(
+      (node) =>
+        node.type === "details" &&
+        String(node.props.children?.[0]?.props?.children).includes(
+          "identificador",
+        ),
+    );
+  assert(manual);
+  assert(!manual.props.open);
+  h.change("voice_id_manual", "voice_explicit");
+  assert.equal(h.field("voice_id").props.value, "voice_explicit");
 });

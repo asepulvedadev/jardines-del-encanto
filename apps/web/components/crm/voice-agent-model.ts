@@ -1,4 +1,5 @@
 import type { RetellSchema } from "./retell-schema";
+import { voiceSchemaPatch, type VoiceSchemaDrafts } from "./voice-schema-model";
 
 type ComposedSchema = RetellSchema & {
   allOf?: ComposedSchema[];
@@ -82,7 +83,7 @@ function modelBranch(
 
 const agentLabels = [
   ["agent_name", "Nombre del agente"],
-  ["voice_id", "ID de la voz"],
+  ["voice_id", "Voz del agente"],
   ["language", "Idioma"],
   ["voice_speed", "Velocidad de voz"],
   ["responsiveness", "Capacidad de respuesta"],
@@ -197,6 +198,7 @@ export function voiceEditorArguments(
   record: Record<string, unknown> | undefined,
   values: Record<string, string>,
   replacements: VoiceReplacements = {},
+  advancedDrafts: VoiceSchemaDrafts = {},
 ): { endpoint: string; arguments: Record<string, unknown> } {
   const fields = voiceEditorFields(kind, schema, record);
   const bodySchema = property(schema, "requestBody");
@@ -204,7 +206,29 @@ export function voiceEditorArguments(
     throw new Error(
       "El esquema aprobado no está disponible para este formulario.",
     );
-  const body: Record<string, unknown> = {};
+  const body: Record<string, unknown> = voiceSchemaPatch(
+    bodySchema,
+    advancedDrafts,
+    record,
+  );
+  const fullModel = body.model_config !== undefined;
+  const fullEngine = body.response_engine !== undefined;
+  const legacyKeys = [
+    "model",
+    "backup_model",
+    "model_high_priority",
+    "model_temperature",
+    "model_ultrafast",
+    "s2s_model",
+  ];
+  if (
+    (fullModel || record?.model_config) &&
+    legacyKeys.some((key) => body[key] !== undefined)
+  ) {
+    throw new Error(
+      "Retell omite los ajustes heredados cuando existe una configuración completa del modelo. Usa la configuración vigente.",
+    );
+  }
   const args: Record<string, unknown> = { requestBody: body };
   const initial = voiceInitialValues(kind, record);
   if (record) {
@@ -221,6 +245,11 @@ export function voiceEditorArguments(
     }
   }
   for (const field of fields) {
+    if (
+      body[field.key] !== undefined ||
+      (fullModel && ["model", "temperature"].includes(field.key))
+    )
+      continue;
     const raw = values[field.key] ?? "";
     const isFullText =
       field.key === "general_prompt" || field.key === "begin_message";
@@ -304,7 +333,7 @@ export function voiceEditorArguments(
       !fields.some((field) => field.key === "voice_id")
     )
       throw new Error("El esquema no permite configurar el agente.");
-    if (!record || replacements.response_engine) {
+    if (!fullEngine && (!record || replacements.response_engine)) {
       const engine = property(bodySchema, "response_engine");
       const variant =
         engine &&
@@ -325,6 +354,17 @@ export function voiceEditorArguments(
         body.response_engine = { type: "retell-llm", llm_id: llmId };
     }
   }
+  if (
+    !record &&
+    kind === "agent" &&
+    (typeof body.agent_name !== "string" ||
+      !body.agent_name.trim() ||
+      typeof body.voice_id !== "string" ||
+      !body.voice_id.trim())
+  )
+    throw new Error(
+      "Completa el nombre del agente y selecciona una voz válida.",
+    );
   if (!Object.keys(body).length)
     throw new Error("No hay cambios para revisar.");
   return {

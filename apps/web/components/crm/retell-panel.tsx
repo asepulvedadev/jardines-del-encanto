@@ -92,6 +92,7 @@ export function RetellPanel({
   active,
   connectionEnabled,
   operationsOnly = false,
+  friendly = false,
   initialOperation,
   onResult,
 }: {
@@ -100,6 +101,7 @@ export function RetellPanel({
   active: boolean;
   connectionEnabled?: boolean;
   operationsOnly?: boolean;
+  friendly?: boolean;
   initialOperation?: { endpoint: string; arguments: Record<string, unknown> };
   onResult?: (result: Record<string, unknown>) => void | Promise<void>;
 }) {
@@ -300,6 +302,7 @@ export function RetellPanel({
                 JSON.stringify(seed),
               ),
             );
+            setAdvanced(false);
           } catch {
             setValues({});
           }
@@ -857,6 +860,7 @@ export function RetellPanel({
               request={request}
               onChanged={onChanged}
               onResult={onResult}
+              presentation={friendly ? "friendly" : "technical"}
             />
           )}
         </div>

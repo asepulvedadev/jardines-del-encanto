@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ActionOutput } from "./hermes-panel";
+import { ActionOutput, ActionResultDetails } from "./hermes-panel";
 import { RetellPanel } from "./retell-panel";
 import { VoiceAgentEditor } from "./voice-agent-editor";
 import type { RetellSchema } from "./retell-schema";
@@ -36,7 +36,18 @@ type Catalog = { revision: number; operations: Operation[] };
 type Modal =
   | { kind: "operation"; endpoint: string; arguments: VoiceRecord }
   | { kind: "agent" | "instructions"; record?: VoiceRecord }
-  | { kind: "review"; output: ActionResult };
+  | { kind: "review"; output: ActionResult }
+  | { kind: "details"; result: VoiceRecord };
+type Inventory = {
+  snapshots: VoiceSnapshot[];
+  partial: true;
+  errors?: { endpoint: string; code: string }[];
+  cached?: boolean;
+};
+const automaticReads = new Set([
+  ...sections.flatMap((item) => [item.list, item.get]),
+  "listAgentVersions",
+]);
 const schemaEndpoints = [
   "createAgent",
   "updateAgent",
@@ -59,6 +70,7 @@ export function VoiceWorkspace({
     [catalog, setCatalog] = useState<Catalog | null>(null);
   const [snapshots, setSnapshots] = useState<VoiceSnapshot[]>([]),
     [schemas, setSchemas] = useState<Record<string, RetellSchema>>({});
+  const [resourceErrors, setResourceErrors] = useState<string[]>([]);
   const [sectionKey, setSectionKey] = useState("agents"),
     [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true),
@@ -102,9 +114,18 @@ export function VoiceWorkspace({
     try {
       const settings = await request<State>("retell/settings");
       const [saved, operations] = await Promise.allSettled([
-        request<{ snapshots: VoiceSnapshot[]; partial: true }>(
-          "retell/results",
-        ),
+        settings.available &&
+        settings.configured &&
+        settings.enabled &&
+        settings.verified
+          ? request<Inventory>("retell/inventory", "POST", {
+              revision: settings.revision,
+            })
+          : Promise.resolve({
+              snapshots: [],
+              partial: true,
+              errors: [],
+            } as Inventory),
         settings.available && settings.configured
           ? request<Catalog>("retell/catalog", "POST", {
               revision: settings.revision,
@@ -115,6 +136,11 @@ export function VoiceWorkspace({
       setState(settings);
       setSnapshots(saved.status === "fulfilled" ? saved.value.snapshots : []);
       setCatalog(operations.status === "fulfilled" ? operations.value : null);
+      setResourceErrors(
+        saved.status === "fulfilled"
+          ? (saved.value.errors ?? []).map((item) => item.endpoint)
+          : [],
+      );
       const failed = [saved, operations].find(
         (item) => item.status === "rejected",
       );
@@ -227,10 +253,28 @@ export function VoiceWorkspace({
     if (alive.current && run === epoch.current)
       setModal({ kind: "review", output });
   }
+  async function readResource(endpoint: string, args: VoiceRecord) {
+    if (!state || !enabled || !automaticReads.has(endpoint))
+      throw new Error("Esta consulta no está disponible.");
+    return request<VoiceRecord>("retell/read", "POST", {
+      revision: state.revision,
+      endpoint,
+      arguments: args,
+    });
+  }
   async function editor(kind: "agent" | "instructions", record?: VoiceRecord) {
     await task(async () => {
       if (!state || !enabled) return;
       const run = epoch.current;
+      let currentRecord = record;
+      if (record) {
+        const endpoint = kind === "agent" ? "getAgent" : "getRetellLLM";
+        const key = kind === "agent" ? "agent_id" : "llm_id";
+        const result = await readResource(endpoint, { [key]: record[key] });
+        if (object(result.data)) currentRecord = { ...record, ...result.data };
+        if (alive.current && run === epoch.current)
+          setSnapshots((old) => mergeConfirmed(old, result, state.revision));
+      }
       const definitions = await Promise.all(
         schemaEndpoints.map(async (endpoint) => {
           const value = await request<{ input_schema: RetellSchema }>(
@@ -243,12 +287,23 @@ export function VoiceWorkspace({
       );
       if (alive.current && run === epoch.current) {
         setSchemas(Object.fromEntries(definitions));
-        setModal({ kind, record });
+        setModal({ kind, record: currentRecord });
       }
     });
   }
   function openOperation(endpoint: string, args: VoiceRecord = {}) {
     if (operation(endpoint)) {
+      if (automaticReads.has(endpoint)) {
+        void task(async () => {
+          const run = epoch.current;
+          const result = await readResource(endpoint, args);
+          if (alive.current && run === epoch.current && state) {
+            setSnapshots((old) => mergeConfirmed(old, result, state.revision));
+            setModal({ kind: "details", result });
+          }
+        });
+        return;
+      }
       rememberFocus();
       setModal({ kind: "operation", endpoint, arguments: args });
     }
@@ -256,7 +311,34 @@ export function VoiceWorkspace({
   async function confirmed(result: VoiceRecord) {
     if (!alive.current || !state) return;
     setSnapshots((old) => mergeConfirmed(old, result, state.revision));
-    // Read recovery is local only. Never dispatch another provider action from a callback.
+    // Only fixed safe inventory reads may follow a confirmed write, never re-dispatch it.
+    if (
+      result.provider === "retell" &&
+      result.status === "completed" &&
+      !/^(get|list)/.test(text(result.endpoint))
+    ) {
+      try {
+        const run = epoch.current;
+        const fresh = await request<Inventory>("retell/inventory", "POST", {
+          revision: state.revision,
+        });
+        if (alive.current && run === epoch.current) {
+          setSnapshots((old) => [
+            ...fresh.snapshots,
+            ...old.filter(
+              (item) =>
+                !sections.some((section) => section.list === item.endpoint),
+            ),
+          ]);
+          setResourceErrors((fresh.errors ?? []).map((item) => item.endpoint));
+        }
+      } catch {
+        if (alive.current)
+          setError(
+            "El cambio ya se confirmó. La sincronización está pendiente; no repitas la acción.",
+          );
+      }
+    }
   }
   async function changed() {
     try {
@@ -307,7 +389,7 @@ export function VoiceWorkspace({
             disabled={loading || busy || approvalBusy}
             onClick={() => void load()}
           >
-            Actualizar vista
+            Sincronizar
           </button>
           <button
             className="crm-button crm-secondary"
@@ -371,6 +453,7 @@ export function VoiceWorkspace({
             active={active}
             onChanged={changed}
             operationsOnly
+            friendly
             onResult={confirmed}
           />
         )
@@ -381,21 +464,11 @@ export function VoiceWorkspace({
               <h2>{section.label}</h2>
               <p className="voice-muted">
                 {last
-                  ? `Lectura parcial · ${new Date(last).toLocaleString("es-CO")}`
-                  : "Sin lecturas aprobadas en esta sesión"}
+                  ? `Sincronizado · ${new Date(last).toLocaleString("es-CO")}`
+                  : "Sincronización automática"}
               </p>
             </div>
             <div className="voice-actions">
-              <button
-                className="crm-button crm-secondary"
-                disabled={
-                  !enabled || busy || !operation(section.list)?.available
-                }
-                onClick={() => void task(() => prepare(section.list, {}))}
-              >
-                {rows.length ? "Actualizar" : "Cargar"}{" "}
-                {section.label.toLocaleLowerCase("es")}
-              </button>
               {section.create && (
                 <button
                   className="crm-button"
@@ -419,6 +492,19 @@ export function VoiceWorkspace({
               )}
             </div>
           </div>
+          {resourceErrors.includes(section.list) && (
+            <p className="crm-error" role="alert">
+              No se pudo sincronizar esta sección. Las demás siguen disponibles.{" "}
+              <button
+                type="button"
+                className="crm-button crm-secondary"
+                disabled={loading || busy}
+                onClick={() => void load()}
+              >
+                Reintentar
+              </button>
+            </p>
+          )}
           <div className="voice-search">
             <label htmlFor="voice-resource-search" className="sr-only">
               Buscar en {section.label}
@@ -459,12 +545,16 @@ export function VoiceWorkspace({
               <h3>
                 {query
                   ? "No encontramos coincidencias."
-                  : "Tus recursos, en un solo lugar."}
+                  : resourceErrors.includes(section.list)
+                    ? "Sincronización pendiente."
+                    : "Todavía no hay registros."}
               </h3>
               <p>
                 {query
                   ? "Prueba con otro nombre o identificador."
-                  : "Carga una lectura de Retell para ver los recursos existentes. La consulta se revisa antes de ejecutarse."}
+                  : resourceErrors.includes(section.list)
+                    ? "Puedes reintentar la consulta sin afectar tu configuración."
+                    : "Los recursos de Retell aparecen aquí automáticamente."}
               </p>
             </div>
           ) : (
@@ -479,13 +569,20 @@ export function VoiceWorkspace({
                       <h3>
                         {text(row[section.name]) || text(row[section.id])}
                       </h3>
-                      <code>{text(row[section.id])}</code>
+                      <details className="voice-resource-id">
+                        <summary>Identificador</summary>
+                        <code>{text(row[section.id])}</code>
+                      </details>
                     </div>
                   </div>
                   {sectionKey === "agents" && (
                     <p className="voice-muted">
-                      Voz: {text(row.voice_id) || "Sin dato"} · Versión:{" "}
-                      {text(row.version) || "Sin dato"}
+                      Voz:{" "}
+                      {text(
+                        voices.find((voice) => voice.voice_id === row.voice_id)
+                          ?.voice_name,
+                      ) || (row.voice_id ? "Configurada" : "Sin dato")}{" "}
+                      · Versión: {text(row.version) || "Sin dato"}
                     </p>
                   )}
                   {sectionKey === "voices" && (
@@ -519,10 +616,7 @@ export function VoiceWorkspace({
                               (item) => item.llm_id === id,
                             );
                             if (model) void editor("instructions", model);
-                            else
-                              void task(() =>
-                                prepare("getRetellLLM", { llm_id: id }),
-                              );
+                            else void editor("instructions", { llm_id: id });
                           }}
                         >
                           Instrucciones
@@ -562,9 +656,8 @@ export function VoiceWorkspace({
             </div>
           )}
           <p className="voice-footnote">
-            Lecturas limitadas y solo de esta sesión. No representan todo el
-            inventario. Usa “Todas las funciones” para paginar, consultar por ID
-            y gestionar versiones, análisis, campañas y opciones avanzadas.
+            Sincronización automática con vistas limitadas. Más herramientas
+            reúne las opciones avanzadas.
           </p>
           <button
             className="voice-catalog-link"
@@ -589,7 +682,9 @@ export function VoiceWorkspace({
               ? "Revisar acción"
               : modal?.kind === "operation"
                 ? "Función de Retell"
-                : "Configuración del agente"}
+                : modal?.kind === "details"
+                  ? "Detalle de Retell"
+                  : "Configuración del agente"}
           </h2>
           <button
             type="button"
@@ -602,6 +697,13 @@ export function VoiceWorkspace({
           </button>
         </header>
         <div className="voice-dialog-body">
+          {active && modal?.kind === "details" && (
+            <ActionResultDetails
+              result={modal.result}
+              request={request}
+              presentation="friendly"
+            />
+          )}
           {active && modal?.kind === "operation" && (
             <RetellPanel
               key={modal.endpoint}
@@ -609,6 +711,7 @@ export function VoiceWorkspace({
               active
               onChanged={changed}
               operationsOnly
+              friendly
               initialOperation={{
                 endpoint: modal.endpoint,
                 arguments: modal.arguments,
@@ -645,6 +748,7 @@ export function VoiceWorkspace({
           {active && modal?.kind === "review" && (
             <ActionOutput
               value={modal.output}
+              presentation="friendly"
               request={request}
               onChanged={changed}
               onResult={confirmed}

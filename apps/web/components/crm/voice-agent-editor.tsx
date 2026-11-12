@@ -2,6 +2,8 @@
 
 import { useId, useRef, useState } from "react";
 import type { RetellSchema } from "./retell-schema";
+import { VoiceSchemaEditor } from "./voice-schema-editor";
+import type { VoiceSchemaDrafts } from "./voice-schema-model";
 import {
   voiceCatalogOptions,
   voiceEditorArguments,
@@ -41,6 +43,7 @@ export function VoiceAgentEditor({
   const id = useId();
   const [values, setValues] = useState(() => voiceInitialValues(kind, record));
   const [replacements, setReplacements] = useState<VoiceReplacements>({});
+  const [advancedDrafts, setAdvancedDrafts] = useState<VoiceSchemaDrafts>({});
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const pending = useRef(false);
@@ -49,7 +52,7 @@ export function VoiceAgentEditor({
   const fields = schema ? voiceEditorFields(kind, schema, record) : [];
   const disabled = busy || submitting;
   const voiceOptions = voiceCatalogOptions(voices, "voice_id", "voice_name");
-  const modelOptions = voiceCatalogOptions(models, "llm_id");
+  const modelOptions = voiceCatalogOptions(models, "llm_id", "agent_name");
   const engine = record?.response_engine;
   const engineType =
     engine &&
@@ -87,6 +90,7 @@ export function VoiceAgentEditor({
         record,
         values,
         replacements,
+        advancedDrafts,
       );
     } catch (cause) {
       setError(
@@ -139,154 +143,186 @@ export function VoiceAgentEditor({
         <legend className="sr-only">
           Configuración {kind === "agent" ? "del agente" : "de instrucciones"}
         </legend>
-        {fields.map((field) => {
-          const fullText =
-            field.key === "general_prompt" || field.key === "begin_message";
-          const replacementKey = field.key as keyof VoiceReplacements;
-          const current = record?.[field.key];
-          const currentText =
-            typeof current === "string"
-              ? current
-              : "No disponible en esta lectura parcial.";
-          const options = (field.schema.enum ?? []).filter(
-            (value): value is string => typeof value === "string",
-          );
-          const value = values[field.key] ?? "";
-          const controlId = `${id}-${field.key}`;
-          return (
-            <div key={field.key} className="voice-field">
-              {record && fullText ? (
-                <>
-                  <label htmlFor={`${controlId}-preview`}>
-                    {field.key === "general_prompt"
-                      ? "Instrucciones actuales (lectura parcial)"
-                      : "Mensaje inicial actual (lectura parcial)"}
-                  </label>
-                  <textarea
-                    className="crm-input voice-textarea voice-preview"
-                    id={`${controlId}-preview`}
-                    readOnly
-                    rows={3}
-                    value={currentText}
-                  />
-                  <p className="voice-muted" id={`${controlId}-hint`}>
-                    La lectura puede estar recortada. Para cambiarla, escribe el
-                    texto completo desde cero. El fragmento no se reenviará.
-                  </p>
-                  <label className="voice-checkbox">
-                    <input
-                      type="checkbox"
-                      name={`replace_${field.key}`}
-                      checked={!!replacements[replacementKey]}
-                      onChange={(event) =>
-                        replace(replacementKey, event.target.checked)
-                      }
-                    />
-                    {field.key === "general_prompt"
-                      ? "Reemplazar instrucciones"
-                      : "Reemplazar mensaje inicial"}
-                  </label>
-                </>
-              ) : null}
-              {!record || !fullText || replacements[replacementKey] ? (
-                <>
-                  <label htmlFor={controlId}>{field.label}</label>
-                  {field.multiline ? (
+        {fields
+          .filter(
+            (field) =>
+              !advancedDrafts[field.key]?.enabled &&
+              !(
+                kind === "instructions" &&
+                advancedDrafts.model_config?.enabled &&
+                ["model", "temperature"].includes(field.key)
+              ),
+          )
+          .map((field) => {
+            const fullText =
+              field.key === "general_prompt" || field.key === "begin_message";
+            const replacementKey = field.key as keyof VoiceReplacements;
+            const current = record?.[field.key];
+            const currentText =
+              typeof current === "string"
+                ? current
+                : "No disponible en esta lectura parcial.";
+            const options = (field.schema.enum ?? []).filter(
+              (value): value is string => typeof value === "string",
+            );
+            const value = values[field.key] ?? "";
+            const controlId = `${id}-${field.key}`;
+            return (
+              <div key={field.key} className="voice-field">
+                {record && fullText ? (
+                  <>
+                    <label htmlFor={`${controlId}-preview`}>
+                      {field.key === "general_prompt"
+                        ? "Instrucciones actuales (lectura parcial)"
+                        : "Mensaje inicial actual (lectura parcial)"}
+                    </label>
                     <textarea
-                      className="crm-input voice-textarea"
-                      id={controlId}
-                      name={field.key}
-                      rows={field.key === "general_prompt" ? 8 : 3}
-                      value={value}
-                      aria-describedby={
-                        record ? `${controlId}-hint` : undefined
-                      }
-                      minLength={field.schema.minLength}
-                      maxLength={field.schema.maxLength}
-                      onChange={(event) =>
-                        update(field.key, event.target.value)
-                      }
+                      className="crm-input voice-textarea voice-preview"
+                      id={`${controlId}-preview`}
+                      readOnly
+                      rows={3}
+                      value={currentText}
                     />
-                  ) : options.length ? (
-                    <select
-                      className="crm-input"
-                      id={controlId}
-                      name={field.key}
-                      value={value}
-                      onChange={(event) =>
-                        update(field.key, event.target.value)
-                      }
-                    >
-                      <option value="">
-                        {record
-                          ? "Mantener valor actual"
-                          : "Selecciona un valor"}
-                      </option>
-                      {value && !options.includes(value) ? (
-                        <option value={value} disabled>
-                          Actual: {value}
+                    <p className="voice-muted" id={`${controlId}-hint`}>
+                      La lectura puede estar recortada. Para cambiarla, escribe
+                      el texto completo desde cero. El fragmento no se
+                      reenviará.
+                    </p>
+                    <label className="voice-checkbox">
+                      <input
+                        type="checkbox"
+                        name={`replace_${field.key}`}
+                        checked={!!replacements[replacementKey]}
+                        onChange={(event) =>
+                          replace(replacementKey, event.target.checked)
+                        }
+                      />
+                      {field.key === "general_prompt"
+                        ? "Reemplazar instrucciones"
+                        : "Reemplazar mensaje inicial"}
+                    </label>
+                  </>
+                ) : null}
+                {!record || !fullText || replacements[replacementKey] ? (
+                  <>
+                    <label htmlFor={controlId}>{field.label}</label>
+                    {field.multiline ? (
+                      <textarea
+                        className="crm-input voice-textarea"
+                        id={controlId}
+                        name={field.key}
+                        rows={field.key === "general_prompt" ? 8 : 3}
+                        value={value}
+                        aria-describedby={
+                          record ? `${controlId}-hint` : undefined
+                        }
+                        minLength={field.schema.minLength}
+                        maxLength={field.schema.maxLength}
+                        onChange={(event) =>
+                          update(field.key, event.target.value)
+                        }
+                      />
+                    ) : field.key === "voice_id" ? (
+                      <>
+                        <select
+                          className="crm-input"
+                          id={controlId}
+                          name="voice_id"
+                          value={value}
+                          onChange={(event) =>
+                            update("voice_id", event.target.value)
+                          }
+                        >
+                          <option value="">Selecciona una voz</option>
+                          {value &&
+                          !voiceOptions.some(
+                            (option) => option.value === value,
+                          ) ? (
+                            <option value={value}>Voz actual</option>
+                          ) : null}
+                          {voiceOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <details className="voice-resource-id">
+                          <summary>Usar un identificador de voz</summary>
+                          <label htmlFor={`${controlId}-manual`}>
+                            Identificador exacto
+                          </label>
+                          <input
+                            className="crm-input"
+                            id={`${controlId}-manual`}
+                            name="voice_id_manual"
+                            value={value}
+                            onChange={(event) =>
+                              update("voice_id", event.target.value)
+                            }
+                          />
+                        </details>
+                      </>
+                    ) : options.length ? (
+                      <select
+                        className="crm-input"
+                        id={controlId}
+                        name={field.key}
+                        value={value}
+                        onChange={(event) =>
+                          update(field.key, event.target.value)
+                        }
+                      >
+                        <option value="">
+                          {record
+                            ? "Mantener valor actual"
+                            : "Selecciona un valor"}
                         </option>
-                      ) : null}
-                      {options.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      className="crm-input"
-                      id={controlId}
-                      name={field.key}
-                      type={
-                        ["integer", "number"].includes(
-                          String(field.schema.type),
-                        )
-                          ? "number"
-                          : "text"
-                      }
-                      step={field.schema.type === "integer" ? 1 : "any"}
-                      min={field.schema.minimum}
-                      max={field.schema.maximum}
-                      minLength={field.schema.minLength}
-                      maxLength={field.schema.maxLength}
-                      list={
-                        field.key === "voice_id" ? `${id}-voices` : undefined
-                      }
-                      value={value}
-                      onChange={(event) =>
-                        update(field.key, event.target.value)
-                      }
-                    />
-                  )}
-                  {field.key === "voice_id" ? (
-                    <>
-                      <datalist id={`${id}-voices`}>
-                        {voiceOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
+                        {value && !options.includes(value) ? (
+                          <option value={value} disabled>
+                            Actual: {value}
+                          </option>
+                        ) : null}
+                        {options.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
                           </option>
                         ))}
-                      </datalist>
+                      </select>
+                    ) : (
+                      <input
+                        className="crm-input"
+                        id={controlId}
+                        name={field.key}
+                        type={
+                          ["integer", "number"].includes(
+                            String(field.schema.type),
+                          )
+                            ? "number"
+                            : "text"
+                        }
+                        step={field.schema.type === "integer" ? 1 : "any"}
+                        min={field.schema.minimum}
+                        max={field.schema.maximum}
+                        minLength={field.schema.minLength}
+                        maxLength={field.schema.maxLength}
+                        value={value}
+                        onChange={(event) =>
+                          update(field.key, event.target.value)
+                        }
+                      />
+                    )}
+                    {field.key === "begin_message" ? (
                       <p className="voice-muted">
-                        {voiceOptions.length
-                          ? "Selecciona una voz consultada o escribe su ID exacto."
-                          : "No hay catálogo de voces cargado. Puedes escribir un ID exacto o consultar las voces en el espacio de Voz."}
+                        Un reemplazo vacío hará que el agente espere a que la
+                        persona hable primero.
                       </p>
-                    </>
-                  ) : null}
-                  {field.key === "begin_message" ? (
-                    <p className="voice-muted">
-                      Un reemplazo vacío hará que el agente espere a que la
-                      persona hable primero.
-                    </p>
-                  ) : null}
-                </>
-              ) : null}
-            </div>
-          );
-        })}
-        {kind === "agent" ? (
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
+            );
+          })}
+        {kind === "agent" && !advancedDrafts.response_engine?.enabled ? (
           <section
             className="voice-engine"
             aria-labelledby={`${id}-engine-title`}
@@ -319,7 +355,7 @@ export function VoiceAgentEditor({
             {!record || replacements.response_engine ? (
               <div className="voice-field">
                 <label htmlFor={`${id}-llm-id`}>
-                  ID de las instrucciones Retell LLM
+                  Instrucciones Retell LLM (ID)
                 </label>
                 <input
                   className="crm-input"
@@ -363,6 +399,20 @@ export function VoiceAgentEditor({
           </p>
         ) : null}
       </fieldset>
+      {schema ? (
+        <VoiceSchemaEditor
+          schema={schema}
+          record={record}
+          drafts={advancedDrafts}
+          onChange={(next) => {
+            setAdvancedDrafts(next);
+            setError("");
+          }}
+          disabled={disabled}
+          voices={voices}
+          models={models}
+        />
+      ) : null}
       {error ? (
         <p className="voice-error" role="alert">
           {error}
