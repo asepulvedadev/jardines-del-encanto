@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-This is a local implementation, not an activated production connection. Retell appears
+The owner-authorized production connection was activated on 2026-11-12. Retell appears
 under CRM Settings > Connections, independently of Zernio social channels. Sara uses
 three compact application actions: `retell.catalog`, `retell.schema`, and
 `retell.execute`. Execution always creates an exact, owner/session-bound human
@@ -92,8 +92,8 @@ live provider quota, audio quality, permission groups or carrier readiness.
    permission groups and storage only in Jardines' gateway. Do not borrow another
    project's key or copy credentials into GitHub, prompts, transcripts or `.env` examples.
 2. Before migration011, establish a healthy **compatibility rollback boundary** whose
-   connection catalogue ignores unknown provider keys. The currently deployed b421614
-   predates Retell and cannot render a later `retell` connection row. Do not call that
+   connection catalogue ignores unknown provider keys. The pre-Retell b421614
+   release cannot render a later `retell` connection row. Do not call that
    old release a fully compatible rollback after adding this migration; migrations are
    not automatically reversed. Preserve backups and an explicit recovery plan.
 3. Back up the dedicated project database and capture sibling-container/vhost identities.
@@ -114,11 +114,38 @@ live provider quota, audio quality, permission groups or carrier readiness.
    metadata request/catalogue, choose actual account defaults and explicitly enable.
    Any real paid test or customer outreach requires separate explicit consent.
 
+## Production verification (2026-11-12)
+
+The owner authorized a dedicated Retell key, private gateway storage and direct VPS
+activation without paid tests. The credential was entered over HTTPS, verified using
+`getApiKeyInfo`, and stored only by the gateway. The connection is enabled; the live
+catalogue reports 107 JSON operations and five disabled multipart operations. Agent,
+chat-agent and originating-number defaults remain unset rather than borrowing another
+project's configuration. No agents, numbers, calls, messages or paid tests were created.
+
+Sara's deployed manifest exposes `retell.catalog`, `retell.schema` and `retell.execute`.
+Both operator policy services were refreshed with their existing environment, model and
+transcription flag preserved. Readiness and the existing ElevenLabs connection were
+verified without a model invocation or microphone access.
+
+The actual authenticated MCP invocation wraps JSON as
+`API Response (Status: 200):\n{...}`, unlike discovery responses. The adapter accepts
+only that anchored 2xx status envelope or complete plain/structured JSON. Error statuses,
+arbitrary prefixes, trailing data, duplicate keys and non-finite numbers remain denied.
+Diagnostic events contain controlled codes or exception class names, never exception
+messages, request payloads, provider responses or credentials.
+
+The healthy pre-migration rollback boundary is
+`7b0a307da8b9cd16f0d1edb37ef26345aecc2d89`. Roll back application images through the gate;
+retain migration011, the installed overlays and the compatible Retell gateway image.
+Do not revert to b421614 after migration011. The private operator checkpoint retains
+backups and policy/container/vhost evidence; no credentials belong in this document.
+
 ## Local verification (2026-11-12)
 
-- API suite: 262 passed; one existing Starlette/httpx deprecation warning.
+- API suite: 263 passed; one existing Starlette/httpx deprecation warning.
 - Web gateway/UI suite: 111 passed.
-- Runtime suite: 141 passed, one opt-in pinned Hermes fixture skipped.
+- Runtime suite: 144 passed, one opt-in pinned Hermes fixture skipped.
 - TypeScript, production web build, Ruff and whitespace checks passed.
 - Independent loopback HTTP and React probes reproduced and then verified fixes for
   composed-schema validation, encoded callback credentials and provider-specific voice controls.
@@ -126,9 +153,9 @@ live provider quota, audio quality, permission groups or carrier readiness.
   editor, enable-state synchronization, 112-operation catalogue and schema fields rendered
   correctly. At 390px the settings dialog had no horizontal overflow.
 
-These checks do not establish live vendor execution, webhook ingestion, Colombian carrier
-routing, microphone behavior or a deployed connection. No key was created, no paid
-operation was sent and no production changes were made during this implementation.
+The isolated tests do not establish webhook ingestion, Colombian carrier routing or
+microphone behavior. Production verification was limited to authenticated metadata,
+discovery and readiness; paid execution remains deliberately untested.
 
 ## Primary evidence (verified 2026-11-12)
 

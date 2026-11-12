@@ -1,10 +1,11 @@
 # Reviewed Retell MCP gateway
 
-The CRM and Sara share one credential-isolated Retell gateway. This is a local
-integration, not production activation. Installing the root-owned overlay,
+The CRM and Sara share one credential-isolated Retell gateway. Production activation is an
+explicit operator step, not a side effect of an application release. Installing the root-owned overlay,
 creating its private volume/token, configuring a vendor key, and deploying it
 require separately authorized operator work. No provider account was modified,
 no call was made, and no paid vendor test was performed during implementation.
+See `RETELL.md` for the subsequent owner-authorized production activation.
 
 ## Scope and provenance
 
@@ -61,6 +62,8 @@ separate reviewed routing decision in the API, not an unchecked action parameter
   base URL, fallback host, or automatic retry is supported.
 - Each MCP exchange initializes a bounded independent session, negotiates only
   reviewed protocol versions, and uses only the three official meta-tools.
+  Authenticated invocations accept the observed `API Response (Status: 2xx):`
+  wrapper only with a complete JSON body; discovery can remain plain JSON.
   JSON and SSE RPC responses have strict IDs, duplicate-key rejection, response
   MIME/encoding limits, a 4 MiB ceiling, and a 25-second whole-call deadline.
 - Local strict JSON Schema validation closes declared objects while preserving

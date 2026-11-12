@@ -45,6 +45,22 @@ class GatewayError(Exception):
         self.status, self.code = status, code
         super().__init__(code)
 
+def report_gateway_error(error):
+    # Only controlled reason codes, never request bodies, keys or upstream messages.
+    allowed = {'provider_unavailable', 'provider_response_invalid', 'provider_operation_failed',
+               'provider_verification_failed', 'provider_protocol_changed', 'gateway_unavailable',
+               'configuration_changed', 'service_authentication_required', 'schema_changed'}
+    code = error.code if error.code in allowed else 'gateway_error'
+    print(json.dumps({'event': 'retell_gateway_error', 'code': code, 'status': error.status}), flush=True)
+
+
+def report_gateway_fault(error):
+    kind = type(error).__name__
+    # Exception class names are code metadata; never format the exception message.
+    safe = kind if re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,79}', kind) else 'unexpected'
+    print(json.dumps({'event': 'retell_gateway_fault', 'type': safe}), flush=True)
+
+
 def require(condition, code='invalid_input', status=422):
     if not condition:
         raise GatewayError(status, code)
@@ -320,7 +336,18 @@ def tool_value(result):
         content = result.get('content')
         require(isinstance(content, list) and len(content) == 1 and isinstance(content[0], dict)
                 and content[0].get('type') == 'text' and isinstance(content[0].get('text'), str), 'provider_response_invalid', 502)
-        value = json_load(content[0]['text'])
+        raw = content[0]['text']
+        # The authenticated hosted MCP wraps API results, unlike its discovery tools.
+        # Accept only the observed status envelope; never extract arbitrary embedded JSON.
+        if raw.startswith('API Response (Status: '):
+            envelope = re.fullmatch(r'API Response \(Status: (2[0-9]{2})\):\r?\n([\s\S]+)', raw)
+            require(envelope is not None, 'provider_response_invalid', 502)
+            raw = envelope[2]
+        try:
+            value = json_load(raw)
+        except (ValueError, TypeError):
+            raise GatewayError(502, 'provider_response_invalid') from None
+
     require(value is None or isinstance(value, (dict, list, str, int, float, bool)), 'provider_response_invalid', 502)
     return value
 
@@ -744,8 +771,10 @@ class Handler(BaseHTTPRequestHandler):
             require(self.path == '/state', 'not_found', 404)
             self.reply(200, self.gateway.state())
         except GatewayError as error:
+            report_gateway_error(error)
             self.reply(error.status, {'detail': error.code})
-        except Exception:  # noqa: BLE001 - private HTTP errors never expose implementation or secrets
+        except Exception as error:  # noqa: BLE001 - private HTTP errors never expose implementation or secrets
+            report_gateway_fault(error)
             self.reply(503, {'detail': 'gateway_unavailable'})
 
     def do_POST(self):
@@ -769,10 +798,13 @@ class Handler(BaseHTTPRequestHandler):
             require(match, 'not_found', 404)
             self.reply(200, self.gateway.claim(match[1], body))
         except GatewayError as error:
+            report_gateway_error(error)
             self.reply(error.status, {'detail': error.code})
-        except (ValueError, TypeError, RecursionError):
+        except (ValueError, TypeError, RecursionError) as error:
+            report_gateway_fault(error)
             self.reply(422, {'detail': 'invalid_input'})
-        except Exception:  # noqa: BLE001 - private HTTP errors never expose implementation or secrets
+        except Exception as error:  # noqa: BLE001 - private HTTP errors never expose implementation or secrets
+            report_gateway_fault(error)
             self.reply(503, {'detail': 'gateway_unavailable'})
 
 

@@ -274,6 +274,31 @@ class TransportTests(unittest.TestCase):
         with patch.object(gw, 'HTTPSConnection', Conn), self.assertRaises(gw.GatewayError):
             gw.https_rpc('k'*30, {'id': 1})
 
+    def test_live_mcp_api_response_status_envelope_is_parsed_strictly(self):
+        def rejected(code, operation):
+            with self.assertRaises(gw.GatewayError) as caught:
+                operation()
+            self.assertEqual(caught.exception.code, code)
+        for status, body in [(200, {'org_id':'org_fixture','org_name':'Fixture'}), (201, {'id':'fixture'}), (202, []), (204, None)]:
+            result = {'content': [{'type':'text','text':f'API Response (Status: {status}):\n'+json.dumps(body)}]}
+            self.assertEqual(gw.tool_value(result), body)
+        for text in ['API Response (Status: 401):\n{}', 'API Response (Status: 500):\n{}',
+                     'untrusted prefix {}', 'API Response (Status: 200):\n{} trailing']:
+            rejected('provider_response_invalid', lambda text=text: gw.tool_value({'content':[{'type':'text','text':text}]}))
+        self.assertEqual(gw.tool_value({'content':[{'type':'text','text':'{"ok":true}'}]}), {'ok':True})
+        rejected('provider_operation_failed', lambda: gw.tool_value({'isError':True,'content':[{'type':'text','text':'API Response (Status: 200):\n{}'}]}))
+
+    def test_diagnostic_events_never_include_provider_payloads(self):
+        with patch('builtins.print') as output:
+            gw.report_gateway_error(gw.GatewayError(502, 'provider_verification_failed'))
+            gw.report_gateway_error(gw.GatewayError(502, 'key_' + 's'*40))
+            gw.report_gateway_fault(ValueError('key_' + 's'*40))
+        rows = [json.loads(call.args[0]) for call in output.call_args_list]
+        self.assertEqual(rows[0], {'event': 'retell_gateway_error', 'code': 'provider_verification_failed', 'status': 502})
+        self.assertEqual(rows[1]['code'], 'gateway_error')
+        self.assertEqual(rows[2], {'event': 'retell_gateway_fault', 'type': 'ValueError'})
+        self.assertNotIn('s'*40, str(output.call_args_list))
+
     def test_http_wrong_auth_no_routes_reached(self):
         tmp = tempfile.TemporaryDirectory()
         token = Path(tmp.name) / 'token'
