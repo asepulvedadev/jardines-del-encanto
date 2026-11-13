@@ -1,0 +1,597 @@
+/* Agent studio: a wide editing surface, not a stacked settings form. */
+.voice-studio-dialog {
+  width: calc(100vw - 24px);
+  max-width: 1920px;
+  height: calc(100dvh - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+  border-radius: 14px;
+}
+.voice-studio-dialog > .voice-dialog-body {
+  padding: 0;
+  height: 100%;
+}
+.voice-agent-studio {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #f6f7f1;
+  color: #062619;
+  font-size: 14px;
+}
+.voice-agent-studio button {
+  font-size: 13px;
+}
+.voice-studio-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 68px;
+  padding: 10px 18px;
+  background: #fff;
+  border-bottom: 1px solid #d9e1d5;
+}
+.voice-studio-back {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #d9e1d5;
+  border-radius: 8px;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.voice-studio-back svg {
+  transform: rotate(180deg);
+}
+.voice-studio-identity {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.crm-shell .voice-studio-identity input {
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #062619;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+}
+.voice-studio-identity span {
+  font-size: 12px;
+  color: #526056;
+}
+.voice-studio-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.voice-studio-header-actions .crm-button {
+  min-height: 40px;
+  padding: 8px 12px;
+}
+.voice-studio-tabs {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 24px;
+  background: #fff;
+  border-bottom: 1px solid #d9e1d5;
+}
+.voice-studio-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #526056;
+  background: transparent;
+  min-height: 48px;
+  padding: 10px 3px;
+  font-weight: 600;
+}
+.voice-studio-tabs button[aria-current] {
+  color: #062619;
+  border-bottom-color: #507010;
+}
+.voice-studio-columns {
+  display: grid;
+  grid-template-columns: minmax(350px, 1.6fr) minmax(290px, 1fr) minmax(
+      250px,
+      0.85fr
+    );
+  gap: 8px;
+  padding: 8px;
+  min-height: 0;
+  flex: 1;
+}
+.voice-studio-writing,
+.voice-studio-settings,
+.voice-studio-testing {
+  min-width: 0;
+  min-height: 0;
+}
+.voice-studio-writing,
+.voice-studio-columns > .voice-studio-settings,
+.voice-studio-testing {
+  border: 1px solid #d9e1d5;
+  border-radius: 12px;
+  background: #fff;
+  overflow: auto;
+}
+.voice-studio-writing {
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px 16px;
+  gap: 14px;
+}
+.voice-studio-metadata {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #526056;
+  min-height: 40px;
+  border-bottom: 1px solid #d9e1d5;
+  font-size: 12px;
+}
+.voice-studio-metadata details {
+  position: relative;
+}
+.voice-studio-metadata code {
+  position: absolute;
+  right: 0;
+  top: 28px;
+  z-index: 3;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #7b897e;
+  overflow-wrap: anywhere;
+  max-width: 260px;
+}
+.voice-studio-toolbar {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.voice-studio-chip {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 110px;
+  color: #526056;
+  font-size: 11px;
+}
+.voice-studio-chip select {
+  width: 100%;
+  min-width: 0;
+  background: #f6f7f1;
+  border: 1px solid #d9e1d5;
+  border-radius: 7px;
+  color: #062619;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  min-height: 42px;
+  padding: 7px;
+}
+.voice-studio-model-menu {
+  flex: 1 1 140px;
+  font-size: 13px;
+  min-width: 0;
+}
+.voice-studio-model-menu > summary {
+  cursor: pointer;
+  background: #eef3e8;
+  padding: 12px;
+  border-radius: 7px;
+}
+.voice-studio-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.voice-studio-prompt {
+  flex: 1 0 300px;
+}
+.voice-studio-field-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.voice-studio-text textarea {
+  width: 100%;
+  min-height: 84px;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+  color: #062619;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.7;
+  resize: vertical;
+}
+.voice-studio-prompt textarea {
+  flex: 1;
+  min-height: 290px;
+  resize: none;
+}
+.voice-studio-link {
+  border: 0;
+  color: #507010;
+  padding: 4px;
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  min-height: 32px;
+}
+.voice-studio-columns > .voice-studio-settings {
+  padding: 0 14px;
+}
+.voice-studio-accordion {
+  border-bottom: 1px solid #d9e1d5;
+}
+.voice-studio-accordion > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 17px 0;
+  min-height: 56px;
+  font-weight: 600;
+}
+.voice-studio-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+.voice-studio-accordion > summary > span {
+  flex: 1;
+}
+.voice-studio-accordion > summary > svg {
+  flex-shrink: 0;
+  color: #526056;
+}
+.voice-studio-accordion > summary > svg:last-child {
+  width: 14px;
+  transform: rotate(90deg);
+}
+.voice-studio-accordion[open] > summary > svg:last-child {
+  transform: rotate(-90deg);
+}
+.voice-studio-settings .voice-schema-editor,
+.voice-studio-welcome-settings .voice-schema-editor,
+.voice-studio-model-menu .voice-schema-editor {
+  margin: 0;
+  gap: 0;
+}
+.voice-studio-settings .voice-schema-editor > header,
+.voice-studio-settings .voice-schema-editor > label,
+.voice-studio-settings .voice-schema-editor > input,
+.voice-studio-settings .voice-schema-section-title,
+.voice-studio-welcome-settings .voice-schema-editor > header,
+.voice-studio-welcome-settings .voice-schema-editor > label,
+.voice-studio-welcome-settings .voice-schema-editor > input,
+.voice-studio-welcome-settings .voice-schema-section-title,
+.voice-studio-model-menu .voice-schema-editor > header,
+.voice-studio-model-menu .voice-schema-editor > label,
+.voice-studio-model-menu .voice-schema-editor > input {
+  display: none;
+}
+.voice-studio-settings .voice-schema-sections,
+.voice-studio-welcome-settings .voice-schema-sections {
+  gap: 0;
+}
+.voice-studio-settings .voice-schema-section,
+.voice-studio-welcome-settings .voice-schema-section {
+  border: 0;
+  border-radius: 0;
+}
+.voice-studio-settings .voice-schema-section-content,
+.voice-studio-welcome-settings .voice-schema-section-content {
+  padding: 0;
+}
+.voice-studio-settings .voice-schema-row {
+  padding: 13px 0;
+  gap: 8px;
+}
+.voice-studio-settings .voice-schema-row h5 {
+  font-size: 13px;
+  font-weight: 600;
+}
+.voice-studio-settings .voice-schema-row p {
+  font-size: 12px;
+}
+.voice-studio-settings .voice-schema-row .crm-button,
+.voice-studio-welcome-settings .voice-schema-row .crm-button {
+  background: #fff;
+  color: #062619;
+  border: 1px solid #7b897e;
+  min-height: 36px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+.voice-studio-settings .voice-schema-row .voice-editor-actions {
+  flex-direction: column;
+  align-items: flex-end;
+}
+.voice-studio-settings .voice-schema-row .voice-editor-actions .crm-button {
+  justify-self: end;
+}
+.voice-studio-testing {
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+}
+.voice-studio-testing > nav,
+.voice-studio-simulation > nav {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #d9e1d5;
+  padding-bottom: 12px;
+}
+.voice-studio-testing nav button,
+.voice-studio-simulation nav button {
+  min-height: 40px;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #526056;
+  border-radius: 7px;
+}
+.voice-studio-testing nav button[aria-pressed="true"],
+.voice-studio-simulation nav button[aria-pressed="true"] {
+  border-color: #d9e1d5;
+  color: #062619;
+  background: #eef3e8;
+}
+.voice-studio-test-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  padding: 24px 8px;
+}
+.voice-studio-test-content > svg {
+  color: #7b897e;
+}
+.voice-studio-test-content h3 {
+  font-size: 16px;
+  margin: 0;
+}
+.voice-studio-test-content p {
+  font-size: 13px;
+  color: #526056;
+  margin: 0;
+  line-height: 1.65;
+}
+.voice-studio-test-content > span {
+  font-size: 12px;
+}
+.voice-studio-test-content label {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+}
+.voice-studio-test-content textarea {
+  width: 100%;
+  min-height: 120px;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  padding: 10px;
+  font: inherit;
+}
+.voice-studio-notice {
+  padding: 10px 20px;
+  margin: 0;
+  background: #fff4db;
+  color: #855708;
+  font-size: 13px;
+}
+.voice-studio-notice button {
+  margin-inline-start: 10px;
+}
+.voice-studio-workflow {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: 1fr 0.8fr 1.4fr;
+  gap: 20px;
+  padding: 28px;
+}
+.voice-studio-phase {
+  background: #fff;
+  border: 1px solid #d9e1d5;
+  border-radius: 12px;
+  padding: 20px;
+  min-width: 0;
+}
+.voice-studio-phase-marker {
+  display: inline-grid;
+  place-items: center;
+  padding: 10px;
+  background: #eef3e8;
+  border-radius: 8px;
+}
+.voice-studio-phase h3 {
+  font-size: 17px;
+}
+.voice-studio-phase p {
+  line-height: 1.6;
+  color: #526056;
+}
+.voice-studio-simulation {
+  padding: 24px;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+.voice-studio-simulation > header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 20px;
+}
+.voice-studio-simulation h3 {
+  font-size: 20px;
+  margin: 0 auto 0 0;
+}
+.voice-studio-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+  padding: 64px 20px;
+  text-align: center;
+}
+.voice-studio-empty h4,
+.voice-studio-empty p {
+  margin: 0;
+}
+.voice-studio-case-list article {
+  padding: 18px;
+  background: #fff;
+  border-bottom: 1px solid #d9e1d5;
+  overflow-wrap: anywhere;
+}
+.voice-studio-case-list .crm-button {
+  margin: 4px;
+}
+.voice-studio-action-dialog {
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  border: 1px solid #7b897e;
+  border-radius: 14px;
+  padding: 24px;
+  color: #062619;
+  background: #fff;
+}
+.voice-studio-action-dialog::backdrop {
+  background: rgb(6 38 25 / 35%);
+}
+.voice-studio-action-dialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #d9e1d5;
+  padding-bottom: 16px;
+}
+.voice-studio-action-dialog h3 {
+  font-size: 19px;
+}
+.voice-agent-studio
+  :is(button, input, textarea, select, summary):focus-visible {
+  outline: 2px solid #507010;
+  outline-offset: 3px;
+}
+@media (max-width: 1100px) {
+  .voice-studio-columns {
+    grid-template-columns: minmax(330px, 1.3fr) minmax(280px, 1fr);
+    overflow: auto;
+  }
+  .voice-studio-testing {
+    grid-column: 1/-1;
+    min-height: 320px;
+  }
+  .voice-studio-writing,
+  .voice-studio-columns > .voice-studio-settings {
+    overflow: visible;
+  }
+  .voice-studio-workflow {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .voice-studio-dialog {
+    width: calc(100vw - 8px);
+    height: calc(100dvh - 8px);
+    max-height: calc(100dvh - 8px);
+  }
+  .voice-studio-header {
+    padding: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .voice-studio-identity {
+    flex-basis: calc(100% - 52px);
+  }
+  .voice-studio-header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .voice-studio-tabs {
+    gap: 12px;
+    padding: 0 12px;
+  }
+  .voice-studio-tabs button {
+    font-size: 12px;
+  }
+  .voice-studio-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .voice-studio-writing {
+    min-height: 600px;
+  }
+  .voice-studio-testing {
+    grid-column: auto;
+  }
+  .voice-studio-settings .voice-schema-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .voice-studio-simulation,
+  .voice-studio-workflow {
+    padding: 12px;
+  }
+  .voice-studio-action-dialog {
+    width: calc(100vw - 16px);
+    padding: 16px;
+    max-height: calc(100dvh - 24px);
+  }
+  .voice-studio-action-dialog > header {
+    flex-wrap: wrap;
+  }
+}
+
+.voice-studio-dialog > .voice-dialog-heading[hidden] {
+  display: none;
+}
+/* Stacked/tablet panels size to their content, never overlap adjacent panels. */
+@media (max-width: 1100px) {
+  .voice-studio-columns {
+    grid-auto-rows: max-content;
+    align-items: start;
+  }
+  .voice-studio-writing {
+    height: auto;
+  }
+  .voice-studio-prompt {
+    flex: none;
+  }
+  .voice-studio-prompt textarea {
+    flex: none;
+    height: 340px;
+  }
+}

@@ -417,3 +417,60 @@ test("explicit full speech-to-speech model configuration does not require the co
     },
   });
 });
+
+test("direct complete prompt editing is dirty-only and incomplete/blocked writes are rejected", () => {
+  const current = {
+    llm_id: "l",
+    general_prompt: "Full prompt",
+    begin_message: "Hello",
+  };
+  const schema = schemas.updateRetellLLM;
+  const safety = { completeFields: ["general_prompt", "begin_message"] };
+  assert.throws(
+    () =>
+      voiceEditorArguments(
+        "instructions",
+        schema,
+        current,
+        { general_prompt: "Full prompt", begin_message: "Hello" },
+        { general_prompt: true, begin_message: true },
+        {},
+        safety,
+      ),
+    /cambios/i,
+  );
+  assert.deepEqual(
+    voiceEditorArguments(
+      "instructions",
+      schema,
+      current,
+      { general_prompt: "Edited full prompt" },
+      { general_prompt: true },
+      {},
+      safety,
+    ).arguments.requestBody,
+    { general_prompt: "Edited full prompt" },
+  );
+  assert.throws(() =>
+    voiceEditorArguments(
+      "instructions",
+      schema,
+      current,
+      { general_prompt: "edited" },
+      { general_prompt: true },
+      {},
+      { completeFields: [] },
+    ),
+  );
+  assert.throws(() =>
+    voiceEditorArguments(
+      "instructions",
+      schema,
+      current,
+      { general_prompt: "edited" },
+      { general_prompt: true },
+      {},
+      { ...safety, blockedFields: { general_prompt: "sensitive" } },
+    ),
+  );
+});

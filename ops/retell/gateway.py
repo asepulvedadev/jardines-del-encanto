@@ -6,6 +6,7 @@ import hmac
 import io
 import ipaddress
 import json
+import math
 import os
 import re
 import socket
@@ -491,6 +492,114 @@ def safe_output(value, key=None, secrets=(), depth=0, budget=None):
     return '[unsupported]'
 
 
+EDITOR_READS = {'getAgent': ('updateAgent', 'agent_id'), 'getRetellLLM': ('updateRetellLLM', 'llm_id')}
+EDITOR_LIMIT = 96 * 1024
+
+
+def editor_properties(schema):
+    """Collect reviewed allOf mixin properties without opening unknown objects."""
+    output = dict(schema.get('properties', {}))
+    for branch in schema.get('allOf', []):
+        for name, value in editor_properties(branch).items():
+            output[name] = {'allOf': [output[name], value]} if name in output else value
+    return output
+
+
+def editor_nullable_schema(value):
+    """Translate OpenAPI nullable for value validation, preserving every constraint."""
+    if isinstance(value, list):
+        return [editor_nullable_schema(child) for child in value]
+    if not isinstance(value, dict):
+        return value
+    output = {key: editor_nullable_schema(child) for key, child in value.items() if key != 'nullable'}
+    return {'anyOf': [output, {'type': 'null'}]} if value.get('nullable') is True else output
+
+
+def editor_check(value, secrets=(), depth=0, nodes=None):
+    """Reject an entire root, never redact or truncate an editable value."""
+    nodes = [0] if nodes is None else nodes
+    nodes[0] += 1
+    require(depth <= 20 and nodes[0] <= 3000, 'editor_field_too_complex')
+    if isinstance(value, dict):
+        require(len(value) <= 200, 'editor_field_too_complex')
+        for name, child in value.items():
+            require(isinstance(name, str) and len(name) <= 120, 'editor_field_invalid')
+            normalized = re.sub(r'[^a-z0-9]', '', name.casefold())
+            require(name not in {'__proto__', 'constructor', 'prototype'}
+                    and not SENSITIVE.search(name) and not SENSITIVE.search(normalized)
+                    and normalized not in {'key', 'sig', 'sas', 'signature', 'proto', 'constructor', 'prototype'}, 'editor_field_private')
+            require(not SECRET_VALUE.search(name) and all(not secret or secret not in name for secret in secrets), 'editor_field_private')
+            editor_check(child, secrets, depth + 1, nodes)
+    elif isinstance(value, list):
+        require(len(value) <= 100, 'editor_field_too_complex')
+        for child in value:
+            editor_check(child, secrets, depth + 1, nodes)
+    elif isinstance(value, str):
+        require(len(value) <= 16000 and '\x00' not in value, 'editor_field_too_large')
+        require(not SECRET_VALUE.search(value) and all(not secret or secret not in value for secret in secrets), 'editor_field_private')
+        normalized = value.translate({9: None, 10: None, 13: None}).strip()
+        # Parse URL-shaped text with the same whitespace normalization as browsers.
+        # Do not rewrite accepted values: any private/invalid URL blocks the whole root.
+        candidates = re.findall('(?:https?|wss?):[^\\s<>"\']+|//[^\\s<>"\']+|\\\\\\\\[^\\s<>"\']+', normalized, re.IGNORECASE)
+        for candidate in candidates:
+            parsed_candidate = candidate.replace('\\', '/')
+            if parsed_candidate.startswith('//'):
+                parsed_candidate = 'https:' + parsed_candidate
+            try:
+                validate_url(parsed_candidate)
+                parts = urlsplit(parsed_candidate)
+                for name, _query_value in parse_qsl(parts.query, keep_blank_values=True, max_num_fields=100):
+                    key = re.sub(r'[^a-z0-9]', '', name.casefold())
+                    require(not SENSITIVE.search(key) and not re.search(r'signature|accesskey|privatekey', key)
+                            and key not in {'key', 'sig', 'sas'}, 'editor_field_private')
+            except (GatewayError, ValueError, TypeError):
+                raise GatewayError(422, 'editor_field_private') from None
+
+    else:
+        require(value is None or type(value) in {bool, int, float}, 'editor_field_invalid')
+        require(not isinstance(value, float) or math.isfinite(value), 'editor_field_invalid')
+
+
+def editor_projection(endpoint, arguments, result, secrets=()):
+    require(endpoint in EDITOR_READS and isinstance(result, dict), 'editor_response_invalid', 502)
+    update, identity = EDITOR_READS[endpoint]
+    require(result.get(identity) == arguments.get(identity), 'editor_identity_changed', 502)
+    if 'version' in arguments:
+        require(type(result.get('version')) is int and result['version'] == arguments['version'], 'editor_version_changed', 502)
+    output = {identity: result[identity]}
+    if 'version' in result and result['version'] is not None:
+        require(type(result['version']) is int and 0 <= result['version'] <= 2**53 - 1, 'editor_version_changed', 502)
+        output['version'] = result['version']
+    body = editor_properties(input_schema(update))['requestBody']
+    properties = editor_properties(body)
+    complete, blocked = [], {}
+    for name, field in properties.items():
+        if SENSITIVE.search(name) or field.get('readOnly') is True:
+            blocked[name] = 'editor_field_private'
+            continue
+        if name not in result:
+            complete.append(name)
+            continue
+        value = result[name]
+        try:
+            editor_check(value, secrets)
+            require(next(Draft202012Validator(editor_nullable_schema(field), format_checker=FormatChecker()).iter_errors(value), None) is None, 'editor_field_schema_mismatch')
+            # Include metadata overhead while enforcing a whole-field total response budget.
+            candidate = {'status': 'completed', 'endpoint': endpoint,
+                         'data': {**output, name: value},
+                         'editor': {'complete_fields': list(properties), 'blocked_fields': {key: 'editor_field_too_large' for key in properties}}}
+            require(len(canonical(candidate).encode()) <= EDITOR_LIMIT, 'editor_field_too_large')
+        except GatewayError as error:
+            blocked[name] = error.code if error.code in {'editor_field_private', 'editor_field_too_large', 'editor_field_too_complex', 'editor_field_invalid', 'editor_field_schema_mismatch'} else 'editor_field_invalid'
+            continue
+        output[name] = copy.deepcopy(value)
+        complete.append(name)
+    response = {'status': 'completed', 'endpoint': endpoint, 'data': output,
+                'editor': {'complete_fields': complete, 'blocked_fields': blocked}}
+    require(len(canonical(response).encode()) <= EDITOR_LIMIT, 'editor_response_invalid', 502)
+    return response
+
+
 class PrivateStore:
     """Private fsynced state and tombstones; reservations survive key replacement."""
     def __init__(self, directory):
@@ -671,7 +780,11 @@ class Gateway:
         return {'revision': data['revision'], 'endpoint': endpoint, 'schema_hash': schema_hash(endpoint),
                 'requires_consent': metadata['risk'] != 'read', 'risk': metadata['risk']}
 
-    def execute(self, body):
+    def editor_read(self, body):
+        require(isinstance(body, dict) and body.get('endpoint') in EDITOR_READS, 'editor_endpoint_denied', 422)
+        return self.execute(body, _editor=True)
+
+    def execute(self, body, *, _editor=False):
         fields(body, {'revision', 'endpoint', 'arguments', 'request_id', 'expected_schema_hash', 'consent_confirmed'})
         identifier = request_id(body['request_id'])
         require(type(body['consent_confirmed']) is bool)
@@ -697,6 +810,8 @@ class Gateway:
             # approved operation. All read invocations are reserved too.
             try:
                 result = self.transport(key, 'invoke_api_endpoint', {'endpoint': endpoint, 'arguments': body['arguments']})
+                if _editor:
+                    return editor_projection(endpoint, body['arguments'], result, secrets=(key,))
                 if endpoint == 'createWebCall':
                     require(isinstance(result, dict) and isinstance(result.get('access_token'), str)
                             and 1 <= len(result['access_token']) <= 8192, 'provider_response_invalid', 502)
@@ -711,6 +826,10 @@ class Gateway:
                 if len(canonical(output).encode()) > 96 * 1024:
                     output = {'truncated': True, 'message': 'Provider result exceeded the safe response limit.'}
                 return {'status': 'completed', 'endpoint': endpoint, 'data': output}
+            except GatewayError:
+                if _editor:
+                    raise
+                return {'status': 'external_outcome_unconfirmed', 'endpoint': endpoint, 'retryable': False}
             except Exception:  # noqa: BLE001 - a reserved dispatch is never retried after an unknown outcome
                 return {'status': 'external_outcome_unconfirmed', 'endpoint': endpoint, 'retryable': False}
 
@@ -791,7 +910,8 @@ class Handler(BaseHTTPRequestHandler):
             body = json_load(raw)
             routes = {'/configure': self.gateway.configure, '/disconnect': self.gateway.disconnect,
                       '/catalog': self.gateway.catalog, '/schema': self.gateway.schema,
-                      '/prepare': self.gateway.prepare, '/execute': self.gateway.execute}
+                      '/prepare': self.gateway.prepare, '/execute': self.gateway.execute,
+                      '/editor-read': self.gateway.editor_read}
             if self.path in routes:
                 return self.reply(200, routes[self.path](body))
             match = re.fullmatch(r'/sessions/([0-9a-f-]{36})/claim', self.path)

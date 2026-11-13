@@ -223,3 +223,87 @@ test("actual webhook schema rejects private URLs after URL parser whitespace nor
     { webhook_url: "https://example.com/hook" },
   );
 });
+
+test("only validated complete roots hydrate native drafts, including known-absent roots", () => {
+  const { voiceHydrateField } = module.exports;
+  const schema = body("updateAgent");
+  const current = {
+    boosted_keywords: ["Complete", "List"],
+    language: ["es-419", "en-US"],
+    call_screening_option: null,
+    voice_speed: 1,
+  };
+  assert.equal(
+    voiceHydrateField(schema, "boosted_keywords", current, []).editable,
+    false,
+  );
+  const full = voiceHydrateField(schema, "boosted_keywords", current, [
+    "boosted_keywords",
+  ]);
+  assert(full.editable);
+  assert.equal(full.draft.items[0].raw, "Complete");
+  assert.deepEqual(
+    voiceSchemaPatch(schema, { boosted_keywords: full.draft }, current, [
+      "boosted_keywords",
+    ]),
+    {},
+  );
+  assert(voiceHydrateField(schema, "language", current, ["language"]).editable);
+  assert.equal(
+    voiceHydrateField(schema, "call_screening_option", current, [
+      "call_screening_option",
+    ]).draft.null,
+    true,
+  );
+  assert(
+    voiceHydrateField(schema, "webhook_url", current, ["webhook_url"]).editable,
+  );
+  assert.equal(
+    voiceHydrateField(schema, "voice_speed", { voice_speed: "1" }, [
+      "voice_speed",
+    ]).editable,
+    false,
+  );
+  assert.equal(
+    voiceHydrateField(
+      schema,
+      "boosted_keywords",
+      current,
+      ["boosted_keywords"],
+      { boosted_keywords: "sensitive" },
+    ).editable,
+    false,
+  );
+  assert.equal(
+    voiceHydrateField(
+      schema,
+      "webhook_url",
+      { webhook_url: "https://u:p@example.com" },
+      ["webhook_url"],
+    ).editable,
+    false,
+  );
+});
+
+test("hydration fails closed for private/prototype dictionary keys and never changes prototypes", () => {
+  const { voiceHydrateField } = module.exports;
+  const schema = {
+    properties: {
+      variables: { type: "object", additionalProperties: { type: "string" } },
+    },
+  };
+  for (const key of [
+    "__proto__",
+    "constructor",
+    "prototype",
+    "authorization",
+  ]) {
+    const variables = JSON.parse(`{"${key}":"must not hydrate"}`);
+    assert.equal(
+      voiceHydrateField(schema, "variables", { variables }, ["variables"])
+        .editable,
+      false,
+    );
+  }
+  assert.equal({}.polluted, undefined);
+});

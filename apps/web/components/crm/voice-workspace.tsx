@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { ActionOutput, ActionResultDetails } from "./hermes-panel";
 import { RetellPanel } from "./retell-panel";
 import { VoiceAgentEditor } from "./voice-agent-editor";
+import { VoiceAgentStudio } from "./voice-agent-studio";
+import type { StudioSnapshot } from "./voice-agent-studio-model";
 import type { RetellSchema } from "./retell-schema";
 import type { ActionResult, SettingsRequest } from "./settings-types";
 import { voiceRequest } from "./voice-request";
@@ -34,8 +36,20 @@ type Operation = {
 };
 type Catalog = { revision: number; operations: Operation[] };
 type Modal =
+  | {
+      kind: "studio";
+      agent: StudioSnapshot;
+      instructions?: StudioSnapshot;
+      warning?: string;
+      generation: number;
+    }
   | { kind: "operation"; endpoint: string; arguments: VoiceRecord }
-  | { kind: "agent" | "instructions"; record?: VoiceRecord }
+  | {
+      kind: "agent" | "instructions";
+      record?: VoiceRecord;
+      completeFields?: string[];
+      blockedFields?: Record<string, string>;
+    }
   | { kind: "review"; output: ActionResult }
   | { kind: "details"; result: VoiceRecord };
 type Inventory = {
@@ -78,6 +92,21 @@ export function VoiceWorkspace({
     [approvalBusy, setApprovalBusy] = useState(false),
     [error, setError] = useState("");
   const [modal, setModal] = useState<Modal | null>(null);
+  const studioGeneration = useRef(0);
+  const studioLockOwner = useRef<symbol | null>(null);
+  const studioPending = useCallback((value: boolean, owner: symbol) => {
+    if (value) {
+      if (lock.current && studioLockOwner.current !== owner)
+        throw new Error("Hay una solicitud en curso.");
+      studioLockOwner.current = owner;
+      lock.current = true;
+      setBusy(true);
+    } else if (studioLockOwner.current === owner) {
+      studioLockOwner.current = null;
+      lock.current = false;
+      setBusy(false);
+    }
+  }, []);
   const dialog = useRef<HTMLDialogElement>(null),
     lock = useRef(false),
     alive = useRef(false),
@@ -262,18 +291,157 @@ export function VoiceWorkspace({
       arguments: args,
     });
   }
-  async function editor(kind: "agent" | "instructions", record?: VoiceRecord) {
+  async function readEditor(
+    kind: "agent" | "instructions",
+    id: string,
+    version?: unknown,
+  ) {
+    if (!state || !enabled)
+      throw new Error("Esta consulta no está disponible.");
+    const result = await request<VoiceRecord>("retell/editor", "POST", {
+      revision: state.revision,
+      kind,
+      id,
+      ...(version != null ? { version } : {}),
+    });
+    const key = kind === "agent" ? "agent_id" : "llm_id";
+    const endpoint = kind === "agent" ? "getAgent" : "getRetellLLM";
+    const metadata = result.editor;
+    if (
+      result.provider !== "retell" ||
+      result.status !== "completed" ||
+      result.endpoint !== endpoint ||
+      !object(result.data) ||
+      result.data[key] !== id ||
+      (version != null && result.data.version !== version) ||
+      !object(metadata) ||
+      !Array.isArray(metadata.complete_fields) ||
+      !metadata.complete_fields.every((field) => typeof field === "string") ||
+      !object(metadata.blocked_fields) ||
+      !Object.values(metadata.blocked_fields).every(
+        (reason) => typeof reason === "string",
+      )
+    )
+      throw new Error(
+        "No se pudo verificar la lectura completa de la configuración. No se habilitó la edición.",
+      );
+    return {
+      data: result.data,
+      completeFields: metadata.complete_fields as string[],
+      blockedFields: metadata.blocked_fields as Record<string, string>,
+    };
+  }
+  async function agentStudio(record: VoiceRecord) {
+    await task(async () => {
+      if (!state || !enabled) return;
+      const run = epoch.current;
+      const agent = await readEditor("agent", text(record.agent_id));
+      if (!alive.current || run !== epoch.current) return;
+      const engine = agent.data.response_engine;
+      let instructions: StudioSnapshot | undefined;
+      let warning: string | undefined;
+      if (
+        object(engine) &&
+        engine.type === "retell-llm" &&
+        text(engine.llm_id)
+      ) {
+        try {
+          instructions = await readEditor(
+            "instructions",
+            text(engine.llm_id),
+            engine.version,
+          );
+        } catch {
+          warning =
+            "No se pudieron cargar las instrucciones completas. Los ajustes seguros del agente siguen disponibles.";
+        }
+      } else {
+        warning =
+          object(engine) && engine.type === "conversation-flow"
+            ? "Este agente usa un flujo de conversación. El prompt de Retell LLM no está disponible; el motor no se convertirá."
+            : "Este agente no tiene instrucciones Retell LLM editables. Su motor se conserva sin cambios.";
+      }
+      if (!alive.current || run !== epoch.current) return;
+      const definitions = await Promise.all(
+        schemaEndpoints.map(async (endpoint) => {
+          const result = await request<{ input_schema: RetellSchema }>(
+            "retell/schema",
+            "POST",
+            { revision: state.revision, endpoint },
+          );
+          return [endpoint, result.input_schema] as const;
+        }),
+      );
+      if (!alive.current || run !== epoch.current) return;
+      setSchemas(Object.fromEntries(definitions));
+      setModal({
+        kind: "studio",
+        agent,
+        instructions,
+        warning,
+        generation: ++studioGeneration.current,
+      });
+    });
+  }
+  async function editor(
+    kind: "agent" | "instructions",
+    record?: VoiceRecord,
+    fromAgent = false,
+  ) {
+    if (record?.agent_id && (kind === "agent" || fromAgent)) {
+      await agentStudio(record);
+      return;
+    }
     await task(async () => {
       if (!state || !enabled) return;
       const run = epoch.current;
       let currentRecord = record;
-      if (record) {
-        const endpoint = kind === "agent" ? "getAgent" : "getRetellLLM";
+      let completeFields: string[] | undefined;
+      let blockedFields: Record<string, string> | undefined;
+      if (fromAgent) {
+        const agentId = text(record?.agent_id);
+        const result = await readEditor("agent", agentId);
+        if (!object(result.data) || result.data.agent_id !== agentId)
+          throw new Error(
+            "No se pudo verificar el agente. No se abrió ningún prompt.",
+          );
+        if (!alive.current || run !== epoch.current) return;
+        const engine = result.data.response_engine;
+        if (
+          !object(engine) ||
+          engine.type !== "retell-llm" ||
+          !text(engine.llm_id)
+        )
+          throw new Error(
+            object(engine) && engine.type === "conversation-flow"
+              ? "Este agente usa un flujo de conversación. Su comportamiento se edita en Flujos."
+              : "Este agente no tiene un prompt de Retell LLM vinculado.",
+          );
+        if (
+          engine.version != null &&
+          (!Number.isSafeInteger(engine.version) || Number(engine.version) < 0)
+        )
+          throw new Error(
+            "No se pudo verificar la versión de las instrucciones.",
+          );
+        currentRecord = {
+          llm_id: engine.llm_id,
+          ...(engine.version != null ? { version: engine.version } : {}),
+        };
+      }
+      if (currentRecord) {
         const key = kind === "agent" ? "agent_id" : "llm_id";
-        const result = await readResource(endpoint, { [key]: record[key] });
-        if (object(result.data)) currentRecord = { ...record, ...result.data };
-        if (alive.current && run === epoch.current)
-          setSnapshots((old) => mergeConfirmed(old, result, state.revision));
+        const target = currentRecord;
+        const result = await readEditor(
+          kind,
+          text(target[key]),
+          fromAgent ? target.version : undefined,
+        );
+        if (!alive.current || run !== epoch.current) return;
+        // Full editor records stay in this modal, never in the partial inventory cache.
+        currentRecord = result.data;
+        completeFields = result.completeFields;
+        blockedFields = result.blockedFields;
       }
       const definitions = await Promise.all(
         schemaEndpoints.map(async (endpoint) => {
@@ -287,7 +455,12 @@ export function VoiceWorkspace({
       );
       if (alive.current && run === epoch.current) {
         setSchemas(Object.fromEntries(definitions));
-        setModal({ kind, record: currentRecord });
+        setModal({
+          kind,
+          record: currentRecord,
+          completeFields,
+          blockedFields,
+        });
       }
     });
   }
@@ -602,26 +775,20 @@ export function VoiceWorkspace({
                         Editar agente
                       </button>
                     )}
-                    {sectionKey === "agents" &&
-                      object(row.response_engine) &&
-                      text(row.response_engine.llm_id) && (
-                        <button
-                          className="crm-button crm-secondary"
-                          disabled={!enabled || busy}
-                          onClick={() => {
-                            const id = object(row.response_engine)
-                              ? text(row.response_engine.llm_id)
-                              : "";
-                            const model = models.find(
-                              (item) => item.llm_id === id,
-                            );
-                            if (model) void editor("instructions", model);
-                            else void editor("instructions", { llm_id: id });
-                          }}
-                        >
-                          Instrucciones
-                        </button>
-                      )}
+                    {sectionKey === "agents" && (
+                      <button
+                        className="crm-button crm-secondary"
+                        disabled={
+                          !enabled ||
+                          busy ||
+                          !operation("getAgent")?.available ||
+                          !operation("getRetellLLM")?.available
+                        }
+                        onClick={() => void editor("instructions", row, true)}
+                      >
+                        Prompt del agente
+                      </button>
+                    )}
                     {sectionKey === "models" && (
                       <button
                         className="crm-button crm-secondary"
@@ -669,22 +836,33 @@ export function VoiceWorkspace({
       )}
       <dialog
         ref={dialog}
-        className="voice-dialog"
+        className={
+          modal?.kind === "studio"
+            ? "voice-dialog voice-studio-dialog"
+            : "voice-dialog"
+        }
         aria-labelledby="voice-dialog-title"
         onCancel={(event) => {
           event.preventDefault();
           close();
         }}
       >
-        <header className="voice-dialog-heading">
+        <header
+          className="voice-dialog-heading"
+          hidden={modal?.kind === "studio"}
+        >
           <h2 id="voice-dialog-title">
-            {modal?.kind === "review"
-              ? "Revisar acción"
-              : modal?.kind === "operation"
-                ? "Función de Retell"
-                : modal?.kind === "details"
-                  ? "Detalle de Retell"
-                  : "Configuración del agente"}
+            {modal?.kind === "studio"
+              ? "Editor del agente"
+              : modal?.kind === "review"
+                ? "Revisar acción"
+                : modal?.kind === "operation"
+                  ? "Función de Retell"
+                  : modal?.kind === "details"
+                    ? "Detalle de Retell"
+                    : modal?.kind === "instructions"
+                      ? "Prompt e instrucciones"
+                      : "Configuración del agente"}
           </h2>
           <button
             type="button"
@@ -697,6 +875,28 @@ export function VoiceWorkspace({
           </button>
         </header>
         <div className="voice-dialog-body">
+          {active && modal?.kind === "studio" && state && (
+            <VoiceAgentStudio
+              key={modal.generation}
+              agent={modal.agent}
+              instructions={modal.instructions}
+              warning={modal.warning}
+              schemas={schemas}
+              voices={voices}
+              models={models}
+              revision={state.revision}
+              available={(catalog?.operations ?? [])
+                .filter((item) => item.available)
+                .map((item) => item.endpoint)}
+              request={request}
+              busy={busy || approvalBusy}
+              onPendingChange={studioPending}
+              onClose={close}
+              onReload={() => void agentStudio(modal.agent.data)}
+              onChanged={changed}
+              onResult={confirmed}
+            />
+          )}
           {active && modal?.kind === "details" && (
             <ActionResultDetails
               result={modal.result}
@@ -725,6 +925,8 @@ export function VoiceWorkspace({
                 key={`${modal.kind}:${text(modal.record?.agent_id) || text(modal.record?.llm_id) || "new"}:${text(modal.record?.version)}`}
                 kind={modal.kind}
                 record={modal.record}
+                completeFields={modal.completeFields}
+                blockedFields={modal.blockedFields}
                 schemas={schemas}
                 voices={voices}
                 models={models}

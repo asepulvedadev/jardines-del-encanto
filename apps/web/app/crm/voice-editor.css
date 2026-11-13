@@ -184,3 +184,99 @@
     padding: 10px;
   }
 }
+
+/* Each row opens a local native dialog; review remains in the parent editor. */
+.voice-schema-section-title {
+  padding: 14px 16px;
+  border-bottom: 1px solid #d9e1d5;
+  font-size: 16px;
+}
+.voice-schema-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.voice-schema-row-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.voice-schema-row-copy p {
+  overflow-wrap: anywhere;
+}
+.voice-draft-status {
+  color: #216e47;
+  font-size: 13px;
+  font-weight: 600;
+}
+.voice-field-dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  border: 1px solid #7b897e;
+  border-radius: 16px;
+  padding: 0;
+  margin: auto;
+  background: #fff;
+  color: #062619;
+  box-shadow: 0 24px 80px rgb(6 38 25 / 20%);
+}
+.voice-field-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.voice-field-dialog::backdrop {
+  background: rgb(6 38 25 / 35%);
+}
+.voice-field-dialog-header {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  border-bottom: 1px solid #d9e1d5;
+}
+.voice-field-dialog-header h3 {
+  margin: 0;
+  font-size: 19px;
+}
+.voice-field-dialog-body {
+  overflow: auto;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  margin: 0;
+  padding: 20px;
+}
+.voice-field-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid #d9e1d5;
+}
+.voice-prompt-field {
+  grid-column: 1 / -1;
+}
+.voice-prompt-field textarea {
+  min-height: 120px;
+  line-height: 1.65;
+}
+.voice-prompt-field:first-of-type textarea {
+  min-height: 300px;
+}
+@media (max-width: 600px) {
+  .voice-schema-row {
+    grid-template-columns: 1fr;
+  }
+  .voice-schema-row > .voice-editor-actions {
+    justify-content: flex-end;
+  }
+  .voice-field-dialog {
+    width: calc(100vw - 16px);
+    max-height: calc(100dvh - 24px);
+  }
+  .voice-field-dialog-header,
+  .voice-field-dialog-body,
+  .voice-field-dialog-actions {
+    padding: 16px;
+  }
+}

@@ -137,42 +137,38 @@ test("native agent form only reviews after explicit input; catalogue IDs remain 
     h.all().some((node) => node.props?.children === "Revisar nuevo agente"),
   );
 });
-test("rendered cached instructions are read-only and replacement starts blank", async () => {
-  const h = harness({
+test("complete prompt and greeting edit directly, while partial text never becomes an editable prefill", async () => {
+  const record = {
+    llm_id: "l",
+    general_prompt: "Complete prompt",
+    begin_message: "Complete greeting",
+  };
+  const partial = harness({ kind: "instructions", record });
+  assert.equal(partial.field("general_prompt").props.readOnly, true);
+  assert(!partial.field("replace_general_prompt"));
+  partial.change("general_prompt", "Cannot replace a clipped prompt");
+  await partial.submit();
+  assert.equal(partial.calls.length, 0);
+  const full = harness({
     kind: "instructions",
-    record: {
-      llm_id: "l",
-      general_prompt: "clipped prompt",
-      begin_message: "clipped greeting",
-      model_config: {
-        type: "cascading",
-        primary: { model: "gpt-4.1" },
-        temperature: 0.1,
-      },
-    },
+    record,
+    completeFields: ["general_prompt", "begin_message"],
   });
-  const preview = h
-    .all()
-    .find((node) => node.props?.value === "clipped prompt");
-  assert.equal(preview.props.readOnly, true);
-  assert(!h.field("general_prompt"));
-  h.change("replace_general_prompt", true);
-  assert.equal(h.field("general_prompt").props.value, "");
-  h.change("general_prompt", "Full replacement written by user");
-  await h.submit();
-  assert.deepEqual(h.calls[0], [
+  assert.equal(full.field("general_prompt").props.value, "Complete prompt");
+  assert.equal(full.field("general_prompt").props.readOnly, false);
+  assert(!full.field("replace_general_prompt"));
+  full.change("general_prompt", "Edited full prompt");
+  await full.submit();
+  assert.deepEqual(full.calls[0], [
     "updateRetellLLM",
-    {
-      llm_id: "l",
-      requestBody: { general_prompt: "Full replacement written by user" },
-    },
+    { llm_id: "l", requestBody: { general_prompt: "Edited full prompt" } },
   ]);
-  assert(!h.field("begin_message"));
 });
 test("custom engine remains omitted without explicit replacement; cancel/create-model are separate events", async () => {
   let cancelled = 0,
     created = 0;
   const h = harness({
+    completeFields: ["agent_name"],
     record: {
       agent_id: "a",
       agent_name: "Old",
@@ -220,26 +216,44 @@ test("busy/missing schemas/failures do not submit or discard the draft", async (
   assert.equal(h.field("agent_name").props.value, "Sara");
   assert(h.all().some((node) => node.props?.role === "alert"));
 });
-test("prompt replacement can be cancelled and re-enabling never restores a fragment or prior draft", async () => {
+test("restoring complete prompt text omits it, and explicit empty/null actions remain exact", async () => {
+  const record = {
+    llm_id: "l",
+    general_prompt: "Original",
+    begin_message: "Hello",
+  };
   const h = harness({
     kind: "instructions",
-    record: {
-      llm_id: "l",
-      general_prompt: "partial original",
-      begin_message: "partial hello",
-      model_config: { type: "cascading", primary: { model: "gpt-4.1" } },
-    },
+    record,
+    completeFields: ["general_prompt", "begin_message"],
   });
-  h.change("replace_general_prompt", true);
-  h.change("general_prompt", "Draft replacement");
-  h.change("replace_general_prompt", false);
-  h.change("temperature", "0.2");
+  h.change("general_prompt", "Temporary");
+  h.change("general_prompt", "Original");
+  h.change("begin_message", "Updated greeting");
   await h.submit();
   assert.deepEqual(h.calls[0][1].requestBody, {
-    model_config: { temperature: 0.2 },
+    begin_message: "Updated greeting",
   });
-  h.change("replace_general_prompt", true);
-  assert.equal(h.field("general_prompt").props.value, "");
+  const empty = harness({
+    kind: "instructions",
+    record,
+    completeFields: ["general_prompt", "begin_message"],
+  });
+  empty.change("general_prompt", "");
+  await empty.submit();
+  assert.deepEqual(empty.calls[0][1].requestBody, { general_prompt: "" });
+  const dynamic = harness({
+    kind: "instructions",
+    record,
+    completeFields: ["general_prompt", "begin_message"],
+  });
+  dynamic
+    .all()
+    .find((node) => node.props?.children === "Generar saludo dinámico")
+    .props.onClick();
+  dynamic.render();
+  await dynamic.submit();
+  assert.deepEqual(dynamic.calls[0][1].requestBody, { begin_message: null });
 });
 test("pending review handoff is single-flight and user draft remains intact", async () => {
   let release;
@@ -272,6 +286,7 @@ test("pending review handoff is single-flight and user draft remains intact", as
 test("voice picker presents names and keeps manual identifiers in a closed disclosure", () => {
   const h = harness({
     record: { agent_id: "a", agent_name: "Sara", voice_id: "v-current" },
+    completeFields: ["agent_name", "voice_id"],
     voices: [{ voice_id: "v", voice_name: "Voz de prueba" }],
   });
   assert.equal(h.field("voice_id").type, "select");
@@ -308,4 +323,43 @@ test("voice picker presents names and keeps manual identifiers in a closed discl
   assert(!manual.props.open);
   h.change("voice_id_manual", "voice_explicit");
   assert.equal(h.field("voice_id").props.value, "voice_explicit");
+});
+
+test("blocked complete prompt roots never collect or display hidden credential-bearing text", async () => {
+  const h = harness({
+    kind: "instructions",
+    record: { llm_id: "l", general_prompt: "Hidden private configuration" },
+    completeFields: ["general_prompt"],
+    blockedFields: { general_prompt: "sensitive" },
+  });
+  assert.equal(h.field("general_prompt").props.value, "");
+  assert.equal(h.field("general_prompt").props.readOnly, true);
+  h.change("general_prompt", "Forged edit");
+  await h.submit();
+  assert.equal(h.calls.length, 0);
+});
+
+test("oversized proposal errors remain explicit without truncating the complete prompt draft", async () => {
+  const original = "Full original prompt";
+  const h = harness({
+    kind: "instructions",
+    record: { llm_id: "l", general_prompt: original },
+    completeFields: ["general_prompt"],
+    onSubmit: async () => {
+      throw new Error("Arguments exceed 16KiB");
+    },
+  });
+  const draft = "User authored full draft ".repeat(700);
+  h.change("general_prompt", draft);
+  await h.submit();
+  assert.equal(h.field("general_prompt").props.value, draft);
+  assert(
+    h
+      .all()
+      .some(
+        (node) =>
+          node.props?.role === "alert" &&
+          /límite de tamaño/.test(node.props.children),
+      ),
+  );
 });

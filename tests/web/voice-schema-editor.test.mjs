@@ -4,8 +4,26 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 function harness(overrides = {}) {
   let tree,
-    cursor = 0;
-  const hooks = [];
+    cursor = 0,
+    focused = 0,
+    changes = 0;
+  const hooks = [],
+    effects = [];
+  const trigger = {
+    isConnected: true,
+    focus() {
+      focused++;
+    },
+  };
+  const dialog = {
+    open: false,
+    showModal() {
+      this.open = true;
+    },
+    close() {
+      this.open = false;
+    },
+  };
   const react = {
     useId() {
       cursor++;
@@ -13,13 +31,32 @@ function harness(overrides = {}) {
     },
     useState(initial) {
       const i = cursor++;
-      hooks[i] ??= typeof initial === "function" ? initial() : initial;
+      if (!(i in hooks))
+        hooks[i] = typeof initial === "function" ? initial() : initial;
       return [
         hooks[i],
-        (v) => {
-          hooks[i] = typeof v === "function" ? v(hooks[i]) : v;
+        (value) => {
+          hooks[i] = typeof value === "function" ? value(hooks[i]) : value;
         },
       ];
+    },
+    useRef(initial) {
+      const i = cursor++;
+      return (hooks[i] ??= { current: initial });
+    },
+    useEffect(effect, deps) {
+      const i = cursor++;
+      const previous = hooks[i];
+      if (
+        !previous ||
+        deps.some((value, n) => !Object.is(value, previous.deps[n]))
+      ) {
+        hooks[i] = { deps };
+        effects.push(() => {
+          previous?.cleanup?.();
+          hooks[i].cleanup = effect();
+        });
+      }
     },
   };
   const load = (file) => {
@@ -37,8 +74,10 @@ function harness(overrides = {}) {
         },
       },
     ).outputText;
-    const jsx = (type, props) =>
-      typeof type === "function" ? type(props) : { type, props };
+    const jsx = (type, props) => {
+      if (type === "dialog" && props.ref) props.ref.current = dialog;
+      return typeof type === "function" ? type(props) : { type, props };
+    };
     new Function("require", "module", "exports", code)(
       (name) =>
         name === "react"
@@ -75,6 +114,7 @@ function harness(overrides = {}) {
     },
     drafts: {},
     onChange: (drafts) => {
+      changes++;
       props.drafts = drafts;
     },
     ...overrides,
@@ -82,6 +122,7 @@ function harness(overrides = {}) {
   const render = () => {
     cursor = 0;
     tree = VoiceSchemaEditor(props);
+    while (effects.length) effects.shift()();
     return tree;
   };
   const all = (node = tree) =>
@@ -93,111 +134,136 @@ function harness(overrides = {}) {
             .flat(Infinity)
             .flatMap((child) => (child == null ? [] : all(child))),
         ];
-  const find = (name) => all().find((n) => n.props?.name === name);
+  const find = (name) => all().find((node) => node.props?.name === name);
   const change = (name, value) => {
     find(name).props.onChange({ target: { value, checked: value } });
     render();
   };
+  const click = (name) => {
+    find(name).props.onClick({ currentTarget: trigger });
+    render();
+  };
   render();
-  return { props, all, find, change, render };
+  return {
+    props,
+    all,
+    find,
+    change,
+    click,
+    render,
+    dialog,
+    focused: () => focused,
+    changes: () => changes,
+  };
 }
-test("native section controls edit booleans repeatable lists and nested objects without JSON input", () => {
+test("clean modal rows edit booleans lists and nested objects; apply changes only the local draft", () => {
   const h = harness();
   assert(
     !h
       .all()
-      .some((n) => n.type === "textarea" && /json/i.test(n.props?.name ?? "")),
+      .some((node) => /^(configure_|replace_)/.test(node.props?.name ?? "")),
   );
+  h.click("edit_enable_backchannel");
+  assert(h.dialog.open);
   h.change("enable_backchannel", "true");
+  assert.equal(h.changes(), 0);
+  h.click("apply_voice_field");
+  assert(!h.dialog.open);
   assert.equal(h.props.drafts.enable_backchannel.raw, "true");
-  h.change("configure_boosted_keywords", true);
-  h.all()
-    .find((n) => n.props?.name === "add_boosted_keywords")
-    .props.onClick();
-  h.render();
+  h.click("edit_boosted_keywords");
+  h.click("add_boosted_keywords");
   h.change("boosted_keywords.0", "Jardines");
+  h.click("apply_voice_field");
   assert.equal(h.props.drafts.boosted_keywords.items[0].raw, "Jardines");
-  h.change("configure_custom_stt_config", true);
+  h.click("edit_custom_stt_config");
   h.change("custom_stt_config.provider", "azure");
   h.change("custom_stt_config.endpointing_ms", "100");
+  h.click("apply_voice_field");
   assert.equal(
     h.props.drafts.custom_stt_config.children.endpointing_ms.raw,
     "100",
   );
 });
-test("partial complex snapshots cannot prefill replacement; blocked headers cannot collect credentials", () => {
-  const h = harness({
-    record: { boosted_keywords: ["partial"] },
-    schema: {
-      properties: {
-        boosted_keywords: { type: "array", items: { type: "string" } },
-        headers: { type: "object", additionalProperties: { type: "string" } },
-      },
-    },
+test("only complete safe snapshots prefill a modal; partial and blocked roots remain read-only", () => {
+  const partial = harness({ record: { boosted_keywords: ["partial"] } });
+  assert(partial.find("edit_boosted_keywords").props.disabled);
+  partial.click("edit_boosted_keywords");
+  assert(!partial.dialog.open);
+  assert(!partial.find("boosted_keywords.0"));
+  const full = harness({
+    record: { boosted_keywords: ["Complete"] },
+    completeFields: ["boosted_keywords"],
   });
-  assert(!h.find("boosted_keywords.0"));
-  assert(!h.find("configure_headers"));
-  h.change("configure_boosted_keywords", true);
-  assert.deepEqual(h.props.drafts.boosted_keywords.items, []);
-  assert(!h.find("boosted_keywords.0"));
+  full.click("edit_boosted_keywords");
+  assert.equal(full.find("boosted_keywords.0").props.value, "Complete");
+  full.change("boosted_keywords.0", "Temporary");
+  full.click("cancel_voice_field");
+  assert.deepEqual(full.props.drafts, {});
+  full.click("edit_boosted_keywords");
+  assert.equal(full.find("boosted_keywords.0").props.value, "Complete");
+  const blocked = harness({
+    record: { boosted_keywords: ["must not prefill"] },
+    completeFields: ["boosted_keywords"],
+    blockedFields: { boosted_keywords: "sensitive" },
+  });
+  blocked.click("edit_boosted_keywords");
+  assert(!blocked.dialog.open);
 });
-test("search filters named sections and union selection resets the full replacement draft", () => {
-  const h = harness({
-    schema: {
-      properties: {
-        response_engine: {
-          oneOf: [
-            {
-              type: "object",
-              properties: {
-                type: { type: "string", enum: ["retell-llm"] },
-                llm_id: { type: "string" },
-              },
-              required: ["type", "llm_id"],
+test("union changes are isolated until Apply; cancelling reopens the full original branch", () => {
+  const schema = {
+    properties: {
+      response_engine: {
+        oneOf: [
+          {
+            type: "object",
+            properties: {
+              type: { type: "string", enum: ["retell-llm"] },
+              llm_id: { type: "string" },
             },
-            {
-              type: "object",
-              properties: {
-                type: { type: "string", enum: ["conversation-flow"] },
-                conversation_flow_id: { type: "string" },
-              },
-              required: ["type", "conversation_flow_id"],
+            required: ["type", "llm_id"],
+          },
+          {
+            type: "object",
+            properties: {
+              type: { type: "string", enum: ["conversation-flow"] },
+              conversation_flow_id: { type: "string" },
             },
-          ],
-        },
-        webhook_url: { type: "string" },
+            required: ["type", "conversation_flow_id"],
+          },
+        ],
       },
+      webhook_url: { type: "string" },
     },
+  };
+  const h = harness({
+    schema,
+    record: { response_engine: { type: "retell-llm", llm_id: "llm_original" } },
+    completeFields: ["response_engine", "webhook_url"],
   });
-  h.change("configure_response_engine", true);
-  h.change("response_engine.__variant", "0");
-  h.change("response_engine.llm_id", "llm_draft");
+  h.click("edit_response_engine");
+  assert.equal(h.find("response_engine.llm_id").props.value, "llm_original");
   h.change("response_engine.__variant", "1");
-  assert(!h.props.drafts.response_engine.children.llm_id);
+  assert(!h.find("response_engine.llm_id"));
+  h.change("response_engine.conversation_flow_id", "flow_one");
+  h.click("cancel_voice_field");
+  assert.equal(h.changes(), 0);
+  h.click("edit_response_engine");
+  assert.equal(h.find("response_engine.__variant").props.value, "0");
   h.change("voice_schema_search", "Webhook");
-  assert(!h.find("response_engine.__variant"));
-  assert(h.find("configure_webhook_url"));
+  assert(!h.find("edit_response_engine"));
+  assert(h.find("edit_webhook_url"));
 });
-
-test("URLs containing credential material are rejected without retaining their secret in a draft", () => {
+test("credential-bearing URL input is not retained and cannot be applied to the parent draft", () => {
   const h = harness();
-  h.change("configure_webhook_url", true);
-  for (const value of [
-    "https://user:password@example.com?api_key=private",
-    " https://user:password@example.com/hook",
-    "\nhttps://example.com/hook?api_key=private",
-    "//user:password@example.com/hook",
-  ]) {
-    h.change("webhook_url", value);
-    assert.equal(h.props.drafts.webhook_url.blocked, true);
-    assert.equal(h.props.drafts.webhook_url.raw, undefined);
-  }
-  assert.equal(h.props.drafts.webhook_url.blocked, true);
-  assert.equal(h.props.drafts.webhook_url.raw, undefined);
+  h.click("edit_webhook_url");
+  h.change("webhook_url", " https://user:password@example.com?api_key=private");
+  assert.equal(h.find("webhook_url").props.value, "");
+  h.click("apply_voice_field");
+  assert(h.dialog.open);
+  assert.equal(h.changes(), 0);
   assert(h.all().some((node) => node.props?.role === "alert"));
 });
-
-test("all pinned top-level fields render a native or explicitly blocked named configuration path", () => {
+test("all pinned root fields retain named rows, without JSON or configure checkbox ceremony", () => {
   const schemas = JSON.parse(
     readFileSync(
       new URL("../../ops/retell/schemas.json", import.meta.url),
@@ -217,7 +283,102 @@ test("all pinned top-level fields render a native or explicitly blocked named co
       endpoint,
     );
     assert(
-      !h.all().some((node) => node.type === "code" || node.type === "pre"),
+      !h
+        .all()
+        .some(
+          (node) =>
+            node.type === "code" ||
+            node.type === "pre" ||
+            (node.type === "input" && node.props.type === "checkbox"),
+        ),
     );
   }
+});
+test("child Escape cancels locally and restores the opener without bubbling to its ancestor", () => {
+  const h = harness();
+  h.click("edit_webhook_url");
+  h.change("webhook_url", "https://safe.example.com");
+  let prevented = 0,
+    stopped = 0;
+  h.all()
+    .find((node) => node.type === "dialog")
+    .props.onCancel({
+      preventDefault() {
+        prevented++;
+      },
+      stopPropagation() {
+        stopped++;
+      },
+    });
+  h.render();
+  assert.equal(prevented, 1);
+  assert.equal(stopped, 1);
+  assert.equal(h.focused(), 1);
+  assert(!h.dialog.open);
+  assert.equal(h.changes(), 0);
+});
+test("untouched complete modal values are omitted; known-absent roots do not become implicit empty writes", () => {
+  const h = harness({
+    record: { boosted_keywords: ["Complete"] },
+    completeFields: ["boosted_keywords", "webhook_url"],
+  });
+  h.click("edit_webhook_url");
+  h.click("apply_voice_field");
+  assert.equal(h.changes(), 0);
+  h.click("edit_boosted_keywords");
+  h.change("boosted_keywords.0", "Complete");
+  h.click("apply_voice_field");
+  assert.equal(h.props.drafts.boosted_keywords.enabled, false);
+});
+test("required validation and pending locks keep the child modal open without mutating the parent", () => {
+  const h = harness();
+  h.click("edit_custom_stt_config");
+  h.change("custom_stt_config.provider", "azure");
+  h.click("apply_voice_field");
+  assert(h.dialog.open);
+  assert.equal(h.changes(), 0);
+  h.props.disabled = true;
+  h.render();
+  h.click("cancel_voice_field");
+  assert(h.dialog.open);
+  h.click("apply_voice_field");
+  assert(h.dialog.open);
+  assert.equal(h.changes(), 0);
+});
+
+test("Enter in a field modal input prevents implicit parent form submission; textarea keeps newline", () => {
+  const h = harness();
+  h.click("edit_webhook_url");
+  const handler = h.all().find((node) => node.type === "dialog")
+    .props.onKeyDown;
+  let prevented = 0,
+    stopped = 0,
+    proposals = 0;
+  handler({
+    key: "Enter",
+    target: { tagName: "INPUT" },
+    preventDefault() {
+      prevented++;
+    },
+    stopPropagation() {
+      stopped++;
+    },
+  });
+  if (!prevented) proposals++;
+  assert.equal(prevented, 1);
+  assert.equal(stopped, 1);
+  assert.equal(proposals, 0);
+  handler({
+    key: "Enter",
+    target: { tagName: "TEXTAREA" },
+    preventDefault() {
+      prevented++;
+    },
+    stopPropagation() {
+      stopped++;
+    },
+  });
+  assert.equal(prevented, 1);
+  assert.equal(stopped, 2);
+  assert.equal(h.changes(), 0);
 });

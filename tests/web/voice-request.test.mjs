@@ -62,3 +62,27 @@ test("oversized payloads fail locally and expired sessions redirect", async () =
   await assert.rejects(request("retell/settings"), /sesión/);
   assert.equal(expired, 1);
 });
+test("complete editor failures explain that editing is unavailable without exposing codes", async () => {
+  for (const [detail, expected] of [
+    ["retell_editor_unavailable", /editor completo no está disponible/],
+    ["retell_editor_timeout", /No se pudo cargar el editor a tiempo/],
+  ]) {
+    const request = m.exports.voiceRequest(
+      "csrf",
+      () => {},
+      async () => ({
+        status: 503,
+        ok: false,
+        json: async () => ({ detail }),
+      }),
+    );
+    await assert.rejects(
+      request("retell/editor", "POST", {
+        kind: "agent",
+        id: "agent_test",
+        revision: 1,
+      }),
+      expected,
+    );
+  }
+});

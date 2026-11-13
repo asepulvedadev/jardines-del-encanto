@@ -584,6 +584,7 @@ export function voiceSchemaPatch(
   input: VoiceSchema,
   drafts: VoiceSchemaDrafts,
   current?: Record<string, unknown>,
+  completeFields: string[] = [],
 ): Record<string, unknown> {
   const schema = voiceSchemaResolve(input);
   const properties = voiceSchemaProperties(schema);
@@ -600,9 +601,9 @@ export function voiceSchemaPatch(
       );
     const value = parseDraft(properties[key], draft, key);
     if (
-      !voiceSchemaComplex(properties[key], key) &&
       current &&
-      value === current[key]
+      ((!voiceSchemaComplex(properties[key], key) && value === current[key]) ||
+        (completeFields.includes(key) && sameValue(value, current[key])))
     )
       continue;
     Object.defineProperty(result, key, {
@@ -632,4 +633,171 @@ export function voiceSchemaHint(input: VoiceSchema): string {
       : "",
   ];
   return parts.filter(Boolean).join(" ");
+}
+
+export type VoiceFieldHydration = {
+  editable: boolean;
+  draft?: VoiceSchemaDraft;
+  reason?: string;
+  reasonCode?: "blocked" | "incomplete" | "invalid_snapshot" | "unknown_field";
+};
+function sameValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (Array.isArray(left) && Array.isArray(right))
+    return (
+      left.length === right.length &&
+      left.every((value, index) => sameValue(value, right[index]))
+    );
+  if (record(left) && record(right)) {
+    const keys = Object.keys(left);
+    return (
+      keys.length === Object.keys(right).length &&
+      keys.every(
+        (key) => Object.hasOwn(right, key) && sameValue(left[key], right[key]),
+      )
+    );
+  }
+  return false;
+}
+function hydrateValue(
+  input: VoiceSchema,
+  value: unknown,
+  path: string,
+  depth = 0,
+): VoiceSchemaDraft {
+  if (depth > 24 || voiceSensitivePath(path)) throw new Error("blocked");
+  const schema = voiceSchemaResolve(input);
+  if (schema.readOnly) throw new Error("blocked");
+  if (value === null) {
+    if (!voiceSchemaNullable(schema) && voiceSchemaType(schema) !== "null")
+      throw new Error("invalid");
+    return voiceSchemaType(schema) === "null"
+      ? { enabled: true }
+      : { enabled: true, null: true };
+  }
+  const type = voiceSchemaType(schema);
+  const variants = voiceSchemaVariants(schema);
+  if (variants.length || type === "any") {
+    const choices = variants.length ? variants : voiceAnySchemas;
+    for (let branch = 0; branch < choices.length; branch++) {
+      try {
+        const draft = {
+          ...hydrateValue(choices[branch], value, path, depth + 1),
+          branch,
+        };
+        const parsed = parseDraft(schema, draft, path, depth);
+        if (sameValue(parsed, value)) return draft;
+      } catch {
+        /* A different actual schema branch may accept this value. */
+      }
+    }
+    throw new Error("invalid");
+  }
+  if (type === "object") {
+    if (!record(value)) throw new Error("invalid");
+    const properties = voiceSchemaProperties(schema);
+    const draft: VoiceSchemaDraft = {
+      enabled: true,
+      children: {},
+      entries: [],
+    };
+    for (const [key, child] of Object.entries(value)) {
+      if (voiceSensitivePath(key)) throw new Error("blocked");
+      if (Object.hasOwn(properties, key))
+        draft.children![key] = hydrateValue(
+          properties[key],
+          child,
+          `${path}.${key}`,
+          depth + 1,
+        );
+      else {
+        if (
+          schema.additionalProperties === false ||
+          (schema.additionalProperties === undefined &&
+            Object.keys(properties).length)
+        )
+          throw new Error("unknown");
+        const itemSchema =
+          typeof schema.additionalProperties === "object"
+            ? schema.additionalProperties
+            : {};
+        draft.entries!.push({
+          key,
+          draft: hydrateValue(itemSchema, child, `${path}.${key}`, depth + 1),
+        });
+      }
+    }
+    return draft;
+  }
+  if (type === "array") {
+    if (!Array.isArray(value)) throw new Error("invalid");
+    return {
+      enabled: true,
+      items: value.map((entry, index) =>
+        hydrateValue(schema.items ?? {}, entry, `${path}.${index}`, depth + 1),
+      ),
+    };
+  }
+  if (
+    (type === "string" && typeof value !== "string") ||
+    (type === "boolean" && typeof value !== "boolean") ||
+    (["number", "integer"].includes(type) && typeof value !== "number")
+  )
+    throw new Error("invalid");
+  if (!["string", "number", "integer", "boolean"].includes(type))
+    throw new Error("invalid");
+  return { enabled: true, raw: String(value) };
+}
+/** Complete metadata is necessary, not sufficient: validate every original child first. */
+export function voiceHydrateField(
+  input: VoiceSchema,
+  key: string,
+  current: Record<string, unknown> | undefined,
+  completeFields: string[] = [],
+  blockedFields: Record<string, string> = {},
+): VoiceFieldHydration {
+  const properties = voiceSchemaProperties(
+    voiceSchemaProperties(input).requestBody ?? input,
+  );
+  if (!Object.hasOwn(properties, key))
+    return {
+      editable: false,
+      reasonCode: "unknown_field",
+      reason: "Este ajuste no pertenece al esquema revisado.",
+    };
+  if (
+    Object.hasOwn(blockedFields, key) ||
+    voiceSensitivePath(key) ||
+    properties[key].readOnly
+  )
+    return {
+      editable: false,
+      reasonCode: "blocked",
+      reason:
+        "Este ajuste contiene datos privados o no editables. Adminístralo directamente en Retell.",
+    };
+  if (!current)
+    return { editable: true, draft: voiceEmptyDraft(properties[key]) };
+  if (!completeFields.includes(key))
+    return {
+      editable: false,
+      reasonCode: "incomplete",
+      reason:
+        "La lectura está incompleta. Consulta la configuración completa antes de editar este ajuste.",
+    };
+  if (!Object.hasOwn(current, key))
+    return { editable: true, draft: voiceEmptyDraft(properties[key]) };
+  try {
+    const draft = hydrateValue(properties[key], current[key], key);
+    if (!sameValue(parseDraft(properties[key], draft, key), current[key]))
+      throw new Error("invalid");
+    return { editable: true, draft };
+  } catch {
+    return {
+      editable: false,
+      reasonCode: "invalid_snapshot",
+      reason:
+        "La configuración recibida no se puede editar con seguridad. Actualiza la lectura o adminístrala en Retell.",
+    };
+  }
 }

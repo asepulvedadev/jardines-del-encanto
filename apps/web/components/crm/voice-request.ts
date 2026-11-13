@@ -36,6 +36,10 @@ export function voiceRequest(
       const messages: Record<string, string> = {
         connection_disabled: "Retell está pausado. Actívalo en Conexiones.",
         retell_unavailable: "Retell no está disponible. Revisa Conexiones.",
+        retell_editor_unavailable:
+          "El editor completo no está disponible. No se modificó la configuración.",
+        retell_editor_timeout:
+          "No se pudo cargar el editor a tiempo. Intenta abrirlo de nuevo.",
         retell_provider_changed:
           "La conexión cambió. Actualiza y prepara otra propuesta.",
         retell_schema_changed: "La función cambió. Actualiza su esquema.",

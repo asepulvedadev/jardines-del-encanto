@@ -84,6 +84,8 @@ function harness(file, component, props = {}, transport) {
           `${path.slice(2)}.${path === "./voice-workspace-data" ? "ts" : "tsx"}`,
         );
       if (path === "./retell-panel") return { RetellPanel: "RetellPanel" };
+      if (path === "./voice-agent-studio")
+        return { VoiceAgentStudio: "VoiceAgentStudio" };
       if (path === "./voice-agent-editor")
         return { VoiceAgentEditor: "VoiceAgentEditor" };
       if (path === "./hermes-panel")
@@ -241,12 +243,13 @@ test("agent form uses current schemas, actual IDs and proposal handoff only", as
               ],
               partial: true,
             }
-          : path === "retell/read"
+          : path === "retell/editor"
             ? {
                 provider: "retell",
                 status: "completed",
                 endpoint: "getAgent",
                 data: { agent_id: "a", agent_name: "Existing" },
+                editor: { complete_fields: ["agent_name"], blocked_fields: {} },
               }
             : path === "retell/schema"
               ? { input_schema: { type: "object" } }
@@ -257,16 +260,25 @@ test("agent form uses current schemas, actual IDs and proposal handoff only", as
   h.click("Editar agente");
   await tick();
   h.render();
-  const editor = h.nodes().find((n) => n.type === "VoiceAgentEditor");
-  assert.equal(editor.props.record.agent_id, "a");
+  const editor = h.nodes().find((n) => n.type === "VoiceAgentStudio");
+  assert.equal(editor.props.agent.data.agent_id, "a");
+  assert.deepEqual(editor.props.agent.completeFields, ["agent_name"]);
+  assert.deepEqual(h.calls.find(([path]) => path === "retell/editor")[2], {
+    revision: 1,
+    kind: "agent",
+    id: "a",
+  });
   assert.equal(Object.keys(editor.props.schemas).length, 4);
   assert.ok(!h.calls.some((c) => c[0] === "hermes/actions"));
-  await editor.props.onSubmit("updateAgent", {
-    agent_id: "a",
-    requestBody: { agent_name: "New" },
-  });
-  h.render();
-  assert.equal(h.calls.filter((c) => c[0] === "hermes/actions").length, 1);
+  assert.equal(editor.props.instructions, undefined);
+  assert.match(editor.props.warning, /motor/);
+  const owner = Symbol("current-studio");
+  editor.props.onPendingChange(true, owner);
+  editor.props.onPendingChange(false, Symbol("obsolete-studio"));
+  h.click("Editar agente");
+  await tick();
+  assert.equal(h.calls.filter((c) => c[0] === "retell/editor").length, 1);
+  editor.props.onPendingChange(false, owner);
 });
 test("approved result callback fires once and a failed refresh never replays vendor work", async () => {
   let updates = 0;
@@ -489,4 +501,175 @@ test("resource tabs use the initial automatic inventory, while detail reads neve
     h.nodes().find((n) => n.type === "ActionResultDetails").props.presentation,
     "friendly",
   );
+});
+
+function promptHarness({
+  engine = { type: "retell-llm", llm_id: "linked-llm", version: 7 },
+  agentId = "agent-current",
+  llmId = "linked-llm",
+  llmVersion = 7,
+  complete = true,
+  blockedPrompt = false,
+} = {}) {
+  return harness(
+    "voice-workspace.tsx",
+    "VoiceWorkspace",
+    {
+      csrf: "x",
+      active: true,
+      onChanged: async () => {},
+      onOpenConnection: () => {},
+    },
+    async (path, method, body) => {
+      if (path === "retell/settings") return state;
+      if (path === "retell/catalog")
+        return {
+          ...catalog,
+          operations: [
+            ...catalog.operations,
+            { endpoint: "getRetellLLM", available: true, group: "models" },
+          ],
+        };
+      if (path === "retell/inventory")
+        return {
+          snapshots: [
+            {
+              endpoint: "listAgents",
+              provider_revision: 1,
+              data: [{ agent_id: "agent-current", agent_name: "Test agent" }],
+            },
+          ],
+          partial: true,
+        };
+      if (path === "retell/editor")
+        return {
+          provider: "retell",
+          status: "completed",
+          editor: complete
+            ? {
+                complete_fields: blockedPrompt
+                  ? ["begin_message"]
+                  : ["general_prompt", "begin_message"],
+                blocked_fields: blockedPrompt
+                  ? { general_prompt: "private_field" }
+                  : {},
+              }
+            : undefined,
+          endpoint: body.kind === "agent" ? "getAgent" : "getRetellLLM",
+          data:
+            body.kind === "agent"
+              ? { agent_id: agentId, response_engine: engine }
+              : {
+                  llm_id: llmId,
+                  version: llmVersion,
+                  ...(blockedPrompt
+                    ? {}
+                    : { general_prompt: "Complete editable prompt" }),
+                },
+        };
+      if (path === "retell/schema") return { input_schema: { type: "object" } };
+      if (path === "hermes/actions") return { proposals: [] };
+      throw Error(path);
+    },
+  );
+}
+
+test("agent prompt action resolves the saved engine from a fresh agent even when the list omits it", async () => {
+  const h = promptHarness();
+  await tick();
+  h.render();
+  h.click("Prompt del agente");
+  await tick();
+  h.render();
+  const reads = h.calls
+    .filter(([path]) => path === "retell/editor")
+    .map(([, , body]) => body);
+  assert.deepEqual(
+    reads.map((body) => [body.kind, body.id, body.version]),
+    [
+      ["agent", "agent-current", undefined],
+      ["instructions", "linked-llm", 7],
+    ],
+  );
+  const editor = h.nodes().find((n) => n.type === "VoiceAgentStudio");
+  assert.equal(editor.props.agent.data.agent_id, "agent-current");
+  assert.equal(editor.props.instructions.data.llm_id, "linked-llm");
+  assert.equal(editor.props.instructions.data.version, 7);
+  assert.equal(h.calls.filter(([path]) => path === "hermes/actions").length, 0);
+  assert(!h.calls.some(([path]) => path.includes("approve")));
+});
+
+for (const [name, overrides] of Object.entries({
+  "flow engine": {
+    engine: { type: "conversation-flow", conversation_flow_id: "flow" },
+  },
+  "missing engine": { engine: null },
+  "wrong agent": { agentId: "another-agent" },
+  "wrong instructions": { llmId: "another-llm" },
+  "wrong pinned version": { llmVersion: 8 },
+}))
+  test(`agent prompt does not open or write for ${name}`, async () => {
+    const h = promptHarness(overrides);
+    await tick();
+    h.render();
+    h.click("Prompt del agente");
+    await tick();
+    h.render();
+    const studio = h.nodes().find((n) => n.type === "VoiceAgentStudio");
+    if (name === "wrong agent") {
+      assert(!studio);
+      assert(h.nodes().some((n) => n.props?.role === "alert"));
+    } else {
+      assert(studio);
+      assert.equal(studio.props.instructions, undefined);
+      assert(studio.props.warning);
+    }
+    assert(!h.calls.some(([path]) => path === "hermes/actions"));
+  });
+
+test("repeated prompt clicks share the existing workspace lock without duplicate reads or proposals", async () => {
+  const h = promptHarness();
+  await tick();
+  h.render();
+  h.click("Prompt del agente");
+  h.click("Prompt del agente");
+  await tick();
+  h.render();
+  assert.equal(
+    h.calls.filter(
+      ([path, , body]) => path === "retell/editor" && body.kind === "agent",
+    ).length,
+    1,
+  );
+  assert.equal(
+    h.calls.filter(
+      ([path, , body]) =>
+        path === "retell/editor" && body.kind === "instructions",
+    ).length,
+    1,
+  );
+  assert(!h.calls.some(([path]) => path === "hermes/actions"));
+});
+
+test("prompt editing requires complete-read metadata and never falls back to a clipped cached prompt", async () => {
+  const missing = promptHarness({ complete: false });
+  await tick();
+  missing.render();
+  missing.click("Prompt del agente");
+  await tick();
+  missing.render();
+  assert(!missing.nodes().some((n) => n.type === "VoiceAgentStudio"));
+  assert(missing.nodes().some((n) => n.props?.role === "alert"));
+  const blocked = promptHarness({ blockedPrompt: true });
+  await tick();
+  blocked.render();
+  blocked.click("Prompt del agente");
+  await tick();
+  blocked.render();
+  const editor = blocked.nodes().find((n) => n.type === "VoiceAgentStudio");
+  assert.equal(editor.props.instructions.data.general_prompt, undefined);
+  assert.deepEqual(editor.props.instructions.blockedFields, {
+    general_prompt: "private_field",
+  });
+  assert(!editor.props.instructions.completeFields.includes("general_prompt"));
 });

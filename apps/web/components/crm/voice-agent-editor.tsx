@@ -3,7 +3,12 @@
 import { useId, useRef, useState } from "react";
 import type { RetellSchema } from "./retell-schema";
 import { VoiceSchemaEditor } from "./voice-schema-editor";
-import type { VoiceSchemaDrafts } from "./voice-schema-model";
+import {
+  voiceHydrateField,
+  voiceSchemaProperties,
+  voiceSchemaNullable,
+  type VoiceSchemaDrafts,
+} from "./voice-schema-model";
 import {
   voiceCatalogOptions,
   voiceEditorArguments,
@@ -20,6 +25,8 @@ export type VoiceAgentEditorProps = {
   voices: Record<string, unknown>[];
   models: Record<string, unknown>[];
   busy: boolean;
+  completeFields?: string[];
+  blockedFields?: Record<string, string>;
   onSubmit: (
     endpoint: string,
     arguments_: Record<string, unknown>,
@@ -28,7 +35,7 @@ export type VoiceAgentEditorProps = {
   onCreateModel?: () => void;
 };
 
-// The workspace keys this form by resource identity/version to isolate drafts.
+// The workspace keys this editor by kind, resource identity and version.
 export function VoiceAgentEditor({
   kind,
   record,
@@ -36,48 +43,76 @@ export function VoiceAgentEditor({
   voices,
   models,
   busy,
+  completeFields = [],
+  blockedFields = {},
   onSubmit,
   onCancel,
   onCreateModel,
 }: VoiceAgentEditorProps) {
   const id = useId();
-  const [values, setValues] = useState(() => voiceInitialValues(kind, record));
+  const endpoint = `${record ? "update" : "create"}${kind === "agent" ? "Agent" : "RetellLLM"}`;
+  const schema = schemas[endpoint];
+  const body = schema ? voiceSchemaProperties(schema).requestBody : undefined;
+  const properties = body ? voiceSchemaProperties(body) : {};
+  const fields = schema ? voiceEditorFields(kind, schema, record) : [];
+  const state = (key: string) =>
+    body
+      ? voiceHydrateField(body, key, record, completeFields, blockedFields)
+      : { editable: false, reason: "El esquema no está disponible." };
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    if (!record) return {};
+    const initial = voiceInitialValues(kind, record);
+    const allowed =
+      kind === "agent"
+        ? ["agent_name", "voice_id"]
+        : ["general_prompt", "begin_message"];
+    return Object.fromEntries(
+      allowed.flatMap((key) => {
+        const hydrated = state(key);
+        return hydrated.editable
+          ? [[key, hydrated.draft?.raw ?? initial[key] ?? ""]]
+          : [];
+      }),
+    );
+  });
   const [replacements, setReplacements] = useState<VoiceReplacements>({});
-  const [advancedDrafts, setAdvancedDrafts] = useState<VoiceSchemaDrafts>({});
+  const [drafts, setDrafts] = useState<VoiceSchemaDrafts>({});
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const pending = useRef(false);
-  const endpoint = `${record ? "update" : "create"}${kind === "agent" ? "Agent" : "RetellLLM"}`;
-  const schema = schemas[endpoint];
-  const fields = schema ? voiceEditorFields(kind, schema, record) : [];
   const disabled = busy || submitting;
   const voiceOptions = voiceCatalogOptions(voices, "voice_id", "voice_name");
   const modelOptions = voiceCatalogOptions(models, "llm_id", "agent_name");
-  const engine = record?.response_engine;
-  const engineType =
-    engine &&
-    typeof engine === "object" &&
-    !Array.isArray(engine) &&
-    "type" in engine &&
-    typeof engine.type === "string"
-      ? engine.type
-      : "No disponible";
   const title =
     kind === "agent"
       ? record
         ? "Editar agente"
         : "Nuevo agente"
       : record
-        ? "Editar instrucciones"
+        ? "Prompt e instrucciones"
         : "Nuevas instrucciones";
   function update(key: string, value: string) {
+    if (record && !state(key).editable) return;
     setValues((previous) => ({ ...previous, [key]: value }));
+    if (key === "general_prompt" || key === "begin_message") {
+      setReplacements((previous) => ({ ...previous, [key]: true }));
+      setDrafts((previous) => ({ ...previous, [key]: { enabled: false } }));
+    }
     setError("");
   }
-  function replace(key: keyof VoiceReplacements, checked: boolean) {
-    setReplacements((previous) => ({ ...previous, [key]: checked }));
-    // Replacement is always a fresh, explicit full draft, never a cached fragment.
-    update(key === "response_engine" ? "llm_id" : key, "");
+  function explicitText(
+    key: "general_prompt" | "begin_message",
+    value: null | string,
+  ) {
+    if (disabled || (record && !state(key).editable) || !body) return;
+    setDrafts((previous) => ({
+      ...previous,
+      [key]:
+        value === null
+          ? { enabled: true, null: true }
+          : { enabled: true, raw: value },
+    }));
+    setError("");
   }
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -90,7 +125,8 @@ export function VoiceAgentEditor({
         record,
         values,
         replacements,
-        advancedDrafts,
+        drafts,
+        { completeFields, blockedFields },
       );
     } catch (cause) {
       setError(
@@ -105,15 +141,25 @@ export function VoiceAgentEditor({
     setError("");
     try {
       await onSubmit(proposal.endpoint, proposal.arguments);
-    } catch {
+    } catch (cause) {
+      const oversize =
+        cause instanceof Error &&
+        /16\s?(?:KiB|KB)|demasiado grande|excede.{0,30}(?:tama[nñ]o|l[ií]mite)|supera.{0,30}(?:tama[nñ]o|l[ií]mite)|too large/i.test(
+          cause.message,
+        );
       setError(
-        "No se pudo preparar la revisión. Conservamos tu borrador; vuelve a intentarlo.",
+        oversize
+          ? "El borrador supera el límite de tamaño permitido. Reduce su contenido; no se ha recortado ni aplicado."
+          : "No se pudo preparar la revisión. Conservamos tu borrador; vuelve a intentarlo.",
       );
     } finally {
       pending.current = false;
       setSubmitting(false);
     }
   }
+  const nameEditable = !record || state("agent_name").editable;
+  const voiceEditable = !record || state("voice_id").editable;
+  const visibleVoice = values.voice_id ?? "";
   return (
     <form
       className="voice-editor"
@@ -124,260 +170,147 @@ export function VoiceAgentEditor({
       <header className="voice-editor-header">
         <h3 id={`${id}-title`}>{title}</h3>
         <p className="voice-muted">
-          Los cambios se enviarán a revisión antes de aplicarse en Retell.
+          {kind === "instructions"
+            ? "Define qué hace el agente, cómo habla y qué debe evitar. Los cambios requieren revisión antes de aplicarse."
+            : "Edita los ajustes y revisa los cambios antes de aplicarlos en Retell."}
         </p>
       </header>
-      {!schema || !fields.length ? (
+      {!schema ? (
         <p role="alert">
-          El esquema aprobado no está disponible para este formulario. Usa el
-          catálogo de operaciones cuando esté disponible.
+          El esquema aprobado no está disponible para este formulario.
         </p>
       ) : null}
-      {record ? (
-        <p className="voice-muted">
-          Lectura parcial. Solo se enviarán los campos modificados; el resto se
-          conserva en Retell.
+      {record && !completeFields.length ? (
+        <p className="voice-schema-warning">
+          Esta lectura está incompleta. Actualiza la configuración completa para
+          editarla con seguridad.
         </p>
       ) : null}
       <fieldset className="voice-editor-fields" disabled={disabled || !schema}>
-        <legend className="sr-only">
-          Configuración {kind === "agent" ? "del agente" : "de instrucciones"}
-        </legend>
-        {fields
-          .filter(
-            (field) =>
-              !advancedDrafts[field.key]?.enabled &&
-              !(
-                kind === "instructions" &&
-                advancedDrafts.model_config?.enabled &&
-                ["model", "temperature"].includes(field.key)
-              ),
-          )
-          .map((field) => {
-            const fullText =
-              field.key === "general_prompt" || field.key === "begin_message";
-            const replacementKey = field.key as keyof VoiceReplacements;
-            const current = record?.[field.key];
-            const currentText =
-              typeof current === "string"
-                ? current
-                : "No disponible en esta lectura parcial.";
-            const options = (field.schema.enum ?? []).filter(
-              (value): value is string => typeof value === "string",
-            );
-            const value = values[field.key] ?? "";
-            const controlId = `${id}-${field.key}`;
-            return (
-              <div key={field.key} className="voice-field">
-                {record && fullText ? (
-                  <>
-                    <label htmlFor={`${controlId}-preview`}>
-                      {field.key === "general_prompt"
-                        ? "Instrucciones actuales (lectura parcial)"
-                        : "Mensaje inicial actual (lectura parcial)"}
-                    </label>
-                    <textarea
-                      className="crm-input voice-textarea voice-preview"
-                      id={`${controlId}-preview`}
-                      readOnly
-                      rows={3}
-                      value={currentText}
-                    />
-                    <p className="voice-muted" id={`${controlId}-hint`}>
-                      La lectura puede estar recortada. Para cambiarla, escribe
-                      el texto completo desde cero. El fragmento no se
-                      reenviará.
-                    </p>
-                    <label className="voice-checkbox">
-                      <input
-                        type="checkbox"
-                        name={`replace_${field.key}`}
-                        checked={!!replacements[replacementKey]}
-                        onChange={(event) =>
-                          replace(replacementKey, event.target.checked)
-                        }
-                      />
-                      {field.key === "general_prompt"
-                        ? "Reemplazar instrucciones"
-                        : "Reemplazar mensaje inicial"}
-                    </label>
-                  </>
+        <legend className="sr-only">Configuración principal</legend>
+        {kind === "agent" ? (
+          <>
+            <div className="voice-field" data-voice-field="agent_name">
+              <label htmlFor={`${id}-agent-name`}>Nombre del agente</label>
+              <input
+                className="crm-input"
+                id={`${id}-agent-name`}
+                name="agent_name"
+                value={values.agent_name ?? ""}
+                readOnly={!nameEditable}
+                onChange={(event) => update("agent_name", event.target.value)}
+              />
+              {!nameEditable ? (
+                <p className="voice-muted">{state("agent_name").reason}</p>
+              ) : null}
+            </div>
+            <div className="voice-field" data-voice-field="voice_id">
+              <label htmlFor={`${id}-voice`}>Voz</label>
+              <select
+                className="crm-input"
+                id={`${id}-voice`}
+                name="voice_id"
+                value={visibleVoice}
+                disabled={!voiceEditable}
+                onChange={(event) => update("voice_id", event.target.value)}
+              >
+                <option value="">Selecciona una voz</option>
+                {visibleVoice &&
+                !voiceOptions.some(
+                  (option) => option.value === visibleVoice,
+                ) ? (
+                  <option value={visibleVoice}>Voz actual</option>
                 ) : null}
-                {!record || !fullText || replacements[replacementKey] ? (
-                  <>
-                    <label htmlFor={controlId}>{field.label}</label>
-                    {field.multiline ? (
-                      <textarea
-                        className="crm-input voice-textarea"
-                        id={controlId}
-                        name={field.key}
-                        rows={field.key === "general_prompt" ? 8 : 3}
-                        value={value}
-                        aria-describedby={
-                          record ? `${controlId}-hint` : undefined
-                        }
-                        minLength={field.schema.minLength}
-                        maxLength={field.schema.maxLength}
-                        onChange={(event) =>
-                          update(field.key, event.target.value)
-                        }
-                      />
-                    ) : field.key === "voice_id" ? (
-                      <>
-                        <select
-                          className="crm-input"
-                          id={controlId}
-                          name="voice_id"
-                          value={value}
-                          onChange={(event) =>
-                            update("voice_id", event.target.value)
-                          }
-                        >
-                          <option value="">Selecciona una voz</option>
-                          {value &&
-                          !voiceOptions.some(
-                            (option) => option.value === value,
-                          ) ? (
-                            <option value={value}>Voz actual</option>
-                          ) : null}
-                          {voiceOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                        <details className="voice-resource-id">
-                          <summary>Usar un identificador de voz</summary>
-                          <label htmlFor={`${controlId}-manual`}>
-                            Identificador exacto
-                          </label>
-                          <input
-                            className="crm-input"
-                            id={`${controlId}-manual`}
-                            name="voice_id_manual"
-                            value={value}
-                            onChange={(event) =>
-                              update("voice_id", event.target.value)
-                            }
-                          />
-                        </details>
-                      </>
-                    ) : options.length ? (
-                      <select
-                        className="crm-input"
-                        id={controlId}
-                        name={field.key}
-                        value={value}
-                        onChange={(event) =>
-                          update(field.key, event.target.value)
-                        }
-                      >
-                        <option value="">
-                          {record
-                            ? "Mantener valor actual"
-                            : "Selecciona un valor"}
-                        </option>
-                        {value && !options.includes(value) ? (
-                          <option value={value} disabled>
-                            Actual: {value}
-                          </option>
-                        ) : null}
-                        {options.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        className="crm-input"
-                        id={controlId}
-                        name={field.key}
-                        type={
-                          ["integer", "number"].includes(
-                            String(field.schema.type),
-                          )
-                            ? "number"
-                            : "text"
-                        }
-                        step={field.schema.type === "integer" ? 1 : "any"}
-                        min={field.schema.minimum}
-                        max={field.schema.maximum}
-                        minLength={field.schema.minLength}
-                        maxLength={field.schema.maxLength}
-                        value={value}
-                        onChange={(event) =>
-                          update(field.key, event.target.value)
-                        }
-                      />
-                    )}
-                    {field.key === "begin_message" ? (
-                      <p className="voice-muted">
-                        Un reemplazo vacío hará que el agente espere a que la
-                        persona hable primero.
-                      </p>
-                    ) : null}
-                  </>
-                ) : null}
-              </div>
-            );
-          })}
-        {kind === "agent" && !advancedDrafts.response_engine?.enabled ? (
-          <section
-            className="voice-engine"
-            aria-labelledby={`${id}-engine-title`}
-          >
-            <h4 id={`${id}-engine-title`}>Instrucciones vinculadas</h4>
-            {record ? (
-              <>
-                <p className="voice-muted">
-                  Motor actual: {engineType}. No cambia al editar otros campos.
-                </p>
-                <label className="voice-checkbox">
+                {voiceOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              {voiceEditable ? (
+                <details className="voice-schema-reference">
+                  <summary>Usar un identificador de voz</summary>
+                  <label htmlFor={`${id}-voice-manual`}>
+                    Identificador exacto de la voz
+                  </label>
                   <input
-                    type="checkbox"
-                    name="replace_response_engine"
-                    checked={!!replacements.response_engine}
-                    onChange={(event) =>
-                      replace("response_engine", event.target.checked)
-                    }
+                    className="crm-input"
+                    id={`${id}-voice-manual`}
+                    name="voice_id_manual"
+                    value={visibleVoice}
+                    onChange={(event) => update("voice_id", event.target.value)}
                   />
-                  Cambiar motor de respuesta a Retell LLM
-                </label>
-                {replacements.response_engine ? (
-                  <p className="voice-muted">
-                    Esta acción reemplaza el motor actual por las instrucciones
-                    cuyo ID indiques.
-                  </p>
-                ) : null}
-              </>
-            ) : null}
-            {!record || replacements.response_engine ? (
+                </details>
+              ) : (
+                <p className="voice-muted">{state("voice_id").reason}</p>
+              )}
+            </div>
+            {!record ? (
               <div className="voice-field">
-                <label htmlFor={`${id}-llm-id`}>
-                  Instrucciones Retell LLM (ID)
-                </label>
-                <input
+                <label htmlFor={`${id}-language`}>Idioma</label>
+                <select
                   className="crm-input"
-                  id={`${id}-llm-id`}
+                  name="language"
+                  id={`${id}-language`}
+                  value={values.language ?? ""}
+                  onChange={(event) => update("language", event.target.value)}
+                >
+                  <option value="">Usar idioma del proveedor</option>
+                  {fields
+                    .find((field) => field.key === "language")
+                    ?.schema.enum?.filter(
+                      (option): option is string => typeof option === "string",
+                    )
+                    .map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            ) : null}
+            {!record && !drafts.response_engine?.enabled ? (
+              <section className="voice-engine">
+                <h4>Instrucciones del agente</h4>
+                <label htmlFor={`${id}-llm`}>Instrucciones Retell LLM</label>
+                <select
+                  className="crm-input"
+                  id={`${id}-llm`}
                   name="llm_id"
-                  list={`${id}-models`}
                   value={values.llm_id ?? ""}
                   onChange={(event) => update("llm_id", event.target.value)}
-                />
-                <datalist id={`${id}-models`}>
+                >
+                  <option value="">Selecciona las instrucciones</option>
+                  {values.llm_id &&
+                  !modelOptions.some(
+                    (option) => option.value === values.llm_id,
+                  ) ? (
+                    <option value={values.llm_id}>
+                      Instrucciones elegidas
+                    </option>
+                  ) : null}
                   {modelOptions.map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.label}
+                      {option.label === option.value
+                        ? "Instrucciones Retell LLM"
+                        : option.label}
                     </option>
                   ))}
-                </datalist>
-                <p className="voice-muted">
-                  {modelOptions.length
-                    ? "Selecciona unas instrucciones consultadas o escribe un ID exacto."
-                    : "No hay instrucciones cargadas. Escribe un ID existente o crea las instrucciones primero."}
-                </p>
-                {!record && onCreateModel ? (
+                </select>
+                <details className="voice-schema-reference">
+                  <summary>Usar un identificador de instrucciones</summary>
+                  <label htmlFor={`${id}-llm-manual`}>
+                    Identificador exacto de las instrucciones
+                  </label>
+                  <input
+                    className="crm-input"
+                    id={`${id}-llm-manual`}
+                    name="llm_id_manual"
+                    value={values.llm_id ?? ""}
+                    onChange={(event) => update("llm_id", event.target.value)}
+                  />
+                </details>
+                {onCreateModel ? (
                   <button
                     className="crm-button"
                     type="button"
@@ -386,28 +319,134 @@ export function VoiceAgentEditor({
                     Crear instrucciones primero
                   </button>
                 ) : null}
+              </section>
+            ) : null}
+          </>
+        ) : (
+          <>
+            {!record && !drafts.model_config?.enabled ? (
+              <div className="voice-field">
+                <label htmlFor={`${id}-model`}>Modelo de respuesta</label>
+                <select
+                  className="crm-input"
+                  id={`${id}-model`}
+                  name="model"
+                  value={values.model ?? ""}
+                  onChange={(event) => update("model", event.target.value)}
+                >
+                  <option value="">Selecciona un modelo</option>
+                  {fields
+                    .find((field) => field.key === "model")
+                    ?.schema.enum?.filter(
+                      (option): option is string => typeof option === "string",
+                    )
+                    .map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                </select>
               </div>
             ) : null}
-          </section>
-        ) : null}
-        {kind === "instructions" &&
-        !fields.some((field) => field.key === "model") ? (
-          <p className="voice-muted">
-            El tipo de modelo actual no está disponible en el editor guiado. Se
-            conservará sin cambios; usa el catálogo para configuraciones
-            avanzadas.
-          </p>
-        ) : null}
+            {(["general_prompt", "begin_message"] as const).map((key) => {
+              const hydrated = state(key);
+              const editable = !record || hydrated.editable;
+              const blocked =
+                hydrated.reasonCode === "blocked" ||
+                hydrated.reasonCode === "invalid_snapshot";
+              const explicit = drafts[key]?.enabled;
+              const original =
+                !blocked && typeof record?.[key] === "string"
+                  ? String(record[key])
+                  : "";
+              const value = explicit
+                ? drafts[key].null
+                  ? ""
+                  : (drafts[key].raw ?? "")
+                : editable
+                  ? (values[key] ?? "")
+                  : original;
+              return (
+                <div
+                  className="voice-field voice-prompt-field"
+                  data-voice-field={key}
+                  key={key}
+                >
+                  <label htmlFor={`${id}-${key}`}>
+                    {key === "general_prompt"
+                      ? "Prompt del agente"
+                      : "Saludo inicial"}
+                  </label>
+                  <textarea
+                    className="crm-input voice-textarea"
+                    id={`${id}-${key}`}
+                    name={key}
+                    rows={key === "general_prompt" ? 14 : 4}
+                    value={value}
+                    readOnly={!editable}
+                    aria-describedby={`${id}-${key}-hint`}
+                    onChange={(event) => update(key, event.target.value)}
+                  />
+                  <p id={`${id}-${key}-hint`} className="voice-muted">
+                    {!editable
+                      ? hydrated.reason
+                      : explicit && drafts[key].null
+                        ? key === "begin_message"
+                          ? "El agente generará un saludo dinámico."
+                          : "Se guardará sin instrucciones."
+                        : "Edita el texto completo. Solo se enviará si lo modificas."}
+                  </p>
+                  {editable ? (
+                    <div className="voice-editor-actions">
+                      {properties[key] &&
+                      voiceSchemaNullable(properties[key]) ? (
+                        <button
+                          className="crm-button"
+                          type="button"
+                          onClick={() => explicitText(key, null)}
+                        >
+                          {key === "general_prompt"
+                            ? "Dejar sin instrucciones"
+                            : "Generar saludo dinámico"}
+                        </button>
+                      ) : null}
+                      <button
+                        className="crm-button"
+                        type="button"
+                        onClick={() => explicitText(key, "")}
+                      >
+                        {key === "general_prompt"
+                          ? "Vaciar prompt"
+                          : "Esperar a la persona"}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </>
+        )}
       </fieldset>
       {schema ? (
         <VoiceSchemaEditor
           schema={schema}
           record={record}
-          drafts={advancedDrafts}
+          completeFields={completeFields}
+          blockedFields={blockedFields}
+          drafts={drafts}
           onChange={(next) => {
-            setAdvancedDrafts(next);
+            setDrafts(next);
             setError("");
           }}
+          exclude={
+            kind === "agent"
+              ? ["agent_name", "voice_id", ...(!record ? ["language"] : [])]
+              : [
+                  "general_prompt",
+                  "begin_message",
+                  ...(!record ? ["model"] : []),
+                ]
+          }
           disabled={disabled}
           voices={voices}
           models={models}
@@ -430,7 +469,7 @@ export function VoiceAgentEditor({
         <button
           className="crm-button crm-button-primary"
           type="submit"
-          disabled={disabled || !schema || !fields.length}
+          disabled={disabled || !schema}
         >
           {kind === "agent" && !record
             ? "Revisar nuevo agente"

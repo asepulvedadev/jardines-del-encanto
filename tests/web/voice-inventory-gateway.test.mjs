@@ -66,7 +66,7 @@ afterEach(() => {
   }
 });
 test("automatic inventory and exact reads admit only bounded POSTs with CSRF/session forwarding", async () => {
-  for (const path of ["retell/inventory", "retell/read"]) {
+  for (const path of ["retell/inventory", "retell/read", "retell/editor"]) {
     const response = await POST(request("POST", path), context(path));
     assert.equal(response.status, 200);
     assert.match(response.headers.get("cache-control"), /no-store, private/);
@@ -85,7 +85,7 @@ test("automatic inventory and exact reads admit only bounded POSTs with CSRF/ses
   }
 });
 test("automatic reads reject queries, other methods, origins and neighboring paths before fetching", async () => {
-  for (const path of ["retell/inventory", "retell/read"]) {
+  for (const path of ["retell/inventory", "retell/read", "retell/editor"]) {
     for (const [method, handler] of [
       ["GET", GET],
       ["PATCH", PATCH],

@@ -211,6 +211,10 @@ density. No full-bleed photographs, oversized promotional typography or decorati
   have a keyboard-accessible equivalent and obey server-side workflow rules.
 - Inventory: provide a list fallback for plans/maps. Lot selection must expose a textual
   identifier and status, not require recognizing a polygon color.
+- The owner's Retell-style agent editor uses a wide modal studio: prompt and core
+  controls left, grouped settings accordions center, explicit test panel right.
+  Keep focused setting modals, shared drafts across tabs and final approval. Reflow
+  into stacked panels on smaller screens; do not imitate unimplemented vendor controls.
 - At smaller widths, replace the sidebar with a labeled drawer and a single-column
   task flow. A 360–400px supporting panel becomes a full-width sheet.
 

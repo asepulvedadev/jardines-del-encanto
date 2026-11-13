@@ -118,6 +118,18 @@ class AutomaticRead(Revision):
         return self
 
 
+class EditorRead(Revision):
+    kind: Literal["agent", "instructions"]
+    id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,128}$", strict=True)
+    version: int | None = Field(default=None, ge=0, le=2**53 - 1, strict=True)
+
+    @model_validator(mode="after")
+    def explicit_version(self):
+        if "version" in self.model_fields_set and self.version is None:
+            raise ValueError("invalid_version")
+        return self
+
+
 class Configure(Revision):
     api_key: SecretStr | None = None
     defaults: Defaults | None = None

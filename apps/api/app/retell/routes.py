@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from ..control.models import Empty
 from ..crm import security
 from ..crm.database import connect
-from . import inventory, models, service
+from . import editor, inventory, models, service
 
 router = APIRouter(prefix="/crm/retell")
 Admin = Annotated[dict, Depends(security.session)]
@@ -71,3 +71,10 @@ def automatic_read(data: models.AutomaticRead, request: Request, admin: Admin):
     if request.query_params:
         raise HTTPException(422, "invalid_input")
     return inventory.read(data, admin)
+
+
+@router.post("/editor")
+def editor_snapshot(data: models.EditorRead, request: Request, admin: Admin):
+    if request.query_params:
+        raise HTTPException(422, "invalid_input")
+    return editor.snapshot(data, admin)

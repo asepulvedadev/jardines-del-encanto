@@ -21,7 +21,7 @@ const rules: [RegExp, string[]][] = [
   [/^sara\/attachments\/[0-9a-f-]{36}\/content$/, ["GET"]],
   [/^retell\/settings$/, ["GET", "POST"]],
   [/^retell\/results$/, ["GET"]],
-  [/^retell\/(catalog|schema|disconnect|inventory|read)$/, ["POST"]],
+  [/^retell\/(catalog|schema|disconnect|inventory|read|editor)$/, ["POST"]],
   [
     /^retell\/sessions\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/claim$/,
     ["POST"],

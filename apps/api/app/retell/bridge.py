@@ -41,6 +41,7 @@ def request(path, body=None, timeout=3):
         "/execute",
         "/schema",
         "/prepare",
+        "/editor-read",
     } and not re.fullmatch(r"/sessions/[0-9a-f-]{36}/claim", path):
         raise HTTPException(503, "retell_unavailable")
     if (path == "/state") != (body is None):

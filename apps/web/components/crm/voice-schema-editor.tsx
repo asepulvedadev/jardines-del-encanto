@@ -1,9 +1,11 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   voiceAnySchemas,
   voiceEmptyDraft,
+  voiceHydrateField,
+  voiceSchemaPatch,
   voicePrivateUrl,
   voiceSchemaComplex,
   voiceSchemaHint,
@@ -30,6 +32,8 @@ export type VoiceSchemaEditorProps = {
   disabled?: boolean;
   voices?: Record<string, unknown>[];
   models?: Record<string, unknown>[];
+  completeFields?: string[];
+  blockedFields?: Record<string, string>;
 };
 type ControlProps = {
   schema: VoiceSchema;
@@ -259,33 +263,57 @@ function VoiceControl({
           return (
             <div className="voice-schema-child" key={name}>
               {complex ? (
-                <label className="voice-checkbox">
-                  <input
-                    type="checkbox"
-                    name={`configure_${childPath}`}
-                    checked={!!child?.enabled}
-                    onChange={(event) =>
-                      update({
-                        children: {
-                          ...base.children,
-                          [name]: event.target.checked
-                            ? voiceEmptyDraft(property)
-                            : { enabled: false },
-                        },
-                      })
-                    }
-                  />
-                  {voiceSchemaLabel(name)}
-                  {childRequired ? " *" : ""}
-                </label>
+                <div className="voice-editor-actions">
+                  <span>
+                    {voiceSchemaLabel(name)}
+                    {childRequired ? " *" : ""}
+                  </span>
+                  {!child?.enabled && !childRequired ? (
+                    <button
+                      className="crm-button"
+                      type="button"
+                      name={`add_${childPath}`}
+                      onClick={() =>
+                        update({
+                          children: {
+                            ...base.children,
+                            [name]: voiceEmptyDraft(property),
+                          },
+                        })
+                      }
+                    >
+                      Agregar {voiceSchemaLabel(name).toLowerCase()}
+                    </button>
+                  ) : null}
+                  {child?.enabled && !childRequired ? (
+                    <button
+                      className="crm-button"
+                      type="button"
+                      name={`remove_${childPath}`}
+                      onClick={() =>
+                        update({
+                          children: {
+                            ...base.children,
+                            [name]: { enabled: false },
+                          },
+                        })
+                      }
+                    >
+                      Quitar {voiceSchemaLabel(name).toLowerCase()}
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
-              {!complex || child?.enabled ? (
+              {!complex || child?.enabled || childRequired ? (
                 <VoiceControl
                   {...childProps}
                   schema={property}
                   path={childPath}
                   id={`${id}-${name}`}
-                  draft={child}
+                  draft={
+                    child ??
+                    (childRequired ? voiceEmptyDraft(property) : undefined)
+                  }
                   required={childRequired}
                   onChange={(value) =>
                     update({ children: { ...base.children, [name]: value } })
@@ -528,21 +556,28 @@ function VoiceControl({
   return (
     <div className="voice-schema-control">
       {voiceSchemaNullable(schema) ? (
-        <label className="voice-checkbox">
-          <input
-            type="checkbox"
+        <div className="voice-editor-actions">
+          <button
+            className="crm-button"
+            type="button"
             name={`${path}.__null`}
-            checked={!!base.null}
-            onChange={(event) =>
-              event.target.checked
-                ? onChange({ enabled: true, null: true })
-                : onChange(voiceEmptyDraft(schema))
-            }
-          />
-          {key === "begin_message"
-            ? "Generar un mensaje inicial dinámico (null)"
-            : `${label}: sin valor (null)`}
-        </label>
+            onClick={() => onChange({ enabled: true, null: true })}
+          >
+            {key === "begin_message"
+              ? "Generar saludo dinámico"
+              : "Dejar sin valor"}
+          </button>
+          {base.null ? (
+            <button
+              className="crm-button"
+              type="button"
+              name={`${path}.__value`}
+              onClick={() => onChange(voiceEmptyDraft(schema))}
+            >
+              Editar valor
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {control}
       {base.blocked ? (
@@ -570,9 +605,18 @@ export function VoiceSchemaEditor({
   disabled,
   voices,
   models,
+  completeFields = [],
+  blockedFields = {},
 }: VoiceSchemaEditorProps) {
   const id = useId();
   const [search, setSearch] = useState("");
+  const [editing, setEditing] = useState<
+    { key: string; draft: VoiceSchemaDraft; dirty: boolean } | undefined
+  >();
+  const [error, setError] = useState("");
+  const dialog = useRef<HTMLDialogElement>(null);
+  const opener = useRef<HTMLButtonElement | null>(null);
+  const body = voiceSchemaProperties(schema).requestBody ?? schema;
   const inventory = voiceSchemaInventory(schema).filter(
     (entry) => !exclude.includes(entry.key),
   );
@@ -585,13 +629,107 @@ export function VoiceSchemaEditor({
         .includes(query),
   );
   const sections = [...new Set(filtered.map((entry) => entry.section))];
+  const active = inventory.find((entry) => entry.key === editing?.key);
+  useEffect(() => {
+    const node = dialog.current;
+    if (!editing || !node) return;
+    if (!node.open) node.showModal();
+    return () => {
+      if (node.open) node.close();
+    };
+  }, [editing?.key]);
+  function close() {
+    if (disabled) return;
+    if (dialog.current?.open) dialog.current.close();
+    setEditing(undefined);
+    setError("");
+    if (opener.current?.isConnected) opener.current.focus();
+  }
+  function open(key: string, trigger: HTMLButtonElement) {
+    if (disabled) return;
+    const hydrated = voiceHydrateField(
+      body,
+      key,
+      record,
+      completeFields,
+      blockedFields,
+    );
+    if (!hydrated.editable || !hydrated.draft) return;
+    opener.current = trigger;
+    // Native drafts contain no credentials; clone so Cancel cannot alter the parent.
+    const draft = drafts[key]?.enabled
+      ? structuredClone(drafts[key])
+      : hydrated.draft;
+    setEditing({ key, draft, dirty: false });
+    setError("");
+  }
+  function apply() {
+    if (disabled || !editing) return;
+    if (!editing.dirty) {
+      close();
+      return;
+    }
+    try {
+      if (
+        !voiceHydrateField(
+          body,
+          editing.key,
+          record,
+          completeFields,
+          blockedFields,
+        ).editable
+      )
+        throw new Error(
+          "Actualiza la lectura completa antes de editar este ajuste.",
+        );
+      const patch = voiceSchemaPatch(
+        body,
+        { [editing.key]: editing.draft },
+        record,
+        completeFields,
+      );
+      onChange({
+        ...drafts,
+        [editing.key]: Object.hasOwn(patch, editing.key)
+          ? editing.draft
+          : { enabled: false },
+      });
+      close();
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Revisa la configuración.",
+      );
+    }
+  }
+  function summary(key: string, value: unknown): string {
+    if (value === undefined) return "Sin configurar";
+    if (value === null) return "Sin valor";
+    if (typeof value === "boolean") return value ? "Activo" : "Inactivo";
+    if (Array.isArray(value))
+      return `${value.length} ${value.length === 1 ? "elemento" : "elementos"}`;
+    if (typeof value === "object") {
+      const item = value as Record<string, unknown>;
+      return typeof item.type === "string"
+        ? voiceSchemaOptionLabel(item.type)
+        : "Configuración guardada";
+    }
+    if (key === "voice_id")
+      return (
+        (voices?.find((item) => item?.voice_id === value)
+          ?.voice_name as string) || "Voz elegida"
+      );
+    if (/_id$/.test(key)) return "Recurso seleccionado";
+    return voicePrivateUrl(String(value))
+      ? "Dirección privada oculta"
+      : String(value).slice(0, 100) || "Texto vacío";
+  }
   return (
     <section className="voice-schema-editor" aria-labelledby={`${id}-heading`}>
       <header>
-        <h4 id={`${id}-heading`}>Todas las opciones del proveedor</h4>
+        <h4 id={`${id}-heading`}>Configuración del agente</h4>
         <p className="voice-muted">
-          Organizadas por función, según el esquema de API revisado. Cada cambio
-          requiere revisión. Los datos privados se administran en Retell.
+          Abre un ajuste, edítalo y aplícalo al borrador. Nada cambia en Retell
+          hasta revisar y aprobar el conjunto.
         </p>
       </header>
       <label htmlFor={`${id}-search`}>Buscar un ajuste</label>
@@ -608,26 +746,27 @@ export function VoiceSchemaEditor({
         <p role="status">No hay ajustes que coincidan con la búsqueda.</p>
       ) : null}
       <fieldset disabled={disabled} className="voice-schema-sections">
-        <legend className="sr-only">Ajustes adicionales de Retell</legend>
+        <legend className="sr-only">Ajustes de Retell</legend>
         {sections.map((section) => (
-          <details
+          <section
             className="voice-schema-section"
             key={section}
-            open={query ? true : undefined}
+            aria-labelledby={`${id}-${section}`}
           >
-            <summary>
+            <h4 className="voice-schema-section-title" id={`${id}-${section}`}>
               {section}
-              <span>
-                {filtered.filter((entry) => entry.section === section).length}{" "}
-                ajustes
-              </span>
-            </summary>
+            </h4>
             <div className="voice-schema-section-content">
               {filtered
                 .filter((entry) => entry.section === section)
                 .map((entry) => {
-                  const draft = drafts[entry.key];
-                  const complex = voiceSchemaComplex(entry.schema, entry.key);
+                  const hydrated = voiceHydrateField(
+                    body,
+                    entry.key,
+                    record,
+                    completeFields,
+                    blockedFields,
+                  );
                   const legacyBlocked =
                     (record?.model_config || drafts.model_config?.enabled) &&
                     [
@@ -638,100 +777,154 @@ export function VoiceSchemaEditor({
                       "model_ultrafast",
                       "s2s_model",
                     ].includes(entry.key);
-                  const update = (value: VoiceSchemaDraft) =>
-                    onChange({ ...drafts, [entry.key]: value });
+                  let value = hydrated.editable
+                    ? record?.[entry.key]
+                    : undefined;
+                  if (drafts[entry.key]?.enabled) {
+                    try {
+                      value = voiceSchemaPatch(body, {
+                        [entry.key]: drafts[entry.key],
+                      })[entry.key];
+                    } catch {
+                      value = undefined;
+                    }
+                  }
                   return (
                     <article
-                      className="voice-schema-field"
+                      className="voice-schema-field voice-schema-row"
                       key={entry.key}
                       data-voice-field={entry.key}
                     >
-                      <header>
+                      <div className="voice-schema-row-copy">
                         <h5>{entry.label}</h5>
-                      </header>
-                      {entry.support === "blocked" || legacyBlocked ? (
-                        <p className="voice-schema-blocked">
+                        <p className="voice-muted">
                           {legacyBlocked
-                            ? "Retell omite este ajuste heredado cuando existe model_config. Usa la configuración completa del modelo."
-                            : entry.reason}
+                            ? "Este ajuste heredado no se usa con la configuración vigente del modelo."
+                            : hydrated.editable
+                              ? summary(entry.key, value)
+                              : hydrated.reason}
                         </p>
-                      ) : (
-                        <>
-                          {complex ? (
-                            <>
-                              {record ? (
-                                <details className="voice-schema-preview">
-                                  <summary>Ver lectura parcial actual</summary>
-                                  <VoiceSnapshot
-                                    value={record[entry.key]}
-                                    path={entry.key}
-                                  />
-                                  <p className="voice-muted">
-                                    Esta lectura puede estar recortada. Nunca se
-                                    reutiliza como borrador.
-                                  </p>
-                                </details>
-                              ) : null}
-                              <label className="voice-checkbox">
-                                <input
-                                  type="checkbox"
-                                  name={`configure_${entry.key}`}
-                                  checked={!!draft?.enabled}
-                                  onChange={(event) =>
-                                    update(
-                                      event.target.checked
-                                        ? voiceEmptyDraft(entry.schema)
-                                        : { enabled: false },
-                                    )
-                                  }
-                                />
-                                {record
-                                  ? "Reemplazar configuración completa"
-                                  : "Configurar"}
-                                : {entry.label.toLowerCase()}
-                              </label>
-                              {draft?.enabled && record ? (
-                                <p className="voice-schema-warning">
-                                  Escribe la configuración completa desde cero.
-                                  El reemplazo puede eliminar elementos o
-                                  ajustes que no incluyas.
-                                </p>
-                              ) : null}
-                            </>
-                          ) : null}
-                          {!complex || draft?.enabled ? (
-                            <VoiceControl
-                              schema={entry.schema}
-                              path={entry.key}
-                              id={`${id}-${entry.key}`}
-                              draft={draft}
-                              onChange={update}
-                              current={
-                                complex ? undefined : record?.[entry.key]
-                              }
-                              voices={voices}
-                              models={models}
-                            />
-                          ) : null}
-                          {draft?.enabled ? (
-                            <button
-                              className="crm-button voice-schema-reset"
-                              type="button"
-                              name={`reset_${entry.key}`}
-                              onClick={() => update({ enabled: false })}
-                            >
-                              Descartar cambio de {entry.label.toLowerCase()}
-                            </button>
-                          ) : null}
-                        </>
-                      )}
+                        {drafts[entry.key]?.enabled ? (
+                          <span className="voice-draft-status">
+                            Modificado en el borrador
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="voice-editor-actions">
+                        <button
+                          className="crm-button"
+                          type="button"
+                          name={`edit_${entry.key}`}
+                          disabled={!!legacyBlocked || !hydrated.editable}
+                          onClick={(event) =>
+                            open(entry.key, event.currentTarget)
+                          }
+                        >
+                          Editar
+                          <span className="sr-only">
+                            {" "}
+                            {entry.label.toLowerCase()}
+                          </span>
+                        </button>
+                        {drafts[entry.key]?.enabled ? (
+                          <button
+                            className="crm-button"
+                            type="button"
+                            name={`reset_${entry.key}`}
+                            onClick={() =>
+                              onChange({
+                                ...drafts,
+                                [entry.key]: { enabled: false },
+                              })
+                            }
+                          >
+                            Deshacer cambio
+                          </button>
+                        ) : null}
+                      </div>
                     </article>
                   );
                 })}
             </div>
-          </details>
+          </section>
         ))}
       </fieldset>
+      <dialog
+        className="voice-field-dialog"
+        ref={dialog}
+        aria-labelledby={`${id}-modal-title`}
+        aria-describedby={`${id}-modal-note`}
+        onCancel={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          close();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            if (disabled) event.preventDefault();
+          }
+          if (event.key === "Enter") {
+            event.stopPropagation();
+            if (
+              (event.target as HTMLElement).tagName !== "TEXTAREA" &&
+              (event.target as HTMLElement).tagName !== "BUTTON"
+            )
+              event.preventDefault();
+          }
+        }}
+      >
+        <header className="voice-field-dialog-header">
+          <h3 id={`${id}-modal-title`}>{active?.label ?? "Editar ajuste"}</h3>
+          <p className="voice-muted" id={`${id}-modal-note`}>
+            Los cambios de esta ventana se aplican solo al borrador.
+          </p>
+        </header>
+        <fieldset disabled={disabled} className="voice-field-dialog-body">
+          <legend className="sr-only">
+            Editar {active?.label.toLowerCase()}
+          </legend>
+          {active && editing ? (
+            <VoiceControl
+              schema={active.schema}
+              path={active.key}
+              id={`${id}-modal-${active.key}`}
+              draft={editing.draft}
+              onChange={(draft) => {
+                setEditing({ ...editing, draft, dirty: true });
+                setError("");
+              }}
+              voices={voices}
+              models={models}
+            />
+          ) : null}
+          {error ? (
+            <p className="voice-error" role="alert">
+              {error}
+            </p>
+          ) : null}
+        </fieldset>
+        <footer className="voice-field-dialog-actions">
+          <button
+            className="crm-button"
+            type="button"
+            name="cancel_voice_field"
+            disabled={disabled}
+            onClick={close}
+          >
+            Cancelar
+          </button>
+          <button
+            className="crm-button crm-button-primary"
+            type="button"
+            name="apply_voice_field"
+            disabled={disabled}
+            onClick={apply}
+          >
+            Aplicar al borrador
+          </button>
+        </footer>
+      </dialog>
     </section>
   );
 }

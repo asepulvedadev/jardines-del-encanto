@@ -1,5 +1,9 @@
 import type { RetellSchema } from "./retell-schema";
-import { voiceSchemaPatch, type VoiceSchemaDrafts } from "./voice-schema-model";
+import {
+  voiceSchemaPatch,
+  voiceHydrateField,
+  type VoiceSchemaDrafts,
+} from "./voice-schema-model";
 
 type ComposedSchema = RetellSchema & {
   allOf?: ComposedSchema[];
@@ -118,8 +122,8 @@ export function voiceEditorFields(
       : []),
     ...(
       [
-        ["general_prompt", "Instrucciones completas"],
-        ["begin_message", "Mensaje inicial completo"],
+        ["general_prompt", "Prompt del agente (completo)"],
+        ["begin_message", "Saludo inicial (completo)"],
       ] as const
     ).flatMap(([key, label]) => {
       const fieldSchema = scalar(property(body, key));
@@ -192,6 +196,10 @@ function parseField(field: VoiceEditorField, raw: string): string | number {
     throw new Error(`Revisa ${label.toLowerCase()}.`);
   return raw;
 }
+export type VoiceEditorSafety = {
+  completeFields?: string[];
+  blockedFields?: Record<string, string>;
+};
 export function voiceEditorArguments(
   kind: VoiceEditorKind,
   schema: RetellSchema,
@@ -199,6 +207,7 @@ export function voiceEditorArguments(
   values: Record<string, string>,
   replacements: VoiceReplacements = {},
   advancedDrafts: VoiceSchemaDrafts = {},
+  safety?: VoiceEditorSafety,
 ): { endpoint: string; arguments: Record<string, unknown> } {
   const fields = voiceEditorFields(kind, schema, record);
   const bodySchema = property(schema, "requestBody");
@@ -210,6 +219,7 @@ export function voiceEditorArguments(
     bodySchema,
     advancedDrafts,
     record,
+    safety?.completeFields,
   );
   const fullModel = body.model_config !== undefined;
   const fullEngine = body.response_engine !== undefined;
@@ -245,6 +255,7 @@ export function voiceEditorArguments(
     }
   }
   for (const field of fields) {
+    if (record && safety && !Object.hasOwn(values, field.key)) continue;
     if (
       body[field.key] !== undefined ||
       (fullModel && ["model", "temperature"].includes(field.key))
@@ -259,10 +270,27 @@ export function voiceEditorArguments(
       !replacements[field.key as keyof VoiceReplacements]
     )
       continue;
+    if (
+      record &&
+      isFullText &&
+      safety?.completeFields?.includes(field.key) &&
+      raw === record[field.key]
+    )
+      continue;
     if (record && !isFullText && raw === (initial[field.key] ?? "")) continue;
     if (
       !raw.trim() &&
-      !(record && field.key === "begin_message" && replacements.begin_message)
+      !(
+        record &&
+        field.key === "begin_message" &&
+        replacements.begin_message
+      ) &&
+      !(
+        record &&
+        isFullText &&
+        safety?.completeFields?.includes(field.key) &&
+        replacements[field.key as keyof VoiceReplacements]
+      )
     ) {
       if (
         (!record &&
@@ -365,6 +393,23 @@ export function voiceEditorArguments(
     throw new Error(
       "Completa el nombre del agente y selecciona una voz válida.",
     );
+  if (record && safety) {
+    for (const key of Object.keys(body)) {
+      if (
+        !voiceHydrateField(
+          bodySchema,
+          key,
+          record,
+          safety.completeFields,
+          safety.blockedFields,
+        ).editable
+      ) {
+        throw new Error(
+          "Este ajuste no tiene una lectura completa y segura. Actualiza la configuración antes de editarlo.",
+        );
+      }
+    }
+  }
   if (!Object.keys(body).length)
     throw new Error("No hay cambios para revisar.");
   return {
