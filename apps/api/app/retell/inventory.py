@@ -20,7 +20,7 @@ TTL = 30
 MAX_KEYS = 128
 _slots = BoundedSemaphore(3)
 _queue_slots = BoundedSemaphore(33)
-_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="retell-read")
+_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="retell-read")
 _lock = Lock()
 _cache = OrderedDict()
 _flights = {}
@@ -207,29 +207,77 @@ def _read(data, admin, *, connection_version=None, deadline=None):
             raise HTTPException(503, "retell_read_unavailable") from None
 
 
+def _submit(function, *args, **kwargs):
+    if not _queue_slots.acquire(blocking=False):
+        future = Future()
+        future.set_exception(HTTPException(429, "retell_read_busy"))
+        return future
+    try:
+        future = _pool.submit(function, *args, **kwargs)
+    except BaseException:
+        _queue_slots.release()
+        raise
+    future.add_done_callback(lambda done: _queue_slots.release())
+    return future
+
+
+def _inventory_rows(data):
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict) and isinstance(data.get("items"), list):
+        return data["items"]
+    raise HTTPException(503, "retell_read_unavailable")
+
+
+def _test_case_inventory(revision, admin, version, snapshots, deadline):
+    # Retell requires an engine type AND its identifier; there is no global list.
+    _reviewed("listTestCaseDefinitions")
+    sources = []
+    for endpoint, kind, key in (
+        ("listRetellLLM", "retell-llm", "llm_id"),
+        ("listConversationFlows", "conversation-flow", "conversation_flow_id"),
+    ):
+        if endpoint not in snapshots:
+            raise HTTPException(503, "retell_read_unavailable")
+        for row in _inventory_rows(snapshots[endpoint]["data"]):
+            if not isinstance(row, dict) or not isinstance(row.get(key), str) or not row[key]:
+                raise HTTPException(503, "retell_read_unavailable")
+            arguments = {"type": kind, key: row[key]}
+            if arguments not in sources:
+                sources.append(arguments)
+    items = []
+    # Inventory is explicitly partial; cap linked contexts as well as provider rows.
+    for arguments in sources[:10]:
+        result = read(
+            models.AutomaticRead(
+                revision=revision, endpoint="listTestCaseDefinitions", arguments=arguments
+            ),
+            admin,
+            connection_version=version,
+            deadline=deadline,
+        )
+        items.extend(_inventory_rows(result["data"]))
+    return {"data": service.safe_result({"items": items})}
+
+
 def _collect(revision, admin, version, seed):
     snapshots = {row["endpoint"]: row for row in seed.get("snapshots", [])}
-    pending = [endpoint for endpoint in models.INVENTORY_ENDPOINTS if endpoint not in snapshots]
+    pending = [
+        endpoint
+        for endpoint in models.INVENTORY_ENDPOINTS
+        if endpoint not in snapshots and endpoint != "listTestCaseDefinitions"
+    ]
     deadline = monotonic() + 64
-    work = {}
-    for endpoint in pending:
-        if _queue_slots.acquire(blocking=False):
-            try:
-                future = _pool.submit(
-                    read,
-                    models.AutomaticRead(revision=revision, endpoint=endpoint, arguments={}),
-                    admin,
-                    connection_version=version,
-                    deadline=deadline,
-                )
-            except BaseException:
-                _queue_slots.release()
-                raise
-            future.add_done_callback(lambda done: _queue_slots.release())
-        else:
-            future = Future()
-            future.set_exception(HTTPException(429, "retell_read_busy"))
-        work[endpoint] = future
+    work = {
+        endpoint: _submit(
+            read,
+            models.AutomaticRead(revision=revision, endpoint=endpoint, arguments={}),
+            admin,
+            connection_version=version,
+            deadline=deadline,
+        )
+        for endpoint in pending
+    }
     errors = []
     for endpoint, future in work.items():
         try:
@@ -244,6 +292,22 @@ def _collect(revision, admin, version, seed):
             future.cancel()
             errors.append({"endpoint": endpoint, "code": "retell_read_timeout"})
         except Exception:  # noqa: BLE001 - bounded codes only, never provider exception text
+            errors.append({"endpoint": endpoint, "code": "retell_read_unavailable"})
+    if "listTestCaseDefinitions" not in snapshots:
+        endpoint = "listTestCaseDefinitions"
+        future = _submit(_test_case_inventory, revision, admin, version, snapshots, deadline)
+        try:
+            result = future.result(timeout=max(0, deadline - monotonic()))
+            snapshots[endpoint] = {
+                "endpoint": endpoint,
+                "provider_revision": revision,
+                "created_at": datetime.now(UTC).isoformat(),
+                "data": result["data"],
+            }
+        except TimeoutError:
+            future.cancel()
+            errors.append({"endpoint": endpoint, "code": "retell_read_timeout"})
+        except Exception:  # noqa: BLE001 - never expose provider data
             errors.append({"endpoint": endpoint, "code": "retell_read_unavailable"})
     return {
         "snapshots": [

@@ -8,7 +8,7 @@ from psycopg.types.json import Jsonb
 from test_crm import authenticated  # noqa: F401
 from test_retell import approve, propose, retelled  # noqa: F401
 
-from app.retell import inventory, models
+from app.retell import bridge, inventory, models
 
 
 @pytest.fixture(autouse=True)
@@ -16,6 +16,35 @@ def empty_inventory_cache():
     inventory.clear_cache()
     yield
     inventory.clear_cache()
+
+
+@pytest.fixture(autouse=True)
+def engine_inventory_responses(retelled, monkeypatch):
+    from json import loads
+    from pathlib import Path
+
+    from jsonschema import Draft202012Validator
+
+    request = bridge.request
+    schemas = loads((Path(__file__).resolve().parents[3] / "ops/retell/schemas.json").read_text())
+
+    def response(path, body=None, timeout=3):
+        if path == "/prepare" and body["endpoint"] in models.INVENTORY_ENDPOINTS:
+            Draft202012Validator(schemas[body["endpoint"]]).validate(body["arguments"])
+        result = request(path, body, timeout)
+        if path == "/execute":
+            if body["endpoint"] == "listRetellLLM":
+                result["data"] = {"items": [{"llm_id": "llm-fixture"}]}
+            elif body["endpoint"] == "listConversationFlows":
+                result["data"] = {"items": [{"conversation_flow_id": "flow-fixture"}]}
+            elif body["endpoint"] == "listTestCaseDefinitions":
+                assert body["arguments"].get("llm_id") or body["arguments"].get(
+                    "conversation_flow_id"
+                )
+                result["data"] = {"items": []}
+        return result
+
+    monkeypatch.setattr(bridge, "request", response)
 
 
 def execute_count(calls):
@@ -50,16 +79,16 @@ def test_inventory_auth_csrf_and_fixed_read_workflow_without_proposals(retelled)
     assert result["partial"] is True and result["cached"] is False and result["errors"] == []
     assert [row["endpoint"] for row in result["snapshots"]] == list(models.INVENTORY_ENDPOINTS)
     assert all(row["provider_revision"] == 1 for row in result["snapshots"])
-    assert execute_count(calls) == 11
+    assert execute_count(calls) == 12
     assert client.post("/crm/retell/inventory", json={"revision": 1}).json()["cached"] is True
-    assert execute_count(calls) == 11
+    assert execute_count(calls) == 12
     assert client.get("/crm/retell/results").json() == {"snapshots": [], "partial": True}
     with psycopg.connect(owner) as db:
         assert db.execute("SELECT count(*) FROM crm.hermes_proposals").fetchone()[0] == 0
         audits = db.execute(
             "SELECT action,arguments FROM crm.control_audit WHERE action='retell.automatic_read'"
         ).fetchall()
-        assert len(audits) == 22
+        assert len(audits) == 24
         for _, metadata in audits:
             assert set(metadata) == {"endpoint", "provider_revision", "connection_version", "stage"}
         assert "Safe result" not in str(audits) and "never_persist_me" not in str(audits)
@@ -98,15 +127,15 @@ def test_completed_actor_session_mutation_and_connection_change_invalidate_cache
     mutation = propose(client, "createAgent", {"requestBody": {"agent_name": "fixture"}})
     assert approve(client, mutation, consent_confirmed=True).status_code == 200
     assert client.post("/crm/retell/inventory", json={"revision": 1}).json()["cached"] is False
-    assert execute_count(calls) == 23
+    assert execute_count(calls) == 25
     with psycopg.connect(owner) as db:
         db.execute("UPDATE crm.control_connections SET version=version+1 WHERE key='retell'")
     assert client.post("/crm/retell/inventory", json={"revision": 1}).json()["cached"] is False
-    assert execute_count(calls) == 34
+    assert execute_count(calls) == 37
     with psycopg.connect(owner) as db:
         db.execute("UPDATE crm.control_connections SET enabled=false WHERE key='retell'")
     assert client.post("/crm/retell/inventory", json={"revision": 1}).status_code == 409
-    assert execute_count(calls) == 34
+    assert execute_count(calls) == 37
 
 
 def test_foreign_actor_or_session_mutations_do_not_invalidate_an_admin_cache(retelled):
@@ -129,7 +158,7 @@ def test_foreign_actor_or_session_mutations_do_not_invalidate_an_admin_cache(ret
                 ),
             )
     assert client.post("/crm/retell/inventory", json={"revision": 1}).json()["cached"] is True
-    assert execute_count(calls) == 11
+    assert execute_count(calls) == 12
 
 
 def test_new_login_and_provider_revision_cannot_reuse_old_inventory(retelled):
@@ -141,8 +170,8 @@ def test_new_login_and_provider_revision_cannot_reuse_old_inventory(retelled):
     client.headers["X-CSRF-Token"] = login.json()["csrf_token"]
     state["revision"] = 2
     assert client.post("/crm/retell/inventory", json={"revision": 1}).status_code == 409
-    assert execute_count(calls) == 11
+    assert execute_count(calls) == 12
     response = client.post("/crm/retell/inventory", json={"revision": 2})
     assert response.status_code == 200, response.text
     assert response.json()["cached"] is False
-    assert execute_count(calls) == 22
+    assert execute_count(calls) == 24

@@ -62,6 +62,21 @@ def fake(monkeypatch):
                 "schema_hash": state["schema"],
             }
         if path == "/execute":
+            if body["endpoint"] in {
+                "listRetellLLM",
+                "listConversationFlows",
+                "listTestCaseDefinitions",
+            }:
+                data = {
+                    "listRetellLLM": {"items": [{"llm_id": "llm-fixture"}]},
+                    "listConversationFlows": {"items": [{"conversation_flow_id": "flow-fixture"}]},
+                    "listTestCaseDefinitions": {
+                        "items": [
+                            {"test_case_definition_id": body["arguments"].get("type", "fixture")}
+                        ]
+                    },
+                }[body["endpoint"]]
+                return {"status": "completed", "endpoint": body["endpoint"], "data": data}
             return {
                 "status": "completed",
                 "endpoint": body["endpoint"],
@@ -87,15 +102,23 @@ def test_inventory_fixed_reads_cache_and_isolation(fake):
     assert result["partial"] is True and result["cached"] is False
     assert result["errors"] == []
     assert [row["endpoint"] for row in result["snapshots"]] == list(models.INVENTORY_ENDPOINTS)
-    assert all(row["data"] == [{"agent_id": "fixture"}] for row in result["snapshots"])
+    assert result["snapshots"][0]["data"] == [{"agent_id": "fixture"}]
+    assert (
+        len(
+            next(
+                row for row in result["snapshots"] if row["endpoint"] == "listTestCaseDefinitions"
+            )["data"]["items"]
+        )
+        == 2
+    )
     executed = [body for path, body in calls if path == "/execute"]
-    assert len(executed) == 11 and all(body["consent_confirmed"] is False for body in executed)
+    assert len(executed) == 12 and all(body["consent_confirmed"] is False for body in executed)
     assert all(action == "retell.automatic_read" for action, _ in audits)
     assert "do-not-expose" not in str(audits) and "arguments" not in str(audits)
     result["snapshots"][0]["data"].clear()
     assert inventory.synchronize(models.Revision(revision=7), admin)["cached"] is True
     assert inventory.synchronize(models.Revision(revision=7), admin)["snapshots"][0]["data"]
-    assert len([1 for path, _ in calls if path == "/execute"]) == 11
+    assert len([1 for path, _ in calls if path == "/execute"]) == 12
     for identity in [{**admin, "token_hash": "another-session"}, {**admin, "id": uuid4()}]:
         assert inventory.synchronize(models.Revision(revision=7), identity)["cached"] is False
     state["version"] += 1
@@ -151,7 +174,11 @@ def test_all_allowed_reads_return_sanitized_completed_results(fake):
             "provider": "retell",
             "status": "completed",
             "endpoint": endpoint,
-            "data": [{"agent_id": "fixture"}],
+            "data": {
+                "listRetellLLM": {"items": [{"llm_id": "llm-fixture"}]},
+                "listConversationFlows": {"items": [{"conversation_flow_id": "flow-fixture"}]},
+                "listTestCaseDefinitions": {"items": [{"test_case_definition_id": "fixture"}]},
+            }.get(endpoint, [{"agent_id": "fixture"}]),
         }
     assert len([body for path, body in calls if path == "/execute"]) == 23
 
@@ -219,10 +246,10 @@ def test_partial_failure_keeps_successes_and_explicit_load_only_retries_missing(
     failing[0] = False
     result = inventory.synchronize(models.Revision(revision=7), admin)
     assert len(result["snapshots"]) == 11 and result["errors"] == []
-    assert len([1 for path, _ in calls if path == "/execute"]) == 11
+    assert len([1 for path, _ in calls if path == "/execute"]) == 12
 
 
-def test_singleflight_and_three_reader_concurrency(fake, monkeypatch):
+def test_singleflight_and_serial_inventory_concurrency(fake, monkeypatch):
     _, calls, _, admin, request = fake
     started, release = Event(), Event()
     active, maximum = [0], [0]
@@ -233,7 +260,7 @@ def test_singleflight_and_three_reader_concurrency(fake, monkeypatch):
             with lock:
                 active[0] += 1
                 maximum[0] = max(maximum[0], active[0])
-                if active[0] == 3:
+                if active[0] == 1:
                     started.set()
             assert release.wait(10)
             with lock:
@@ -248,8 +275,8 @@ def test_singleflight_and_three_reader_concurrency(fake, monkeypatch):
         release.set()
         assert len(first.result(timeout=15)["snapshots"]) == 11
         assert len(second.result(timeout=15)["snapshots"]) == 11
-    assert maximum[0] == 3
-    assert len([1 for path, _ in calls if path == "/execute"]) == 11
+    assert maximum[0] == 1
+    assert len([1 for path, _ in calls if path == "/execute"]) == 12
 
 
 def test_cache_is_bounded_and_expired_snapshots_reload(fake, monkeypatch):
@@ -312,7 +339,7 @@ def test_completed_same_session_mutation_invalidates_inventory_cache(fake):
     assert first["cached"] is False
     state["mutation"] = 1
     assert inventory.synchronize(models.Revision(revision=7), admin)["cached"] is False
-    assert len([1 for path, _ in calls if path == "/execute"]) == 22
+    assert len([1 for path, _ in calls if path == "/execute"]) == 24
 
 
 def test_unavailable_resource_is_partial_not_an_all_inventory_failure(fake, monkeypatch):
@@ -402,3 +429,100 @@ def test_cached_policy_changes_preserve_other_resources(fake, monkeypatch):
     result = inventory.synchronize(models.Revision(revision=7), admin)
     assert len(result["snapshots"]) == 10
     assert result["errors"] == [{"endpoint": "listVoices", "code": "retell_read_unavailable"}]
+
+
+def test_inventory_requests_obey_real_schema_and_test_case_engine_context(fake, monkeypatch):
+    import json
+    from pathlib import Path
+
+    from jsonschema import Draft202012Validator
+
+    _, calls, _, admin, request = fake
+    schemas = json.loads(
+        (Path(__file__).resolve().parents[3] / "ops/retell/schemas.json").read_text()
+    )
+
+    def reviewed(path, body=None, timeout=3):
+        if path == "/prepare":
+            Draft202012Validator(schemas[body["endpoint"]]).validate(body["arguments"])
+            if body["endpoint"] == "listTestCaseDefinitions":
+                args = body["arguments"]
+                assert (
+                    args.get("llm_id")
+                    if args["type"] == "retell-llm"
+                    else args.get("conversation_flow_id")
+                )
+        result = request(path, body, timeout)
+        if path == "/execute":
+            endpoint = body["endpoint"]
+            if endpoint == "listRetellLLM":
+                result["data"] = {"items": [{"llm_id": "llm-fixture"}]}
+            elif endpoint == "listConversationFlows":
+                result["data"] = {"items": [{"conversation_flow_id": "flow-fixture"}]}
+            elif endpoint == "listTestCaseDefinitions":
+                result["data"] = {"items": [{"test_case_definition_id": body["arguments"]["type"]}]}
+        return result
+
+    monkeypatch.setattr(bridge, "request", reviewed)
+    result = inventory.synchronize(models.Revision(revision=7), admin)
+    assert result["errors"] == []
+    tests = next(row for row in result["snapshots"] if row["endpoint"] == "listTestCaseDefinitions")
+    assert tests["data"] == {
+        "items": [
+            {"test_case_definition_id": "retell-llm"},
+            {"test_case_definition_id": "conversation-flow"},
+        ]
+    }
+    plans = [
+        body["arguments"]
+        for path, body in calls
+        if path == "/execute" and body["endpoint"] == "listTestCaseDefinitions"
+    ]
+    assert plans == [
+        {"type": "retell-llm", "llm_id": "llm-fixture"},
+        {"type": "conversation-flow", "conversation_flow_id": "flow-fixture"},
+    ]
+
+
+def test_inventory_worker_does_not_fan_out_against_serial_gateway_lock():
+    assert inventory._pool._max_workers == 1
+
+
+def test_test_inventory_contexts_are_bounded_and_unknown_sources_are_not_empty_success(
+    fake, monkeypatch
+):
+    _, calls, _, admin, request = fake
+    source_rows = [{"llm_id": f"llm-{index}"} for index in range(12)]
+
+    def many(path, body=None, timeout=3):
+        result = request(path, body, timeout)
+        if path == "/execute" and body["endpoint"] == "listRetellLLM":
+            result["data"] = {"items": source_rows}
+        return result
+
+    monkeypatch.setattr(bridge, "request", many)
+    result = inventory.synchronize(models.Revision(revision=7), admin)
+    assert result["errors"] == []
+    assert (
+        sum(
+            path == "/execute" and body["endpoint"] == "listTestCaseDefinitions"
+            for path, body in calls
+        )
+        == 10
+    )
+    for rows, expected_error, expected_calls in [([], False, 1), ([{"unknown": "llm"}], True, 0)]:
+        source_rows[:] = rows
+        inventory.clear_cache()
+        calls.clear()
+        result = inventory.synchronize(models.Revision(revision=7), admin)
+        assert (
+            any(error["endpoint"] == "listTestCaseDefinitions" for error in result["errors"])
+            is expected_error
+        )
+        assert (
+            sum(
+                path == "/execute" and body["endpoint"] == "listTestCaseDefinitions"
+                for path, body in calls
+            )
+            == expected_calls
+        )

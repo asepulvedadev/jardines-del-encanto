@@ -94,7 +94,8 @@ other successful resources. Raw provider exceptions are never included.
   checks also apply when returning cached/shared snapshots.
 - A new explicit load retries missing resources once, preserving successful cached
   snapshots without extending their original expiry. There are no background retries.
-- One shared executor has three workers; a process-wide semaphore caps automatic
+- One shared executor has one inventory worker, matching the gateway’s serialized
+  configuration/dispatch lock; a process-wide semaphore caps automatic
   read concurrency at three, including direct reads. Admission bounds the executor
   to 33 running/queued jobs. Every worker owns its DB connection contexts.
 - Individual reads have an 18-second phase deadline. Local prepare calls use at most
@@ -124,3 +125,19 @@ node --test tests/web/voice-inventory-gateway.test.mjs
 `apps/api/tests/test_voice_inventory.py` contains guarded local DB cases for the
 existing isolated CRM runner. Run DB suites serially; tests use a fake gateway and
 never paid calls, microphones, provider credentials or production data.
+
+## Engine-scoped test inventory
+
+`listTestCaseDefinitions` has no unscoped listing. Automatic synchronization first
+loads the reviewed LLM and conversation-flow inventories, then passes each known
+`llm_id` or `conversation_flow_id` with its exact `type`. At most ten unique engine
+contexts are queried, under the same collection deadline and queue admission limit.
+Their bounded item lists are combined into the existing partial test snapshot.
+Missing/failed engine inventories are not presented as an empty successful test list.
+The known empty engine lists require no test-case provider invocation. This is still
+read-only; no tests are created or run. There is no generic argument defaulting.
+
+The single inventory worker prevents its metadata/state calls from racing sibling
+inventory invocations that hold the gateway configuration lock. Direct reads retain
+the existing shared cap of three, and all deadlines, session checks, cache isolation,
+strict schemas and explicit mutation approvals remain in force.
