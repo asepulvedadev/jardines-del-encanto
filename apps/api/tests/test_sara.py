@@ -443,3 +443,129 @@ def test_broker_history_rejects_tool_replay_and_oversized_context():
         with pytest.raises(HTTPException):
             broker.validated_history(history)
     assert broker.validated_history(None) == []
+
+
+def test_progress_is_owned_nonblocking_and_only_committed_activity(sara_ready, monkeypatch):
+    client, owner, _ = sara_ready
+    chat, body = conversation(client), payload()
+    path = f"/crm/sara/conversations/{chat['id']}/messages"
+    progress = path + f"/{body['request_id']}/progress"
+    assert client.get(progress).status_code == 404
+    entered, release = Event(), Event()
+
+    def request(path, data, timeout):
+        with TestClient(app) as runtime:
+            headers = {"Authorization": "Bearer " + data["token"]}
+            assert (
+                runtime.post("/internal/hermes/claim", json={}, headers=headers).status_code == 200
+            )
+            assert (
+                runtime.post(
+                    "/internal/hermes/call",
+                    headers=headers,
+                    json={"call_id": "confirmed", "action": "crm.workspace", "arguments": {}},
+                ).status_code
+                == 200
+            )
+            with psycopg.connect(owner) as db:
+                db.execute("SELECT id FROM crm.hermes_runs WHERE token_hash IS NOT NULL FOR UPDATE")
+                entered.set()
+                assert release.wait(8)
+            return runtime.post(
+                "/internal/hermes/finish", json={"reply": "Listo"}, headers=headers
+            ).json()
+
+    monkeypatch.setattr(bridge, "request", request)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        sending = pool.submit(lambda: client.post(path, json=body))
+        try:
+            assert entered.wait(8)
+            response = pool.submit(lambda: client.get(progress)).result(timeout=3)
+            assert response.status_code == 200
+            value = response.json()
+            assert value["phase"] == "claimed"
+            assert value["request_id"] == body["request_id"]
+            assert value["user_message"]["content"] == body["message"]
+            assert value["activities"] == [
+                {
+                    "id": "confirmed",
+                    "label": "Consultar clientes y pipeline",
+                    "outcome": "completed",
+                }
+            ]
+            assert not (
+                {"token", "token_hash", "prompt", "history", "arguments", "response", "run_id"}
+                & set(value)
+            )
+            assert (
+                client.get(
+                    f"/crm/sara/conversations/{uuid4()}/messages/{body['request_id']}/progress"
+                ).status_code
+                == 404
+            )
+            with TestClient(app) as anonymous:
+                assert anonymous.get(progress).status_code == 401
+        finally:
+            release.set()
+        assert sending.result(timeout=8).json()["state"] == "completed"
+    assert client.get(progress).json()["phase"] == "finished"
+
+
+def test_progress_hides_other_owners_and_sanitizes_proposals_errors(sara_ready, monkeypatch):
+    from psycopg.types.json import Jsonb
+
+    client, owner, password = sara_ready
+    chat, body = conversation(client), payload()
+    path = f"/crm/sara/conversations/{chat['id']}/messages"
+    calls = []
+    fake_runtime(monkeypatch, calls)
+    assert client.post(path, json=body).status_code == 200
+    progress_path = path + f"/{body['request_id']}/progress"
+    with psycopg.connect(owner) as db:
+        run = db.execute(
+            "SELECT run_id FROM crm.sara_messages WHERE request_id=%s AND role='user'",
+            (body["request_id"],),
+        ).fetchone()[0]
+        for index in range(13):
+            db.execute(
+                "INSERT INTO crm.hermes_calls(run_id,call_id,request,response) VALUES (%s,%s,%s,%s)",
+                (
+                    run,
+                    str(index).zfill(2),
+                    Jsonb(
+                        {"action": "secret-custom-label", "arguments": {"secret": "do-not-expose"}}
+                    ),
+                    Jsonb(
+                        {"proposals": [{"private": "do-not-expose"}]}
+                        if index == 0
+                        else {"result": {"error": "do-not-expose"}}
+                    ),
+                ),
+            )
+        db.execute(
+            "INSERT INTO crm.users(username,password_hash) SELECT 'otheradmin',password_hash FROM crm.users WHERE username='testadmin'"
+        )
+    result = client.get(progress_path).json()
+    assert len(result["activities"]) == 12
+    assert result["activities"][0] == {
+        "id": "00",
+        "label": "Usar herramienta del proyecto",
+        "outcome": "proposal",
+    }
+    assert result["activities"][1]["outcome"] == "failed"
+    assert "do-not-expose" not in str(result) and "secret-custom-label" not in str(result)
+    other_chat = conversation(client)
+    assert (
+        client.get(
+            f"/crm/sara/conversations/{other_chat['id']}/messages/{body['request_id']}/progress"
+        ).status_code
+        == 404
+    )
+    with TestClient(app, base_url="http://127.0.0.1:4320") as other:
+        login = other.post(
+            "/crm/auth/login",
+            json={"username": "otheradmin", "password": password},
+            headers={"Origin": "http://127.0.0.1:4320"},
+        )
+        assert login.status_code == 200
+        assert other.get(progress_path).status_code == 404

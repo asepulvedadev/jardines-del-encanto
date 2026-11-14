@@ -84,6 +84,11 @@ def messages(conversation_id: UUID, admin: Admin, before: UUID | None = None):
     return service.messages(conversation_id, before, admin)
 
 
+@router.get("/conversations/{conversation_id}/messages/{request_id}/progress")
+def progress(conversation_id: UUID, request_id: UUID, admin: Admin):
+    return service.progress(conversation_id, request_id, admin)
+
+
 @router.post("/conversations/{conversation_id}/messages")
 def send(conversation_id: UUID, data: models.MessageInput, admin: Admin):
     return service.send(conversation_id, data, admin)

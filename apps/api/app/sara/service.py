@@ -66,7 +66,7 @@ def message_view(db, row, admin):
                     ),
                 }
             )
-    return {key: row[key] for key in ("id", "role", "content", "created_at", "state")} | {
+    return {key: row[key] for key in ("id", "request_id", "role", "content", "created_at", "state")} | {
         "attachments": files_for(db, row["id"], admin["id"], excerpt=512),
         "results": row["results"],
         "proposals": proposals,
@@ -294,6 +294,70 @@ def messages(conversation_id, before, admin):
             used += size
         next_cursor = output[-1]["id"] if len(rows) > len(output) and output else None
         return {"messages": list(reversed(output)), "next_cursor": next_cursor}
+
+
+ACTIVITY_LABELS = {
+    "crm.workspace": "Consultar clientes y pipeline",
+    "crm.activities": "Consultar actividad del cliente",
+    "control.catalog": "Consultar skills y herramientas",
+    "social.status": "Consultar redes sociales",
+    "social.sync": "Sincronizar redes sociales",
+    "social.connect": "Conectar una red social",
+    "voice.catalog": "Consultar ElevenLabs",
+    "voice.execute": "Preparar operación de voz",
+    "retell.catalog": "Consultar Retell",
+    "retell.schema": "Consultar opciones de Retell",
+    "retell.execute": "Preparar operación de Retell",
+    "crm.contact.create": "Preparar nuevo cliente",
+    "crm.contact.update": "Preparar actualización del cliente",
+    "crm.deal.update": "Preparar cambio del pipeline",
+    "crm.note.create": "Preparar nota del cliente",
+    "crm.task.create": "Preparar seguimiento",
+    "crm.task.update": "Preparar actualización del seguimiento",
+}
+
+
+def progress(conversation_id, request_id, admin):
+    """Read committed activity without locks, settlement, replay or model internals."""
+    with connect() as db:
+        owned_conversation(db, conversation_id, admin)
+        user = db.execute(
+            "SELECT * FROM crm.sara_messages WHERE conversation_id=%s AND owner_id=%s "
+            "AND request_id=%s AND role='user'",
+            (conversation_id, admin["id"], request_id),
+        ).fetchone()
+        if not user:
+            raise HTTPException(404, "not_found")
+        run = db.execute(
+            "SELECT state FROM crm.hermes_runs WHERE id=%s AND actor_id=%s",
+            (user["run_id"], admin["id"]),
+        ).fetchone()
+        # Calls have no start timestamp. This is a stable set of completed operations,
+        # never a chronological trace or evidence that an unapproved write executed.
+        calls = db.execute(
+            "SELECT call_id,request->>'action' AS action, "
+            "jsonb_array_length(COALESCE(response->'proposals','[]'::jsonb))>0 AS proposal, "
+            "COALESCE(response->'result' ? 'error',false) AS failed "
+            "FROM crm.hermes_calls WHERE run_id=%s ORDER BY call_id LIMIT 12",
+            (user["run_id"],),
+        ).fetchall()
+        return {
+            "request_id": request_id,
+            "phase": run["state"] if run else "failed",
+            "user_message": message_view(db, user, admin),
+            "activities": [
+                {
+                    "id": row["call_id"],
+                    "label": ACTIVITY_LABELS.get(row["action"], "Usar herramienta del proyecto"),
+                    "outcome": "failed"
+                    if row["failed"]
+                    else "proposal"
+                    if row["proposal"]
+                    else "completed",
+                }
+                for row in calls
+            ],
+        }
 
 
 def delete_conversation(conversation_id, admin):

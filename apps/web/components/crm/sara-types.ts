@@ -25,6 +25,7 @@ export type SaraAttachment = {
 export type SaraProposal = Proposal & { resolvable?: boolean };
 export type SaraMessage = {
   id: string;
+  request_id?: string;
   role: "user" | "assistant";
   content: string;
   created_at: string;
@@ -147,4 +148,80 @@ export function saraInsertSkill(
     text: text.slice(0, token.start) + mention + text.slice(token.end),
     caret: token.start + mention.length,
   };
+}
+
+export type SaraProgress = {
+  request_id: string;
+  phase: "issued" | "claimed" | "finished" | "failed";
+  user_message: SaraMessage;
+  activities: {
+    id: string;
+    label: string;
+    outcome: "completed" | "proposal" | "failed";
+  }[];
+};
+export function saraOutgoingMessage(
+  payload: SaraTurnInput,
+  draft: SaraDraft,
+  createdAt: string,
+): SaraMessage {
+  return {
+    id: `outgoing-${payload.request_id}`,
+    request_id: payload.request_id,
+    role: "user",
+    content: payload.message,
+    created_at: createdAt,
+    state: "pending",
+    attachments: [...draft.attachments],
+    results: [],
+    proposals: [],
+  };
+}
+export function saraVisibleMessages(
+  messages: SaraMessage[],
+  outgoing?: SaraMessage,
+  confirmedId?: string,
+): SaraMessage[] {
+  return outgoing &&
+    !messages.some(
+      (message) =>
+        message.id === confirmedId ||
+        (message.role === "user" &&
+          !!outgoing.request_id &&
+          message.request_id === outgoing.request_id),
+    )
+    ? [...messages, outgoing]
+    : messages;
+}
+
+export function saraDraftAfterConfirmation(
+  current: SaraDraft,
+  payload: SaraTurnInput,
+): SaraDraft {
+  return (current.text.trim() === payload.message ||
+    (!current.text.trim() &&
+      payload.message === "Revisa los archivos adjuntos.")) &&
+    current.attachments.map((file) => file.id).join(",") ===
+      payload.attachment_ids.join(",")
+    ? EMPTY_SARA_DRAFT
+    : current;
+}
+export function saraHistoryConfirmsTurn(
+  messages: SaraMessage[],
+  requestId: string,
+): boolean {
+  return (
+    messages.some(
+      (message) =>
+        message.request_id === requestId &&
+        message.role === "user" &&
+        message.state === "completed",
+    ) &&
+    messages.some(
+      (message) =>
+        message.request_id === requestId &&
+        message.role === "assistant" &&
+        message.state === "completed",
+    )
+  );
 }

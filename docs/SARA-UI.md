@@ -7,7 +7,7 @@ TTS, browser speech recognition or a provider credential store.
 ## Composition and state
 
 `SaraPanel({csrf,onChanged})` fills the parent CRM flex layout.
-Conversation history and messages come only from private server routes. A named
+Saved conversation history and messages come only from private server routes. A named
 native history dialog supports search across loaded conversations and cursor paging,
 without a permanent second navigation rail. A compact toolbar exposes history,
 one-click new chat, title editing and refresh. Skills management remains only in
@@ -28,6 +28,34 @@ responses remain visible and block another turn in that conversation. Comprobar 
 resubmits the exact same ID and payload, not a new provider execution ID. There is no
 automatic provider retry. Acknowledged user/assistant messages and execution results
 come from the server; the UI never fabricates a saved message or assistant reply.
+
+## Immediate send feedback and confirmed activity
+
+Submission immediately renders a local outgoing bubble and clears the composer;
+its “Enviando…” label is not a saved-message acknowledgement. The original draft
+and attachments remain in memory for recovery. A successful confirmation clears
+only the matching restored draft, never edits made afterward. History includes each
+message's stable `request_id`, so a lost acknowledgement can reconcile the exact
+local bubble without content matching or duplicate rows.
+
+While the selected conversation has a sending turn, the browser makes one
+nonoverlapping, abortable progress GET every 1.8 seconds (first check after 300 ms).
+The fixed owner-authenticated endpoint is
+`GET /crm/sara/conversations/{conversation_id}/messages/{request_id}/progress`;
+the web gateway exposes the same path under `/api/crm`. It accepts no query strings
+or writes, never settles a turn and never starts or retries Hermes. Missing messages
+return 404 until persisted. Progress reads do not acquire run/conversation locks.
+Polling stops on selection change, unmount or POST settlement. An unavailable
+progress check is disclosed without replaying the submission.
+
+Progress returns only the owned user message, persisted run phase and at most 12
+committed tool activities with static Spanish labels and completed/proposal/failed
+outcomes. Unknown/custom actions use a generic label. Activities are a stable set,
+not a chronological trace: call IDs do not encode execution order. Arguments,
+results, credentials, internal prompts and model reasoning are not progress output.
+A prepared proposal remains explicitly subject to human approval. No synthetic
+step timer, token animation or word-by-word response is used; the final answer still
+arrives through the existing synchronous, idempotent turn response.
 
 The owner requested the personal Hermes chat in the local `asepulvedadev` project
 as the reference. Its public `app/static/index.html`, `style.css`, `app.js` and
@@ -175,7 +203,6 @@ camera and geolocation stayed denied on every probe. No getUserMedia call was ma
 Merged public-domain/SEO source retained its current routes and CRM separation.
 Final local checks: production build, TypeScript and58 CRM/UI/gateway tests passed;
 merged public web checks passed25 tests with six opt-in browser checks skipped.
-
 
 ### Current revision verification
 

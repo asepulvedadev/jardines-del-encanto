@@ -17,6 +17,10 @@ const rules: [RegExp, string[]][] = [
   [/^sara\/conversations$/, ["GET", "POST"]],
   [/^sara\/conversations\/[0-9a-f-]{36}$/, ["PATCH", "DELETE"]],
   [/^sara\/conversations\/[0-9a-f-]{36}\/messages$/, ["GET", "POST"]],
+  [
+    /^sara\/conversations\/[0-9a-f-]{36}\/messages\/[0-9a-f-]{36}\/progress$/,
+    ["GET"],
+  ],
   [/^sara\/attachments$/, ["POST"]],
   [/^sara\/attachments\/[0-9a-f-]{36}\/content$/, ["GET"]],
   [/^retell\/settings$/, ["GET", "POST"]],

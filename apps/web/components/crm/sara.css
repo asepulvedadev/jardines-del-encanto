@@ -851,3 +851,51 @@
 .sara-workspace .sara-delete-confirm:hover:not(:disabled) {
   background: #7d241e;
 }
+
+.sara-working-card {
+  flex: none;
+  width: min(100%, 620px);
+  border: 1px solid #d9e1d5;
+  border-left: 3px solid #507010;
+  border-radius: 12px;
+  background: #f3f6ef;
+  padding: 16px 18px;
+  color: #062619;
+  font-size: 14px;
+}
+.sara-working-caption {
+  color: #526056;
+  font-size: 12px;
+  margin: 6px 0 0;
+}
+.sara-working-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+  display: grid;
+  gap: 12px;
+}
+.sara-working-card li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+.sara-working-card li > span {
+  color: #507010;
+}
+.sara-working-card li[data-outcome="failed"] > span {
+  color: #a62b35;
+}
+.sara-working-card li strong,
+.sara-working-card li small {
+  display: block;
+}
+.sara-working-card li strong {
+  font-weight: 500;
+  font-size: 13px;
+}
+.sara-working-card li small {
+  color: #526056;
+  font-size: 12px;
+}

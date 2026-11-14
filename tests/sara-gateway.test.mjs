@@ -58,6 +58,7 @@ test("Sara admits only the typed conversation and attachment routes", async () =
     ["DELETE", `sara/conversations/${id}`],
     ["GET", `sara/conversations/${id}/messages`],
     ["POST", `sara/conversations/${id}/messages`],
+    ["GET", `sara/conversations/${id}/messages/${id}/progress`],
     ["POST", "sara/attachments"],
   ])
     assert.equal(
@@ -186,4 +187,18 @@ test("Sara deletion stays exact-route, JSON, Origin and CSRF forwarded", async (
     calls[0].options.headers.get("origin"),
     "https://crm.example.invalid",
   );
+});
+
+test("Sara progress is fixed-route GET-only without arbitrary queries", async () => {
+  const path = `sara/conversations/${id}/messages/${id}/progress`;
+  assert.equal((await POST(req("POST"), ctx(path))).status, 404);
+  assert.equal(
+    (await GET(req("GET", {}, "?before=" + id), ctx(path))).status,
+    422,
+  );
+  assert.equal(
+    (await GET(req("GET"), ctx(path.replace(id, "bad")))).status,
+    404,
+  );
+  assert.equal(calls.length, 0);
 });

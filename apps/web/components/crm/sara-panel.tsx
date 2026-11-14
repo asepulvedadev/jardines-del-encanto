@@ -5,11 +5,17 @@ import { Icon } from "./icon";
 import { ActionProposals, ActionResultDetails } from "./hermes-panel";
 import type { SettingsRequest } from "./settings-types";
 import { SaraRecorder, saraRecorderMime } from "./sara-audio";
+import { SaraWorking } from "./sara-working";
 import { SaraVoiceOutput } from "./sara-voice-output";
 import {
   EMPTY_SARA_DRAFT,
   SARA_FILE_LIMIT,
   mergeSaraMessages,
+  saraOutgoingMessage,
+  saraVisibleMessages,
+  saraDraftAfterConfirmation,
+  saraHistoryConfirmsTurn,
+  type SaraProgress,
   mergeSaraConversations,
   saraFileBase64,
   saraProposalAvailable,
@@ -84,6 +90,11 @@ class SaraRequestError extends Error {
 }
 type TurnState = {
   payload: SaraTurnInput;
+  draft: SaraDraft;
+  outgoing: SaraMessage;
+  confirmedId?: string;
+  progress?: SaraProgress;
+  progressUnavailable?: boolean;
   phase: "sending" | "uncertain" | "pending" | "failed";
 };
 const feedback = (cause: unknown) =>
@@ -229,11 +240,13 @@ function SaraFile({
 }
 export function SaraMessageView({
   message,
+  deliveryLabel,
   csrf,
   request,
   onChanged,
 }: {
   message: SaraMessage;
+  deliveryLabel?: string;
   csrf: string;
   request: SettingsRequest;
   onChanged: () => Promise<void>;
@@ -252,9 +265,10 @@ export function SaraMessageView({
         <time dateTime={message.created_at}>
           {dateLabel(message.created_at)}
         </time>
-        {message.state !== "completed" && (
+        {(deliveryLabel || message.state !== "completed") && (
           <span>
-            {message.state === "pending" ? "Pendiente" : "Envío fallido"}
+            {deliveryLabel ??
+              (message.state === "pending" ? "Recibido" : "Envío fallido")}
           </span>
         )}
       </div>
@@ -397,6 +411,13 @@ export function SaraPanel({
   const historicalPending = currentMessages.some(
     (value) => value.role === "user" && value.state === "pending",
   );
+  const visibleMessages = saraVisibleMessages(
+    currentMessages,
+    turn?.outgoing,
+    turn?.confirmedId,
+  );
+  const activeRequestId = turn?.payload.request_id;
+  const sending = turn?.phase === "sending";
   const isUploading = !!(selectedId && uploads[selectedId]);
   const error = selectedId ? (conversationErrors[selectedId] ?? "") : "";
   const request: SettingsRequest = useCallback(
@@ -471,6 +492,90 @@ export function SaraPanel({
     },
     [csrf, router],
   );
+  useEffect(() => {
+    if (!selectedId || !activeRequestId || !sending) return;
+    const id = selectedId;
+    const controller = new AbortController();
+    let active = true;
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const response = await fetch(
+          `/api/crm/sara/conversations/${encodeURIComponent(id)}/messages/${encodeURIComponent(activeRequestId!)}/progress`,
+          {
+            cache: "no-store",
+            credentials: "same-origin",
+            redirect: "error",
+            headers: { "X-CSRF-Token": csrf },
+            signal: AbortSignal.any([
+              controller.signal,
+              AbortSignal.timeout(8000),
+            ]),
+          },
+        );
+        if (response.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        // A request may not be persisted yet. Never manufacture an acknowledgement.
+        if (response.status !== 404) {
+          if (!response.ok) throw new Error("progress_unavailable");
+          const progress = (await response.json()) as SaraProgress;
+          if (active && progress.request_id === activeRequestId) {
+            setTurns((old) => {
+              const current = old[id];
+              if (
+                current?.payload.request_id !== activeRequestId ||
+                current.phase !== "sending"
+              )
+                return old;
+              return {
+                ...old,
+                [id]: {
+                  ...current,
+                  confirmedId: progress.user_message.id,
+                  progress,
+                  progressUnavailable: false,
+                },
+              };
+            });
+            setMessages((old) => {
+              // A stale pending snapshot must not overwrite an already settled POST.
+              if (
+                (old[id] ?? []).some(
+                  (message) =>
+                    message.id === progress.user_message.id &&
+                    message.state !== "pending",
+                )
+              )
+                return old;
+              return {
+                ...old,
+                [id]: mergeSaraMessages(old[id] ?? [], [progress.user_message]),
+              };
+            });
+          }
+        }
+      } catch {
+        if (active)
+          setTurns((old) => {
+            const current = old[id];
+            return current?.payload.request_id === activeRequestId &&
+              current.phase === "sending"
+              ? { ...old, [id]: { ...current, progressUnavailable: true } }
+              : old;
+          });
+      } finally {
+        if (active) timer = setTimeout(() => void poll(), 1800);
+      }
+    }
+    timer = setTimeout(() => void poll(), 300);
+    return () => {
+      active = false;
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [selectedId, activeRequestId, sending, csrf, router]);
   const updateDraft = useCallback(
     (id: string, change: (value: SaraDraft) => SaraDraft) =>
       setDrafts((old) => ({
@@ -484,6 +589,25 @@ export function SaraPanel({
       setConversationErrors((old) => ({ ...old, [id]: value })),
     [],
   );
+  useEffect(() => {
+    if (
+      !selectedId ||
+      !turn ||
+      !saraHistoryConfirmsTurn(currentMessages, turn.payload.request_id)
+    )
+      return;
+    const id = selectedId;
+    updateDraft(id, (current) =>
+      saraDraftAfterConfirmation(current, turn.payload),
+    );
+    setTurns((old) => {
+      if (old[id]?.payload.request_id !== turn.payload.request_id) return old;
+      const next = { ...old };
+      delete next[id];
+      return next;
+    });
+    setError(id, "");
+  }, [selectedId, currentMessages, turn, updateDraft, setError]);
   const discardPreview = useCallback(() => {
     if (previewRef.current) URL.revokeObjectURL(previewRef.current.url);
     previewRef.current = null;
@@ -671,7 +795,12 @@ export function SaraPanel({
       return;
     }
     if (log.current) log.current.scrollTop = log.current.scrollHeight;
-  }, [selectedId, currentMessages.length]);
+  }, [
+    selectedId,
+    visibleMessages.length,
+    sending,
+    turn?.progress?.activities.length,
+  ]);
   useEffect(() => {
     const field = composer.current;
     if (field) {
@@ -722,7 +851,23 @@ export function SaraPanel({
     if (turnLocks.current.has(id)) return;
     turnLocks.current.add(id);
     setError(id, "");
-    setTurns((old) => ({ ...old, [id]: { payload, phase: "sending" } }));
+    const previous = turns[id];
+    const snapshot =
+      previous?.payload.request_id === payload.request_id
+        ? previous
+        : {
+            payload,
+            draft: drafts[id] ?? EMPTY_SARA_DRAFT,
+            outgoing: saraOutgoingMessage(
+              payload,
+              drafts[id] ?? EMPTY_SARA_DRAFT,
+              new Date().toISOString(),
+            ),
+          };
+    setTurns((old) => ({ ...old, [id]: { ...snapshot, phase: "sending" } }));
+    if (previous?.payload.request_id !== payload.request_id)
+      updateDraft(id, () => EMPTY_SARA_DRAFT);
+    setSkillToken(null);
     try {
       const value = await request<SaraTurn>(
         `sara/conversations/${encodeURIComponent(id)}/messages`,
@@ -745,23 +890,29 @@ export function SaraPanel({
       setTurns((old) => {
         const copy = { ...old };
         if (value.state === "completed") delete copy[id];
-        else copy[id] = { payload, phase: value.state };
+        else
+          copy[id] = {
+            ...snapshot,
+            confirmedId: value.user_message.id,
+            phase: value.state,
+          };
         return copy;
       });
-      updateDraft(id, (current) =>
-        (current.text.trim() === payload.message ||
-          (!current.text.trim() &&
-            payload.message === "Revisa los archivos adjuntos.")) &&
-        current.attachments.map((file) => file.id).join(",") ===
-          payload.attachment_ids.join(",")
-          ? EMPTY_SARA_DRAFT
-          : current,
-      );
-      if (value.state === "failed")
+      if (value.state === "completed")
+        updateDraft(id, (current) =>
+          saraDraftAfterConfirmation(current, payload),
+        );
+      if (value.state === "failed") {
+        updateDraft(id, (current) =>
+          !current.text && !current.attachments.length
+            ? snapshot.draft
+            : current,
+        );
         setError(
           id,
-          "El envío falló. No se inició ningún reintento automático.",
+          "El envío falló. Tu mensaje se conserva; no se inició ningún reintento automático.",
         );
+      }
       try {
         await onChanged();
       } catch {
@@ -775,13 +926,21 @@ export function SaraPanel({
         setTurns((old) => ({
           ...old,
           [id]: {
-            payload,
+            ...old[id],
+            ...snapshot,
+            confirmedId: old[id]?.confirmedId,
+            progress: old[id]?.progress,
             phase:
               cause instanceof SaraRequestError && !cause.uncertain
                 ? "failed"
                 : "uncertain",
           },
         }));
+        updateDraft(id, (current) =>
+          !current.text && !current.attachments.length
+            ? snapshot.draft
+            : current,
+        );
         setError(id, feedback(cause));
       }
     } finally {
@@ -1279,7 +1438,7 @@ export function SaraPanel({
           )}
           {!listLoading &&
             !historyLoading &&
-            !currentMessages.length &&
+            !visibleMessages.length &&
             !historyError &&
             turn?.phase !== "sending" && (
               <div className="sara-welcome">
@@ -1309,24 +1468,29 @@ export function SaraPanel({
               {listError}
             </p>
           )}
-          {currentMessages.map((message) => (
+          {visibleMessages.map((message) => (
             <SaraMessageView
-              key={`${selectedId}-${message.id}`}
+              key={`${selectedId}-${message.request_id ?? message.id}-${message.role}`}
               message={message}
+              deliveryLabel={
+                message.id === turn?.outgoing.id
+                  ? turn.phase === "sending"
+                    ? "Enviando…"
+                    : turn.phase === "failed"
+                      ? "No enviado"
+                      : "Por confirmar"
+                  : undefined
+              }
               csrf={csrf}
               request={request}
               onChanged={() => afterAction(selectedId!)}
             />
           ))}
-          {turn?.phase === "sending" && (
-            <p className="sara-turn-state sara-working" role="status">
-              <span className="sara-working-dots" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-              </span>
-              Sara está trabajando…
-            </p>
+          {sending && (
+            <SaraWorking
+              progress={turn?.progress}
+              unavailable={!!turn?.progressUnavailable}
+            />
           )}
           {(turn?.phase === "uncertain" || turn?.phase === "pending") && (
             <div className="sara-turn-state" role="status">

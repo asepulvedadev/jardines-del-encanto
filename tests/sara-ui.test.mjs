@@ -508,3 +508,118 @@ test("Sara audio is an explicit bounded proposal control without playback on ren
   }
   assert.equal(requests, 0);
 });
+
+test("outgoing bubble appears before confirmation and reconciles only by exact server ID", () => {
+  const { saraOutgoingMessage, saraVisibleMessages } = load("sara-types.ts");
+  const payload = {
+    request_id: "request-one",
+    message: "Consulta mis clientes",
+    attachment_ids: ["file-one"],
+  };
+  const draft = {
+    text: payload.message,
+    attachments: [{ id: "file-one", filename: "nota.webm", kind: "audio" }],
+  };
+  const outgoing = saraOutgoingMessage(payload, draft, "2026-11-14T12:00:00Z");
+  draft.attachments.length = 0;
+  assert.equal(outgoing.content, payload.message);
+  assert.equal(outgoing.attachments.length, 1);
+  assert.equal(outgoing.state, "pending");
+  const existing = {
+    ...outgoing,
+    id: "unrelated-same-text",
+    request_id: "other-request",
+  };
+  assert.deepEqual(saraVisibleMessages([existing], outgoing), [
+    existing,
+    outgoing,
+  ]);
+  const confirmed = { ...outgoing, id: "database-message" };
+  assert.deepEqual(saraVisibleMessages([confirmed], outgoing, confirmed.id), [
+    confirmed,
+  ]);
+  assert.deepEqual(saraVisibleMessages([], outgoing, confirmed.id), [outgoing]);
+  assert.deepEqual(saraVisibleMessages([existing]), [existing]);
+});
+
+test("Sara working feedback shows only confirmed activity without raw tool arguments", () => {
+  const { SaraWorking } = load("sara-working.tsx");
+  const html = renderToStaticMarkup(
+    React.createElement(SaraWorking, {
+      progress: {
+        phase: "claimed",
+        activities: [
+          {
+            id: "a",
+            label: "Consultar clientes y pipeline",
+            outcome: "proposal",
+          },
+          { id: "b", label: "Consultar actividad", outcome: "failed" },
+        ],
+      },
+      unavailable: false,
+    }),
+  );
+  assert.match(html, /role="status"/);
+  assert.match(html, /Sara está trabajando/);
+  assert.match(html, /Consultar clientes y pipeline/);
+  assert.match(html, /Requiere aprobación/);
+  assert.match(html, /No se pudo completar/);
+  assert.doesNotMatch(html, /JSON|<pre|Aplicado|Paso 1/);
+  const sending = renderToStaticMarkup(
+    React.createElement(SaraWorking, { unavailable: false }),
+  );
+  assert.match(sending, /Enviando tu mensaje/);
+  assert.doesNotMatch(sending, /Consultar clientes/);
+});
+
+test("lost acknowledgements reconcile through persisted request identity and clear only the matching restored draft", () => {
+  const {
+    saraOutgoingMessage,
+    saraVisibleMessages,
+    saraDraftAfterConfirmation,
+    saraHistoryConfirmsTurn,
+  } = load("sara-types.ts");
+  const draft = { text: "Hola Sara", attachments: [] };
+  const payload = {
+    request_id: "same-request",
+    message: draft.text,
+    attachment_ids: [],
+  };
+  const outgoing = saraOutgoingMessage(payload, draft, "2026-11-14T12:00:00Z");
+  const user = { ...outgoing, id: "database-user", state: "completed" };
+  const assistant = {
+    ...user,
+    id: "database-assistant",
+    role: "assistant",
+    content: "Respuesta",
+  };
+  assert.deepEqual(saraVisibleMessages([user, assistant], outgoing), [
+    user,
+    assistant,
+  ]);
+  assert.equal(
+    saraHistoryConfirmsTurn([user, assistant], payload.request_id),
+    true,
+  );
+  assert.equal(
+    saraHistoryConfirmsTurn(
+      [{ ...user, state: "pending" }, assistant],
+      payload.request_id,
+    ),
+    false,
+  );
+  assert.equal(saraHistoryConfirmsTurn([user], payload.request_id), false);
+  assert.equal(
+    saraHistoryConfirmsTurn([user, assistant], "different-request"),
+    false,
+  );
+  assert.deepEqual(saraDraftAfterConfirmation(draft, payload), {
+    text: "",
+    attachments: [],
+  });
+  const edited = { ...draft, text: "Otro mensaje" };
+  assert.equal(saraDraftAfterConfirmation(edited, payload), edited);
+  const attached = { ...draft, attachments: [{ id: "new-file" }] };
+  assert.equal(saraDraftAfterConfirmation(attached, payload), attached);
+});
