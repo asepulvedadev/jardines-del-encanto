@@ -197,3 +197,37 @@ class ExtensionUpdate(ExtensionID):
         if any(getattr(self, key) is None for key in self.model_fields_set):
             raise ValueError("null_change")
         return self
+
+
+class WorkflowDraftCreate(Input):
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=1000)
+    document: dict
+
+    @field_validator("document")
+    @classmethod
+    def valid_document(cls, value):
+        from ..workflows.models import Document
+
+        return Document.model_validate(value).model_dump()
+
+
+class WorkflowDraftUpdate(Input):
+    id: UUID
+    version: int = Field(ge=1, strict=True)
+    document: dict
+
+    @field_validator("document")
+    @classmethod
+    def valid_document(cls, value):
+        from ..workflows.models import Document
+
+        return Document.model_validate(value).model_dump()
+
+
+class WorkflowRecord(Input):
+    id: UUID
+
+
+class WorkflowControl(WorkflowRecord):
+    version: int = Field(ge=1, strict=True)

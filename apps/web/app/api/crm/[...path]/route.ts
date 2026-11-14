@@ -1,6 +1,13 @@
 import type { NextRequest } from "next/server";
 
+const workflowId = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const rules: [RegExp, string[]][] = [
+  [/^workflows\/(catalog|definitions|runs)$/, ["GET"]],
+  [/^workflows\/(definitions|options)$/, ["POST"]],
+  [new RegExp(`^workflows/definitions/${workflowId}$`), ["PATCH"]],
+  [new RegExp(`^workflows/definitions/${workflowId}/prepare$`), ["POST"]],
+  [new RegExp(`^workflows/runs/${workflowId}$`), ["GET"]],
+  [new RegExp(`^workflows/runs/${workflowId}/(activate|pause|resume|stop)$`), ["POST"]],
   [/^auth\/login$/, ["POST"]],
   [/^auth\/logout$/, ["POST"]],
   [/^auth\/session$/, ["GET"]],
@@ -105,7 +112,8 @@ async function proxy(
   const sara = endpoint.startsWith("sara/");
   const voice = endpoint.startsWith("voice/");
   const retell = endpoint.startsWith("retell/");
-  if ((voice || retell) && new URL(request.url).searchParams.size)
+  const workflows = endpoint.startsWith("workflows/");
+  if ((voice || retell || workflows) && new URL(request.url).searchParams.size)
     return fail(422, "invalid_input");
   if (endpoint === "retell/results" && request.body !== null)
     return fail(422, "invalid_input");
@@ -146,6 +154,7 @@ async function proxy(
   if (mutation) {
     const definitionWrite =
       (request.method === "POST" && endpoint === "control/items") ||
+      (workflows && /^workflows\/definitions(?:\/[^/]+(?:\/prepare)?)?$/.test(endpoint)) ||
       (request.method === "PATCH" &&
         /^control\/items\/[0-9a-f-]{36}$/.test(endpoint));
     const bodyLimit = ["sara/attachments", "voice/attachments"].includes(
@@ -191,6 +200,7 @@ async function proxy(
   const timeout =
     endpoint.startsWith("voice/") ||
     endpoint.startsWith("retell/") ||
+    workflows ||
     /^hermes\/proposals\/[0-9a-f-]{36}\/approve$/.test(endpoint)
       ? 95000
       : /^sara\/conversations\/[0-9a-f-]{36}\/messages$/.test(endpoint) &&
@@ -223,7 +233,7 @@ async function proxy(
       resultHeaders.append("Set-Cookie", cookie);
     const retry = upstream.headers.get("retry-after");
     if (retry) resultHeaders.set("Retry-After", retry);
-    if (sara || voice || retell) {
+    if (sara || voice || retell || workflows) {
       const voiceDownload =
         /^voice\/artifacts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/content$/.test(
           endpoint,

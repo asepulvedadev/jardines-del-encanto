@@ -13,7 +13,9 @@ ACTIONS = frozenset({'crm.workspace', 'crm.activities', 'crm.contact.create', 'c
     'crm.deal.update', 'crm.note.create', 'crm.task.create', 'crm.task.update', 'control.catalog',
     'control.item.create', 'control.item.update', 'control.connection.update', 'social.status',
     'social.sync', 'social.connect', 'control.extension.create', 'control.extension.update',
-    'control.extension.install', 'control.extension.test', 'voice.catalog', 'voice.execute', 'retell.catalog', 'retell.schema', 'retell.execute'})
+    'control.extension.install', 'control.extension.test', 'voice.catalog', 'voice.execute', 'retell.catalog', 'retell.schema', 'retell.execute',
+    'workflows.catalog', 'workflows.definitions', 'workflows.run', 'workflows.draft.create',
+    'workflows.draft.update', 'workflows.pause', 'workflows.stop'})
 
 
 def valid_token(token):

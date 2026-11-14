@@ -63,3 +63,16 @@ class VoiceProtocolTests(unittest.TestCase):
         self.assertIn("voice.catalog", source)
         self.assertIn("voice.execute", source)
         self.assertIn("Never request API keys", source)
+
+
+class WorkflowProtocolTests(unittest.TestCase):
+    def test_workflows_are_typed_without_activation_authority(self):
+        allowed = {"workflows.catalog", "workflows.definitions", "workflows.run",
+                   "workflows.draft.create", "workflows.draft.update", "workflows.pause", "workflows.stop"}
+        self.assertTrue(allowed <= ACTIONS)
+        for action in allowed:
+            self.assertEqual(call_arguments({"action": action, "arguments": {}}, ACTIONS)["action"], action)
+        for denied in ("workflows.activate", "workflows.prepare", "workflows.resume", "workflows.execute"):
+            self.assertNotIn(denied, ACTIONS)
+            with self.assertRaises(ValueError):
+                call_arguments({"action": denied, "arguments": {}}, ACTIONS)

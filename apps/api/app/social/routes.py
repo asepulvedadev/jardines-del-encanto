@@ -436,6 +436,12 @@ async def webhook(request: Request):
                VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT(event_id) DO NOTHING RETURNING event_id""",
             (event_id, event, profile, platform, Jsonb(payload), body_hash),
         ).fetchone()
+        if record:
+            # Only the authenticated, first-seen event reaches sequence stop-on-reply.
+            from ..workflows.worker import verified_reply
+            from .workflow import normalize_event
+
+            verified_reply(db, normalize_event(payload))
         if not record:
             previous = db.execute(
                 "SELECT body_hash FROM crm.social_webhook_events WHERE event_id=%s", (event_id,)

@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import psycopg
@@ -18,11 +19,30 @@ from .social.mcp_routes import router as social_mcp_router
 from .social.routes import router as social_router
 from .social.routes import webhook_router
 from .voice.routes import router as voice_router
+from .workflows import worker as workflows_worker
+from .workflows.routes import router as workflows_router
 
-app = FastAPI(title="Jardines del Encanto API", docs_url=None, redoc_url=None, openapi_url=None)
+
+@asynccontextmanager
+async def lifespan(app):
+    workflows_worker.start()
+    try:
+        yield
+    finally:
+        workflows_worker.stop()
+
+
+app = FastAPI(
+    lifespan=lifespan,
+    title="Jardines del Encanto API",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 
 app.include_router(crm_router)
+app.include_router(workflows_router)
 app.include_router(control_router)
 app.include_router(hermes_router)
 app.include_router(sara_router)
@@ -37,8 +57,15 @@ app.include_router(webhook_router)
 
 @app.middleware("http")
 async def private_response_headers(request: Request, call_next):
+    if request.url.path.startswith("/crm/workflows/") and request.url.query:
+        return JSONResponse(
+            {"detail": "invalid_input"},
+            status_code=422,
+            headers={"Cache-Control": "no-store, private"},
+        )
     private_control = request.url.path.startswith(
         (
+            "/crm/workflows/",
             "/crm/control/",
             "/crm/hermes/",
             "/internal/hermes/",
@@ -49,9 +76,13 @@ async def private_response_headers(request: Request, call_next):
     )
     if private_control and request.method in ("POST", "PATCH", "DELETE"):
         # Bound bytes before JSON/Pydantic parsing, including chunked requests.
-        large = request.url.path.startswith("/internal/hermes/") or (
-            request.url.path.startswith("/crm/control/items")
-            and not request.url.path.endswith("/run")
+        large = (
+            request.url.path.startswith("/internal/hermes/")
+            or (request.url.path.startswith("/crm/workflows/definitions"))
+            or (
+                request.url.path.startswith("/crm/control/items")
+                and not request.url.path.endswith("/run")
+            )
         )
         maximum = (
             768 * 1024

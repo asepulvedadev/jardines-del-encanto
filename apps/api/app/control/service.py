@@ -15,6 +15,13 @@ from ..voice import models as voice_models
 from . import models
 
 ACTION_MODELS = {
+    "workflows.catalog": models.Empty,
+    "workflows.definitions": models.Empty,
+    "workflows.run": models.WorkflowRecord,
+    "workflows.draft.create": models.WorkflowDraftCreate,
+    "workflows.draft.update": models.WorkflowDraftUpdate,
+    "workflows.pause": models.WorkflowControl,
+    "workflows.stop": models.WorkflowControl,
     "crm.workspace": models.Workspace,
     "crm.activities": models.RecordID,
     "crm.contact.create": crm_models.ContactInput,
@@ -41,6 +48,9 @@ ACTION_MODELS = {
     "social.connect": models.SocialConnect,
 }
 READ_ACTIONS = {
+    "workflows.catalog",
+    "workflows.definitions",
+    "workflows.run",
     "crm.workspace",
     "crm.activities",
     "control.catalog",
@@ -335,6 +345,36 @@ def update_connection(db, key, data, admin):
 
 def execute(db, action, args, admin):
     """Invoked only for reads, direct human configuration, or consumed proposals."""
+    if action.startswith("workflows."):
+        from ..workflows import models as workflow_models
+        from ..workflows import service as workflows
+
+        if action == "workflows.catalog":
+            return workflows.catalog(db)
+        if action == "workflows.definitions":
+            return workflows.definitions(db)
+        if action == "workflows.run":
+            return workflows.detail(db, args.id)
+        if action == "workflows.draft.create":
+            return workflows.create(
+                db, workflow_models.DefinitionCreate.model_validate(args.model_dump()), admin
+            )
+        if action == "workflows.draft.update":
+            return workflows.update(
+                db,
+                args.id,
+                workflow_models.DefinitionUpdate.model_validate(args.model_dump(exclude={"id"})),
+                admin,
+            )
+        if action in {"workflows.pause", "workflows.stop"}:
+            return workflows.transition(
+                db,
+                args.id,
+                action.split(".")[-1],
+                workflow_models.Version(version=args.version),
+                admin,
+            )
+        raise HTTPException(422, "unsupported_action")
     if action == "retell.catalog":
         from ..retell.service import catalog as retell_catalog
 

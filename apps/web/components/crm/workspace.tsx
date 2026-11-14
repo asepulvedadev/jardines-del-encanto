@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "./icon";
 import { VoiceWorkspace } from "./voice-workspace";
+import { WorkflowPanel } from "./workflow-panel";
 import { SaraPanel } from "./sara-panel";
 import { SettingsModal } from "./settings-modal";
 import { Empty, StageSelect, TaskRow } from "./workspace-parts";
@@ -31,6 +32,7 @@ const navigation = [
   ["overview", "home"],
   ["sara", "message"],
   ["voice", "microphone"],
+  ["workflows", "connections"],
   ["pipeline", "board"],
   ["contacts", "people"],
   ["tasks", "task"],
@@ -49,6 +51,7 @@ export function Workspace({
   const [data, setData] = useState(initialData);
   const [view, setView] = useState<View>("overview");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [workflowDirty, setWorkflowDirty] = useState(false);
   const [settingsTab, setSettingsTab] = useState<
     "social" | "connections" | "customizations"
   >("social");
@@ -260,6 +263,15 @@ export function Workspace({
     );
   }
   function changeView(next: View) {
+    if (
+      view === "workflows" &&
+      next !== view &&
+      workflowDirty &&
+      !window.confirm(
+        "Hay cambios sin guardar en la secuencia. ¿Descartarlos y salir?",
+      )
+    )
+      return;
     setView(next);
     setQuery("");
     setError("");
@@ -402,11 +414,13 @@ export function Workspace({
                       ? "Las conversaciones y próximos pasos de tu equipo, en un solo lugar."
                       : view === "voice"
                         ? "Agentes, voces y conversaciones, conectados con Sara IA."
-                        : view === "pipeline"
-                          ? "Una vista clara de cada conversación y su siguiente paso."
-                          : view === "contacts"
-                            ? "Solo lo importante: nombre, celular y de dónde llega cada cliente."
-                            : "Que ninguna conversación se quede sin un siguiente paso."}
+                        : view === "workflows"
+                          ? "Diseña el seguimiento, revisa su alcance y activa solo lo que apruebes."
+                          : view === "pipeline"
+                            ? "Una vista clara de cada conversación y su siguiente paso."
+                            : view === "contacts"
+                              ? "Solo lo importante: nombre, celular y de dónde llega cada cliente."
+                              : "Que ninguna conversación se quede sin un siguiente paso."}
                   </p>
                 </div>
                 <div className="crm-heading-actions">
@@ -453,6 +467,16 @@ export function Workspace({
               active={!settingsOpen}
               onChanged={refresh}
               onOpenConnection={() => {
+                setSettingsTab("connections");
+                setSettingsOpen(true);
+              }}
+            />
+          ) : view === "workflows" ? (
+            <WorkflowPanel
+              csrf={csrf}
+              contacts={data.contacts}
+              onDirtyChange={setWorkflowDirty}
+              onOpenConnections={() => {
                 setSettingsTab("connections");
                 setSettingsOpen(true);
               }}
