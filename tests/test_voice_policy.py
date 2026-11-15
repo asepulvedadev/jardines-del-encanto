@@ -34,8 +34,9 @@ class VoicePolicyTests(unittest.TestCase):
             capture_output=True,
             text=True,
             timeout=10,
-            check=True,
+            check=False,
         )
+        self.assertEqual(result.returncode, 0, result.stderr)
         policy = json.loads(result.stdout)
         api, gateway = (policy["services"][key] for key in ("api", "voice-gateway"))
         self.assertEqual(set(api["networks"]), {"app", "data", "voice"})
