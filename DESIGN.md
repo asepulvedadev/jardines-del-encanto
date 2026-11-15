@@ -35,6 +35,12 @@ not certified original brand values. Recheck them when source artwork is supplie
 
 ### Logo
 
+- For campaign drafts, the owner supplied the original leaf-circle SVG lockup on
+  2026-11-15. Exact source copies live in `assets/campaign-drafts/brand/`:
+  `jardines-del-encanto-refinado.svg`, `jardines-del-encanto-transparente.svg`
+  and `jardines-del-encanto-blanco.svg`. Use green on light backgrounds and the
+  approved white variant on dark backgrounds; do not invent substitute leaf marks.
+  This campaign update does not authorize a global landing or CRM rebrand.
 - Preserve the wordmark, palms, leaf, proportions and approved color variants.
 - Request the original SVG or transparent high-resolution artwork before public launch.
   The poster is a reference, not a production-ready logo or verified standalone photograph.
@@ -198,7 +204,7 @@ density. No full-bleed photographs, oversized promotional typography or decorati
 
 - Desktop shell: approximately 224px quiet navigation, a 64px header, and a flexible
   content area. Active navigation uses label weight and a clear selected surface.
-- Implemented navigation begins with “Dashboard”, then “Sara IA”, “Voz” and “Secuencias”, followed by
+- Implemented navigation begins with “Dashboard”, then “Sara IA”, “Voz”, “Secuencias” and “Plantillas”, followed by
   “Pipeline”, “Clientes” and “Seguimientos”; “Configuraciones” stays at the bottom.
   Show only authorized, implemented modules.
 - The home view prioritizes next actions and overdue follow-ups. Metrics must answer

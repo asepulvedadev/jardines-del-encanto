@@ -2,6 +2,14 @@ import type { NextRequest } from "next/server";
 
 const workflowId = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const rules: [RegExp, string[]][] = [
+  [/^campaigns$/, ["GET", "POST"]],
+  [/^campaigns\/review-accounts$/, ["GET"]],
+  [/^campaigns\/[a-z0-9-]{1,80}\/review-preview$/, ["POST"]],
+  [/^campaigns\/[a-z0-9-]{1,80}\/reviews$/, ["GET", "POST"]],
+  [/^campaigns\/[a-z0-9-]{1,80}\/reviews\/[0-9a-f-]{36}\/refresh$/, ["POST"]],
+  [/^campaigns\/review-media\/[0-9a-f-]{36}\/[A-Za-z0-9_-]{43}$/, ["GET"]],
+  [/^campaigns\/[a-z0-9-]{1,80}$/, ["PATCH"]],
+  [/^campaigns\/media\/campaign-(0[1-9]|1[0-5])$/, ["GET"]],
   [/^workflows\/(catalog|definitions|runs)$/, ["GET"]],
   [/^workflows\/(definitions|options)$/, ["POST"]],
   [new RegExp(`^workflows/definitions/${workflowId}$`), ["PATCH"]],
@@ -113,6 +121,9 @@ async function proxy(
   const voice = endpoint.startsWith("voice/");
   const retell = endpoint.startsWith("retell/");
   const workflows = endpoint.startsWith("workflows/");
+  const campaigns = endpoint === "campaigns" || endpoint.startsWith("campaigns/");
+  if (campaigns && new URL(request.url).searchParams.size)
+    return fail(422, "invalid_input");
   if ((voice || retell || workflows) && new URL(request.url).searchParams.size)
     return fail(422, "invalid_input");
   if (endpoint === "retell/results" && request.body !== null)
@@ -198,6 +209,7 @@ async function proxy(
     request.cookies.get("jardines_session");
   if (session) headers.set("cookie", `${session.name}=${session.value}`);
   const timeout =
+    /^campaigns\/.*\/(?:reviews(?:\/.*\/refresh)?|review-preview)$/.test(endpoint) ||
     endpoint.startsWith("voice/") ||
     endpoint.startsWith("retell/") ||
     workflows ||
@@ -233,6 +245,22 @@ async function proxy(
       resultHeaders.append("Set-Cookie", cookie);
     const retry = upstream.headers.get("retry-after");
     if (retry) resultHeaders.set("Retry-After", retry);
+    if (campaigns) {
+      const media =
+        (endpoint.startsWith("campaigns/media/") ||
+          endpoint.startsWith("campaigns/review-media/")) && upstream.ok;
+      const type = upstream.headers.get("content-type")?.split(";")[0].toLowerCase();
+      if (type !== (media ? "image/png" : "application/json"))
+        return fail(502, "invalid_upstream_response");
+      const raw = await boundedResult(upstream, (media ? 5 : 2) * 1024 * 1024);
+      if (!raw) return fail(502, "upstream_response_too_large");
+      if (media && ![137, 80, 78, 71, 13, 10, 26, 10].every((byte, index) => raw[index] === byte))
+        return fail(502, "invalid_upstream_response");
+      resultHeaders.set("Content-Type", type!);
+      resultHeaders.set("X-Content-Type-Options", "nosniff");
+      resultHeaders.set("Referrer-Policy", "no-referrer");
+      return new Response(raw as BodyInit, { status: upstream.status, headers: resultHeaders });
+    }
     if (sara || voice || retell || workflows) {
       const voiceDownload =
         /^voice\/artifacts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/content$/.test(

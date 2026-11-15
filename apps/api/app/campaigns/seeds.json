@@ -1,0 +1,662 @@
+[
+  {
+    "id": "campaign-01",
+    "document": {
+      "name": "Tu comienzo, en el Llano.",
+      "audience": "invitation",
+      "suggested_date": null,
+      "image_id": "campaign-01",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\n¿Te gustaría conocer una opción de lote en Acacías, Meta? Te comparto el proyecto para que lo revises a tu ritmo. {{enlace_proyecto}}\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_proyecto",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Ver proyecto",
+          "value": "{{enlace_proyecto}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Quiero información",
+          "value": "info"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-02",
+    "document": {
+      "name": "Un lugar para tu próxima idea.",
+      "audience": "invitation",
+      "suggested_date": null,
+      "image_id": "campaign-02",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\nJardines del Encanto está en Acacías, Meta. Si estás explorando opciones en el Llano, podemos contarte las características y condiciones para que evalúes si se ajusta a tu idea.\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_proyecto",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Conocer el proyecto",
+          "value": "{{enlace_proyecto}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Conocer opciones",
+          "value": "opciones"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-03",
+    "document": {
+      "name": "Primero conoce. Luego decide.",
+      "audience": "invitation",
+      "suggested_date": null,
+      "image_id": "campaign-03",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\nAntes de tomar una decisión, vale la pena conocer el lugar y resolver tus preguntas. ¿Qué te gustaría saber de Jardines del Encanto?\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_proyecto",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Ver información",
+          "value": "{{enlace_proyecto}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Hablar con un asesor",
+          "value": "asesor"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-04",
+    "document": {
+      "name": "Desde Bogotá y Soacha.",
+      "audience": "invitation",
+      "suggested_date": null,
+      "image_id": "campaign-04",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\nSi estás en Bogotá o Soacha y quieres conocer opciones en el Llano, te comparto esta guía. El proyecto está en Acacías, Meta, no en Bogotá ni en Soacha.\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_guia",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/lotes-acacias-desde-bogota-soacha"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Leer la guía",
+          "value": "{{enlace_guia}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Quiero conocer más",
+          "value": "conocer"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-05",
+    "document": {
+      "name": "Ubicación del proyecto.",
+      "audience": "information",
+      "suggested_date": null,
+      "image_id": "campaign-05",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\nJardines del Encanto está en Acacías, Meta. Revisa la información del proyecto y conversemos sobre la ubicación y cómo coordinar una visita.\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_proyecto",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Ver ubicación general",
+          "value": "{{enlace_proyecto}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Consultar ubicación",
+          "value": "ubicacion"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-06",
+    "document": {
+      "name": "Una opción de 7 × 14 m.",
+      "audience": "information",
+      "suggested_date": null,
+      "image_id": "campaign-06",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\nUna de las opciones de referencia es de 7 × 14 m, equivalente a 98 m². Consulta medidas, distribución y disponibilidad vigentes con un asesor.\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_plano",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/#plano"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Explorar el plano",
+          "value": "{{enlace_plano}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Consultar medidas",
+          "value": "medidas"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-07",
+    "document": {
+      "name": "Precio de referencia.",
+      "audience": "information",
+      "suggested_date": null,
+      "image_id": "campaign-07",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\nEl proyecto anuncia lotes desde $13 millones COP. El precio depende de las condiciones y la disponibilidad vigentes; confírmalos con un asesor antes de decidir.\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_proyecto",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Conocer el proyecto",
+          "value": "{{enlace_proyecto}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Consultar precio",
+          "value": "precio"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-08",
+    "document": {
+      "name": "Planea el próximo paso.",
+      "audience": "information",
+      "suggested_date": null,
+      "image_id": "campaign-08",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\nPuedes consultar financiación hasta 24 meses. Pide a un asesor los pagos, requisitos y condiciones vigentes para revisar si se ajustan a tu presupuesto.\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_proyecto",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Ver proyecto",
+          "value": "{{enlace_proyecto}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Consultar financiación",
+          "value": "financiacion"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-09",
+    "document": {
+      "name": "Día 1 · Bienvenida.",
+      "audience": "registered",
+      "suggested_date": "2026-11-16",
+      "image_id": "campaign-09",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\nGracias por registrarte en Jardines del Encanto. Para acompañarte mejor, ¿buscas información para un proyecto personal o quieres evaluar las condiciones de compra? {{enlace_proyecto}}\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_proyecto",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Ver proyecto",
+          "value": "{{enlace_proyecto}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Proyecto personal",
+          "value": "personal"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-10",
+    "document": {
+      "name": "Día 2 · Conoce el lugar.",
+      "audience": "registered",
+      "suggested_date": "2026-11-17",
+      "image_id": "campaign-10",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\nHoy te comparto información sobre Acacías, Meta, donde está Jardines del Encanto. Si vienes desde Bogotá o Soacha, revisa la guía y conversemos sobre tus preguntas.\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_guia",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/lotes-acacias-desde-bogota-soacha"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Leer la guía",
+          "value": "{{enlace_guia}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Consultar ubicación",
+          "value": "ubicacion"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-11",
+    "document": {
+      "name": "Día 3 · Revisa el plano.",
+      "audience": "registered",
+      "suggested_date": "2026-11-18",
+      "image_id": "campaign-11",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\nConocer la distribución te ayuda a evaluar opciones. Revisa el plano del proyecto; un asesor puede explicarte las medidas y la disponibilidad vigentes.\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_plano",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/#plano"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Ver el plano",
+          "value": "{{enlace_plano}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Resolver dudas",
+          "value": "plano"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-12",
+    "document": {
+      "name": "Día 4 · Cuentas claras.",
+      "audience": "registered",
+      "suggested_date": "2026-11-19",
+      "image_id": "campaign-12",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\n¿Revisamos precio, pagos y condiciones? Puedes consultar lotes desde $13 millones COP y financiación hasta 24 meses, sujetos a confirmación y disponibilidad vigentes.\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_proyecto",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Ver información",
+          "value": "{{enlace_proyecto}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Consultar condiciones",
+          "value": "condiciones"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-13",
+    "document": {
+      "name": "Día 5 · Recorrido.",
+      "audience": "registered",
+      "suggested_date": "2026-11-20",
+      "image_id": "campaign-13",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\nPuedes ver el recorrido y la maqueta en nuestra página. Son visualizaciones arquitectónicas; consulta el estado actual de obra con un asesor. Cuéntanos qué parte del proyecto quieres conocer mejor.\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_proyecto",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Ver recorrido",
+          "value": "{{enlace_proyecto}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Tengo preguntas",
+          "value": "recorrido"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-14",
+    "document": {
+      "name": "Día 6 · Coordina tu visita.",
+      "audience": "registered",
+      "suggested_date": "2026-11-21",
+      "image_id": "campaign-14",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\nSi quieres conocer el lugar, podemos conversar sobre una visita a Jardines del Encanto. La fecha, el punto de encuentro y los detalles se confirman directamente con un asesor.\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_proyecto",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Conocer el proyecto",
+          "value": "{{enlace_proyecto}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Coordinar visita",
+          "value": "visita"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  },
+  {
+    "id": "campaign-15",
+    "document": {
+      "name": "Día 7 · A tu ritmo.",
+      "audience": "registered",
+      "suggested_date": "2026-11-22",
+      "image_id": "campaign-15",
+      "body": "Hola {{nombre}}, soy {{asesor}}.\n\n¿Qué pregunta te falta resolver sobre Jardines del Encanto? Podemos revisar ubicación, medidas, precio o condiciones. Continuamos a tu ritmo, sin compromiso.\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "asesor",
+          "kind": "text",
+          "example": "Equipo Jardines"
+        },
+        {
+          "key": "enlace_plano",
+          "kind": "link",
+          "example": "https://jardinesdelencanto.site/#plano"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Revisar el plano",
+          "value": "{{enlace_plano}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Hablar con un asesor",
+          "value": "asesor"
+        },
+        {
+          "kind": "reply",
+          "label": "No recibir información",
+          "value": "salir"
+        }
+      ]
+    }
+  }
+]

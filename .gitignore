@@ -16,3 +16,7 @@ coverage/
 
 # Local CRM credentials and developer state
 .local/
+
+# Workstation-only orchestration state and superseded campaign image revisions
+.atl/
+assets/campaign-drafts/2026-11/without-caption/

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "./icon";
 import { VoiceWorkspace } from "./voice-workspace";
 import { WorkflowPanel } from "./workflow-panel";
+import { CampaignPanel } from "./campaign-panel";
 import { SaraPanel } from "./sara-panel";
 import { SettingsModal } from "./settings-modal";
 import { Empty, StageSelect, TaskRow } from "./workspace-parts";
@@ -33,6 +34,7 @@ const navigation = [
   ["sara", "message"],
   ["voice", "microphone"],
   ["workflows", "connections"],
+  ["campaigns", "list"],
   ["pipeline", "board"],
   ["contacts", "people"],
   ["tasks", "task"],
@@ -52,6 +54,7 @@ export function Workspace({
   const [view, setView] = useState<View>("overview");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [workflowDirty, setWorkflowDirty] = useState(false);
+  const [campaignDirty, setCampaignDirty] = useState(false);
   const [settingsTab, setSettingsTab] = useState<
     "social" | "connections" | "customizations"
   >("social");
@@ -263,6 +266,8 @@ export function Workspace({
     );
   }
   function changeView(next: View) {
+    if (view === "campaigns" && next !== view && campaignDirty &&
+        !window.confirm("Hay cambios sin guardar en la plantilla. ¿Descartarlos y salir?")) return;
     if (
       view === "workflows" &&
       next !== view &&
@@ -279,6 +284,8 @@ export function Workspace({
     requestAnimationFrame(() => heading.current?.focus());
   }
   async function logout() {
+    if (view === "campaigns" && campaignDirty &&
+        !window.confirm("Hay cambios sin guardar en la plantilla. ¿Descartarlos y cerrar sesión?")) return;
     if (busy.current) return;
     busy.current = true;
     setPending(true);
@@ -395,7 +402,7 @@ export function Workspace({
         </header>
         <main
           id="crm-content"
-          className={`crm-content ${view === "sara" ? "crm-content-sara" : ""}`}
+          className={`crm-content ${view === "sara" ? "crm-content-sara" : ""} ${view === "campaigns" ? "crm-content-campaigns" : ""}`}
         >
           {view === "sara" ? (
             <h1 className="sr-only" ref={heading} tabIndex={-1}>
@@ -414,6 +421,8 @@ export function Workspace({
                       ? "Las conversaciones y próximos pasos de tu equipo, en un solo lugar."
                       : view === "voice"
                         ? "Agentes, voces y conversaciones, conectados con Sara IA."
+                        : view === "campaigns"
+                          ? "Prepara imágenes, mensajes y elecciones antes de enviar."
                         : view === "workflows"
                           ? "Conecta los pasos de tu seguimiento."
                           : view === "pipeline"
@@ -452,7 +461,7 @@ export function Workspace({
           >
             {pending ? "Guardando cambios…" : notice}
           </p>
-          {data.limited && view !== "sara" && view !== "voice" && (
+          {data.limited && view !== "sara" && view !== "voice" && view !== "campaigns" && (
             <p className="crm-limit-note">
               Esta vista muestra hasta 500 registros por sección. Los totales
               incluyen todos los registros. Se requiere paginación antes de
@@ -471,6 +480,8 @@ export function Workspace({
                 setSettingsOpen(true);
               }}
             />
+          ) : view === "campaigns" ? (
+            <CampaignPanel csrf={csrf} onDirtyChange={setCampaignDirty} />
           ) : view === "workflows" ? (
             <WorkflowPanel
               csrf={csrf}
