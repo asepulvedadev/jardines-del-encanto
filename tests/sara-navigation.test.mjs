@@ -10,6 +10,26 @@ test("Dashboard is first and Sara IA is immediately below it in CRM navigation",
   assert.match(workspace, /\["overview", "home"\],\s*\["sara", "message"\]/);
   assert.match(workspace, /<SaraPanel/);
 });
+test("sales navigation follows Sara IA without removing other sections", () => {
+  const workspace = read("apps/web/components/crm/workspace.tsx");
+  const navigation = workspace.match(/const navigation = \[([\s\S]*?)\] as const;/);
+  assert.ok(navigation);
+  assert.deepEqual(
+    [...navigation[1].matchAll(/\["([^"]+)", "([^"]+)"\]/g)].map(
+      ([, view, icon]) => [view, icon],
+    ),
+    [
+      ["overview", "home"],
+      ["sara", "message"],
+      ["pipeline", "board"],
+      ["contacts", "people"],
+      ["tasks", "task"],
+      ["voice", "microphone"],
+      ["workflows", "connections"],
+      ["campaigns", "list"],
+    ],
+  );
+});
 test("Skills management stays in customization settings without duplicating OAuth consumers", () => {
   const workspace = read("apps/web/components/crm/workspace.tsx"),
     settings = read("apps/web/components/crm/settings-modal.tsx");

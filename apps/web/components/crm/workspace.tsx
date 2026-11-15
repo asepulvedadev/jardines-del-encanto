@@ -32,12 +32,12 @@ import {
 const navigation = [
   ["overview", "home"],
   ["sara", "message"],
-  ["voice", "microphone"],
-  ["workflows", "connections"],
-  ["campaigns", "list"],
   ["pipeline", "board"],
   ["contacts", "people"],
   ["tasks", "task"],
+  ["voice", "microphone"],
+  ["workflows", "connections"],
+  ["campaigns", "list"],
 ] as const;
 
 export function Workspace({
