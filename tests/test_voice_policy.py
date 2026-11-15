@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -18,7 +19,7 @@ class VoicePolicyTests(unittest.TestCase):
             "docker",
             "compose",
             "-f",
-            "ops/crm.compose.yaml",
+            "-",
             "-f",
             "ops/elevenlabs/compose.yaml",
             "config",
@@ -27,15 +28,26 @@ class VoicePolicyTests(unittest.TestCase):
             "--format",
             "json",
         ]
-        result = subprocess.run(
-            command,
-            cwd=ROOT,
-            env={**os.environ, "RELEASE": "a" * 40},
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
+        # Some Compose versions still stat env_file paths with --no-env-resolution.
+        # Only substitute the env-file inputs; validate the actual isolation policy.
+        with TemporaryDirectory(prefix="jardines-compose-policy-") as scratch:
+            empty_env = Path(scratch) / "empty.env"
+            empty_env.touch()
+            base = (ROOT / "ops/crm.compose.yaml").read_text()
+            for filename in ("crm-runtime.env", "crm-migration.env"):
+                source = f"/srv/jardines-del-encanto/secrets/{filename}"
+                self.assertIn(f"env_file: {source}", base)
+                base = base.replace(f"env_file: {source}", f"env_file: {empty_env}")
+            result = subprocess.run(
+                command,
+                input=base,
+                cwd=ROOT,
+                env={**os.environ, "RELEASE": "a" * 40},
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
         self.assertEqual(result.returncode, 0, result.stderr)
         policy = json.loads(result.stdout)
         api, gateway = (policy["services"][key] for key in ("api", "voice-gateway"))

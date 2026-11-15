@@ -10,6 +10,12 @@ builds the two images and checks the database/API/web readiness chain.
 No runner is installed on the VPS. The personal administrator key is not uploaded to
 GitHub. Only the dedicated CI private key is stored in the production environment.
 
+The voice isolation test renders the real Compose policy using temporary empty
+inputs for its two `env_file` declarations. This keeps validation independent of
+production secret files: some Compose versions still require those paths to exist
+even with `--no-env-resolution`. All network, mount and privilege assertions remain
+enabled; no production policy or secret is changed by this test.
+
 ## Temporary HTTPS preview
 
 The owner's public landing domain is now `https://jardinesdelencanto.site`.
