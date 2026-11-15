@@ -60,6 +60,8 @@ class ProvisionTests(unittest.TestCase):
         with patch.object(module, "database", side_effect=database) as db:
             module.provision(root=self.root)
         runtime = (self.folder / "crm-runtime.env").read_text()
+        self.assertIn("CRM_ORIGIN=https://jardinesdelencanto.site\n", runtime)
+        self.assertNotIn("sslip.io", runtime)
         self.assertIn(config["app"], runtime)
         self.assertNotIn(config["migrator"], runtime)
         self.assertEqual(json.loads(path.read_text()), config)

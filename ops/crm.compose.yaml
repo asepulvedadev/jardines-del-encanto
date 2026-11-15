@@ -21,7 +21,7 @@ services:
     environment:
       API_BASE_URL: http://api:8000
       RELEASE_SHA: ${RELEASE}
-      CRM_ORIGIN: https://jardines.2.24.111.40.sslip.io
+      CRM_ORIGIN: https://jardinesdelencanto.site
     networks: [ingress, app]
     tmpfs: ["/tmp:size=64m,mode=1777"]
     mem_limit: 512m
@@ -40,6 +40,7 @@ services:
     user: "10001:10001"
     env_file: /srv/jardines-del-encanto/secrets/crm-runtime.env
     environment:
+      CRM_ORIGIN: https://jardinesdelencanto.site
       HERMES_BRIDGE_URL: http://hermes-bridge:8081
       ZERNIO_HTTPS_PROXY: http://zernio-egress:8080
       ZERNIO_MCP_OAUTH_ENABLED: "1"

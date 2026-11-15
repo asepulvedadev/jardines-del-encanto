@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path("/srv/jardines-del-encanto")
-ORIGIN = "https://jardines.2.24.111.40.sslip.io"
+ORIGIN = "https://jardinesdelencanto.site"
 
 
 def database(project, query, name="postgres"):

@@ -83,44 +83,93 @@ test(
 );
 
 test(
-  "private CRM stays on its existing origin and is not exposed through the alias",
+  "canonical login serves the form and anonymous CRM remains protected",
   options,
   async () => {
+    const login = await fetch(`${base}/login`, { redirect: "manual" });
+    assert.equal(login.status, 200);
+    assert.match(await login.text(), /Bienvenido de nuevo/);
+    assert.match(login.headers.get("x-robots-tag"), /noindex/);
+    const crm = await fetch(`${base}/crm`, { redirect: "manual" });
+    assert.ok([302, 303, 307, 308].includes(crm.status));
     assert.equal(
-      (
-        await fetch(`${base}/api/crm/auth/login`, {
-          method: "POST",
-          body: "{}",
-        })
-      ).status,
-      404,
+      new URL(crm.headers.get("location"), base).href,
+      `${base}/login`,
     );
-    const response = await fetch(`${base}/crm`, { redirect: "manual" });
-    assert.equal(response.status, 302);
-    assert.equal(
-      response.headers.get("location"),
-      "https://jardines.2.24.111.40.sslip.io/crm",
-    );
+    assert.equal((await fetch(`${base}/api/crm/auth/session`)).status, 401);
   },
 );
 
 test(
-  "the original preview retains its existing form origin policy",
+  "canonical login API enforces the exact Origin before credentials are evaluated",
+  options,
+  async () => {
+    for (const [origin, expected] of [
+      [null, 403],
+      ["https://evil.invalid", 403],
+      ["https://jardines.2.24.111.40.sslip.io", 403],
+      [base, 422],
+    ]) {
+      const response = await fetch(`${base}/api/crm/auth/login`, {
+        method: "POST",
+        redirect: "manual",
+        headers: {
+          "Content-Type": "application/json",
+          ...(origin ? { Origin: origin } : {}),
+        },
+        body: "{}",
+      });
+      assert.equal(response.status, expected);
+      assert.equal(response.headers.get("set-cookie"), null);
+    }
+  },
+);
+
+test(
+  "legacy documents redirect to the canonical host without replaying POSTs",
   options,
   async () => {
     const preview = "https://jardines.2.24.111.40.sslip.io";
-    for (const [origin, status] of [
-      [preview, 422],
-      [base, 403],
+    for (const path of [
+      "/login",
+      "/crm",
+      "/crm?domain-check=1",
+      "/crm/tasks",
     ]) {
-      const response = await fetch(`${preview}/api/landing/registrations`, {
-        method: "POST",
-        headers: { Origin: origin, "Content-Type": "application/json" },
-        body: "{}",
-        redirect: "error",
-      });
-      assert.equal(response.status, status);
+      const response = await fetch(preview + path, { redirect: "manual" });
+      assert.equal(response.status, 308);
+      assert.equal(response.headers.get("location"), base + path);
     }
+    assert.equal(
+      (
+        await fetch(preview + "/api/crm/auth/login", {
+          method: "POST",
+          redirect: "manual",
+          body: "{}",
+        })
+      ).status,
+      403,
+    );
+    assert.equal(
+      (
+        await fetch(preview + "/login", {
+          method: "POST",
+          redirect: "manual",
+          body: "{}",
+        })
+      ).status,
+      405,
+    );
+    assert.equal(
+      (
+        await fetch(preview + "/api/landing/registrations", {
+          method: "POST",
+          redirect: "manual",
+          body: "{}",
+        })
+      ).status,
+      403,
+    );
   },
 );
 
@@ -135,3 +184,21 @@ test("HTTP and www redirect to the branded HTTPS apex", options, async () => {
     assert.equal(response.headers.get("location"), `${base}/?domain-check=1`);
   }
 });
+
+test(
+  "the existing legacy webhook still rejects unsigned deliveries",
+  options,
+  async () => {
+    const response = await fetch(
+      "https://jardines.2.24.111.40.sslip.io/api/integrations/zernio/webhook",
+      {
+        method: "POST",
+        redirect: "manual",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).detail, "invalid_signature");
+  },
+);

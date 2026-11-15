@@ -19,16 +19,18 @@ enabled; no production policy or secret is changed by this test.
 ## Temporary HTTPS preview
 
 The owner's public landing domain is now `https://jardinesdelencanto.site`.
-See [DOMAIN.md](DOMAIN.md) for DNS, certificate, public-form origin adaptation,
-verification and recovery. The preview remains the separate CRM/provider origin.
+See [DOMAIN.md](DOMAIN.md) for DNS, certificate, canonical CRM-origin migration,
+verification and recovery. Since November 15, login and CRM also use this domain.
 
-Preview hostname: `jardines.2.24.111.40.sslip.io`, proxying through the project-specific
-Nginx vhost to `127.0.0.1:13400`. The application, API and database ports stay private.
+Legacy hostname: `jardines.2.24.111.40.sslip.io` now redirects safe document requests
+to the branded domain. Its private API is blocked except for the existing signed
+Zernio webhook transport. The branded project vhost proxies to `127.0.0.1:13400`;
+the application, API and database ports stay private.
 The preview response header remains noindex. Approved pages on the branded domain
 use the separate indexing policy in `SEO-GEO.md`; private metadata stays noindex. This
 is a public test URL, not access control; do not expose private CRM data here.
-The hostname depends on the external [sslip.io DNS service](https://sslip.io/) and
-should be replaced with the owner's domain before permanent launch.
+The legacy hostname depends on the external [sslip.io DNS service](https://sslip.io/).
+Do not restore it as CRM_ORIGIN; both API and web must use the branded HTTPS apex.
 
 ### Private tunnel fallback
 
