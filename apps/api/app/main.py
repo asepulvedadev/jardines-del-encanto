@@ -14,6 +14,7 @@ from .crm.landing import router as landing_router
 from .crm.routes import router as crm_router
 from .hermes.routes import internal_router
 from .hermes.routes import router as hermes_router
+from .inbox.routes import router as inbox_router
 from .retell.routes import router as retell_router
 from .sara.routes import router as sara_router
 from .social.mcp_routes import router as social_mcp_router
@@ -44,6 +45,7 @@ app = FastAPI(
 
 app.include_router(crm_router)
 app.include_router(campaigns_router)
+app.include_router(inbox_router)
 app.include_router(workflows_router)
 app.include_router(control_router)
 app.include_router(hermes_router)
@@ -59,7 +61,7 @@ app.include_router(webhook_router)
 
 @app.middleware("http")
 async def private_response_headers(request: Request, call_next):
-    if request.url.path.startswith("/crm/campaigns") and request.url.query:
+    if request.url.path.startswith(("/crm/campaigns", "/crm/inbox")) and request.url.query:
         return JSONResponse(
             {"detail": "invalid_input"}, status_code=422,
             headers={"Cache-Control": "no-store, private"},
@@ -73,6 +75,7 @@ async def private_response_headers(request: Request, call_next):
     private_control = request.url.path.startswith(
         (
             "/crm/campaigns",
+            "/crm/inbox/",
             "/crm/workflows/",
             "/crm/control/",
             "/crm/hermes/",
@@ -96,7 +99,7 @@ async def private_response_headers(request: Request, call_next):
             768 * 1024
             if request.url.path in ("/crm/sara/attachments", "/crm/voice/attachments")
             else 65536
-            if large
+            if large or request.url.path.startswith("/crm/inbox/")
             else 16384
         )
         chunks, size = [], 0

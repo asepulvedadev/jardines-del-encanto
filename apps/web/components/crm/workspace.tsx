@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "./icon";
 import { VoiceWorkspace } from "./voice-workspace";
 import { WorkflowPanel } from "./workflow-panel";
+import { InboxPanel } from "./inbox-panel";
 import { CampaignPanel } from "./campaign-panel";
 import { SaraPanel } from "./sara-panel";
 import { SettingsModal } from "./settings-modal";
@@ -38,6 +39,7 @@ const navigation = [
   ["voice", "microphone"],
   ["workflows", "connections"],
   ["campaigns", "list"],
+  ["inbox", "message"],
 ] as const;
 
 export function Workspace({
@@ -54,6 +56,7 @@ export function Workspace({
   const [view, setView] = useState<View>("overview");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [workflowDirty, setWorkflowDirty] = useState(false);
+  const [inboxDirty, setInboxDirty] = useState(false);
   const [campaignDirty, setCampaignDirty] = useState(false);
   const [settingsTab, setSettingsTab] = useState<
     "social" | "connections" | "customizations"
@@ -266,8 +269,24 @@ export function Workspace({
     );
   }
   function changeView(next: View) {
-    if (view === "campaigns" && next !== view && campaignDirty &&
-        !window.confirm("Hay cambios sin guardar en la plantilla. ¿Descartarlos y salir?")) return;
+    if (
+      view === "inbox" &&
+      next !== view &&
+      inboxDirty &&
+      !window.confirm(
+        "Hay respuestas sin enviar. ¿Descartarlas y salir del inbox?",
+      )
+    )
+      return;
+    if (
+      view === "campaigns" &&
+      next !== view &&
+      campaignDirty &&
+      !window.confirm(
+        "Hay cambios sin guardar en la plantilla. ¿Descartarlos y salir?",
+      )
+    )
+      return;
     if (
       view === "workflows" &&
       next !== view &&
@@ -284,8 +303,22 @@ export function Workspace({
     requestAnimationFrame(() => heading.current?.focus());
   }
   async function logout() {
-    if (view === "campaigns" && campaignDirty &&
-        !window.confirm("Hay cambios sin guardar en la plantilla. ¿Descartarlos y cerrar sesión?")) return;
+    if (
+      view === "inbox" &&
+      inboxDirty &&
+      !window.confirm(
+        "Hay respuestas sin enviar. ¿Descartarlas y cerrar sesión?",
+      )
+    )
+      return;
+    if (
+      view === "campaigns" &&
+      campaignDirty &&
+      !window.confirm(
+        "Hay cambios sin guardar en la plantilla. ¿Descartarlos y cerrar sesión?",
+      )
+    )
+      return;
     if (busy.current) return;
     busy.current = true;
     setPending(true);
@@ -402,7 +435,7 @@ export function Workspace({
         </header>
         <main
           id="crm-content"
-          className={`crm-content ${view === "sara" ? "crm-content-sara" : ""} ${view === "campaigns" ? "crm-content-campaigns" : ""}`}
+          className={`crm-content ${view === "sara" ? "crm-content-sara" : ""} ${view === "campaigns" ? "crm-content-campaigns" : ""} ${view === "inbox" ? "crm-content-inbox" : ""}`}
         >
           {view === "sara" ? (
             <h1 className="sr-only" ref={heading} tabIndex={-1}>
@@ -421,15 +454,17 @@ export function Workspace({
                       ? "Las conversaciones y próximos pasos de tu equipo, en un solo lugar."
                       : view === "voice"
                         ? "Agentes, voces y conversaciones, conectados con Sara IA."
-                        : view === "campaigns"
-                          ? "Prepara imágenes, mensajes y elecciones antes de enviar."
-                        : view === "workflows"
-                          ? "Conecta los pasos de tu seguimiento."
-                          : view === "pipeline"
-                            ? "Una vista clara de cada conversación y su siguiente paso."
-                            : view === "contacts"
-                              ? "Solo lo importante: nombre, celular y de dónde llega cada cliente."
-                              : "Que ninguna conversación se quede sin un siguiente paso."}
+                        : view === "inbox"
+                          ? "Lee y responde a tus canales desde un solo lugar."
+                          : view === "campaigns"
+                            ? "Prepara imágenes, mensajes y elecciones antes de enviar."
+                            : view === "workflows"
+                              ? "Conecta los pasos de tu seguimiento."
+                              : view === "pipeline"
+                                ? "Una vista clara de cada conversación y su siguiente paso."
+                                : view === "contacts"
+                                  ? "Solo lo importante: nombre, celular y de dónde llega cada cliente."
+                                  : "Que ninguna conversación se quede sin un siguiente paso."}
                   </p>
                 </div>
                 <div className="crm-heading-actions">
@@ -461,13 +496,17 @@ export function Workspace({
           >
             {pending ? "Guardando cambios…" : notice}
           </p>
-          {data.limited && view !== "sara" && view !== "voice" && view !== "campaigns" && (
-            <p className="crm-limit-note">
-              Esta vista muestra hasta 500 registros por sección. Los totales
-              incluyen todos los registros. Se requiere paginación antes de
-              superar este volumen.
-            </p>
-          )}
+          {data.limited &&
+            view !== "sara" &&
+            view !== "voice" &&
+            view !== "campaigns" &&
+            view !== "inbox" && (
+              <p className="crm-limit-note">
+                Esta vista muestra hasta 500 registros por sección. Los totales
+                incluyen todos los registros. Se requiere paginación antes de
+                superar este volumen.
+              </p>
+            )}
           {view === "sara" ? (
             <SaraPanel csrf={csrf} onChanged={refresh} />
           ) : view === "voice" ? (
@@ -476,6 +515,16 @@ export function Workspace({
               active={!settingsOpen}
               onChanged={refresh}
               onOpenConnection={() => {
+                setSettingsTab("connections");
+                setSettingsOpen(true);
+              }}
+            />
+          ) : view === "inbox" ? (
+            <InboxPanel
+              csrf={csrf}
+              active={!settingsOpen}
+              onDirtyChange={setInboxDirty}
+              onOpenConnections={() => {
                 setSettingsTab("connections");
                 setSettingsOpen(true);
               }}

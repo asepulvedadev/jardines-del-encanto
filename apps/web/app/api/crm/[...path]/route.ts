@@ -1,7 +1,12 @@
 import type { NextRequest } from "next/server";
 
-const workflowId = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const workflowId =
+  "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const rules: [RegExp, string[]][] = [
+  [/^inbox\/(catalog|accounts|actions)$/, ["GET"]],
+  [/^inbox\/(read|prepare|templates)$/, ["POST"]],
+  [/^inbox\/actions\/[0-9a-f-]{36}$/, ["GET"]],
+  [/^inbox\/actions\/[0-9a-f-]{36}\/confirm$/, ["POST"]],
   [/^campaigns$/, ["GET", "POST"]],
   [/^campaigns\/review-accounts$/, ["GET"]],
   [/^campaigns\/[a-z0-9-]{1,80}\/review-preview$/, ["POST"]],
@@ -15,7 +20,10 @@ const rules: [RegExp, string[]][] = [
   [new RegExp(`^workflows/definitions/${workflowId}$`), ["PATCH"]],
   [new RegExp(`^workflows/definitions/${workflowId}/prepare$`), ["POST"]],
   [new RegExp(`^workflows/runs/${workflowId}$`), ["GET"]],
-  [new RegExp(`^workflows/runs/${workflowId}/(activate|pause|resume|stop)$`), ["POST"]],
+  [
+    new RegExp(`^workflows/runs/${workflowId}/(activate|pause|resume|stop)$`),
+    ["POST"],
+  ],
   [/^auth\/login$/, ["POST"]],
   [/^auth\/logout$/, ["POST"]],
   [/^auth\/session$/, ["GET"]],
@@ -121,7 +129,11 @@ async function proxy(
   const voice = endpoint.startsWith("voice/");
   const retell = endpoint.startsWith("retell/");
   const workflows = endpoint.startsWith("workflows/");
-  const campaigns = endpoint === "campaigns" || endpoint.startsWith("campaigns/");
+  const inbox = endpoint.startsWith("inbox/");
+  if (inbox && new URL(request.url).searchParams.size)
+    return fail(422, "invalid_input");
+  const campaigns =
+    endpoint === "campaigns" || endpoint.startsWith("campaigns/");
   if (campaigns && new URL(request.url).searchParams.size)
     return fail(422, "invalid_input");
   if ((voice || retell || workflows) && new URL(request.url).searchParams.size)
@@ -165,14 +177,15 @@ async function proxy(
   if (mutation) {
     const definitionWrite =
       (request.method === "POST" && endpoint === "control/items") ||
-      (workflows && /^workflows\/definitions(?:\/[^/]+(?:\/prepare)?)?$/.test(endpoint)) ||
+      (workflows &&
+        /^workflows\/definitions(?:\/[^/]+(?:\/prepare)?)?$/.test(endpoint)) ||
       (request.method === "PATCH" &&
         /^control\/items\/[0-9a-f-]{36}$/.test(endpoint));
     const bodyLimit = ["sara/attachments", "voice/attachments"].includes(
       endpoint,
     )
       ? 768 * 1024
-      : definitionWrite
+      : definitionWrite || inbox
         ? 65536
         : 16384;
     if (!request.headers.get("content-type")?.startsWith("application/json"))
@@ -209,10 +222,13 @@ async function proxy(
     request.cookies.get("jardines_session");
   if (session) headers.set("cookie", `${session.name}=${session.value}`);
   const timeout =
-    /^campaigns\/.*\/(?:reviews(?:\/.*\/refresh)?|review-preview)$/.test(endpoint) ||
+    /^campaigns\/.*\/(?:reviews(?:\/.*\/refresh)?|review-preview)$/.test(
+      endpoint,
+    ) ||
     endpoint.startsWith("voice/") ||
     endpoint.startsWith("retell/") ||
     workflows ||
+    inbox ||
     /^hermes\/proposals\/[0-9a-f-]{36}\/approve$/.test(endpoint)
       ? 95000
       : /^sara\/conversations\/[0-9a-f-]{36}\/messages$/.test(endpoint) &&
@@ -248,20 +264,32 @@ async function proxy(
     if (campaigns) {
       const media =
         (endpoint.startsWith("campaigns/media/") ||
-          endpoint.startsWith("campaigns/review-media/")) && upstream.ok;
-      const type = upstream.headers.get("content-type")?.split(";")[0].toLowerCase();
+          endpoint.startsWith("campaigns/review-media/")) &&
+        upstream.ok;
+      const type = upstream.headers
+        .get("content-type")
+        ?.split(";")[0]
+        .toLowerCase();
       if (type !== (media ? "image/png" : "application/json"))
         return fail(502, "invalid_upstream_response");
       const raw = await boundedResult(upstream, (media ? 5 : 2) * 1024 * 1024);
       if (!raw) return fail(502, "upstream_response_too_large");
-      if (media && ![137, 80, 78, 71, 13, 10, 26, 10].every((byte, index) => raw[index] === byte))
+      if (
+        media &&
+        ![137, 80, 78, 71, 13, 10, 26, 10].every(
+          (byte, index) => raw[index] === byte,
+        )
+      )
         return fail(502, "invalid_upstream_response");
       resultHeaders.set("Content-Type", type!);
       resultHeaders.set("X-Content-Type-Options", "nosniff");
       resultHeaders.set("Referrer-Policy", "no-referrer");
-      return new Response(raw as BodyInit, { status: upstream.status, headers: resultHeaders });
+      return new Response(raw as BodyInit, {
+        status: upstream.status,
+        headers: resultHeaders,
+      });
     }
-    if (sara || voice || retell || workflows) {
+    if (sara || voice || retell || workflows || inbox) {
       const voiceDownload =
         /^voice\/artifacts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/content$/.test(
           endpoint,

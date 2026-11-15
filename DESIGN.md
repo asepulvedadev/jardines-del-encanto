@@ -204,8 +204,9 @@ density. No full-bleed photographs, oversized promotional typography or decorati
 
 - Desktop shell: approximately 224px quiet navigation, a 64px header, and a flexible
   content area. Active navigation uses label weight and a clear selected surface.
-- Implemented navigation begins with “Dashboard”, then “Sara IA”, “Voz”, “Secuencias” and “Plantillas”, followed by
-  “Pipeline”, “Clientes” and “Seguimientos”; “Configuraciones” stays at the bottom.
+- Implemented navigation is “Dashboard”, “Sara IA”, “Pipeline”, “Clientes”,
+  “Seguimientos”, “Voz”, “Secuencias”, “Plantillas” and “Inbox”;
+  “Configuraciones” stays at the bottom.
   Show only authorized, implemented modules.
 - The home view prioritizes next actions and overdue follow-ups. Metrics must answer
   real questions, not occupy a decorative four-card dashboard row.
@@ -417,3 +418,14 @@ Calls require a separate exact-recipient consent checkbox. Provider credentials
 must never be prefilled, rendered in results or included in chat history. Use
 honest unavailable/paused/partially permitted states rather than fake connections.
 See [ELEVENLABS.md](docs/ELEVENLABS.md) for implemented scope and rollout limits.
+
+### Unified inbox
+
+Inbox is a private, account-scoped workspace below Plantillas. Distinguish messages,
+comments, mentions and reviews; public responses must not look like private replies.
+Preserve unsent drafts across threads. A response is reviewed before explicit execution,
+with the live account/recipient and exact content visible. Unknown sends are not failures
+to retry automatically. Keep a readable mobile list-to-conversation flow, the composer
+inside the viewport, and settings accessible when the sidebar grows. Advanced vendor
+features belong in a focused tools dialog, not permanent explanatory cards. See
+[INBOX.md](docs/INBOX.md) for the pinned contract and limitations.

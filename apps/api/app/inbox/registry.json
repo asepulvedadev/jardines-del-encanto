@@ -1,0 +1,3200 @@
+{
+  "source": "https://zernio.com/openapi.yaml",
+  "retrieved": "2026-11-15",
+  "source_json_sha256": "f480c40c6774e85533f1f9c51b77e407b1438624a6fd58029d34f9e2f6ca7bda",
+  "operations": {
+    "listInboxConversations": {
+      "method": "GET",
+      "path": "/v1/inbox/conversations",
+      "summary": "List conversations",
+      "description": "Fetch conversations (DMs) from all connected messaging accounts in a single API call. Supports filtering by profile and platform. Results are aggregated and deduplicated.\n\nSupported platforms: Facebook, Instagram, X, Bluesky, Reddit, Telegram, WhatsApp, iMessage, SMS, LINE and WeChat.\n\n### X limitation\n\nX has replaced traditional DMs with encrypted \"X Chat\" for many accounts. Messages sent or received through encrypted X Chat are not accessible via X's API (the /2/dm_events endpoint only returns legacy unencrypted DMs).\n\nThis means some X conversations may show only outgoing messages or appear empty. This is an X platform limitation that affects all third-party applications. See X's docs on encrypted messaging for more details.\n\n### Instagram and Facebook pre-connect history\n\nWhen one of these accounts is connected, Zernio replays the DM history the account already holds on Meta, so conversations that began before the account was connected appear here. Up to 500 conversations per account are replayed.\n\n- The replay runs in the background and can finish after a listing you have already taken.\n- Replayed conversations keep their original lastMessageAt, so they sort into date order rather than appearing at the top.\n- If you mirror this endpoint into your own store, re-run the sweep rather than relying on a single pass at connect time.\n- Replayed history emits no webhooks and is stored as already read, so it never affects unread counts.\n- Threads that Meta refuses to serve are skipped.\n- An account whose Instagram \"connected tools\" message access is turned off is not replayed at all.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "profileId": {
+              "type": "string"
+            },
+            "platform": {
+              "type": "string",
+              "enum": [
+                "facebook",
+                "instagram",
+                "twitter",
+                "bluesky",
+                "reddit",
+                "telegram",
+                "whatsapp",
+                "imessage",
+                "sms",
+                "line",
+                "wechat"
+              ]
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "active",
+                "archived"
+              ]
+            },
+            "folder": {
+              "type": "string",
+              "enum": [
+                "inbox",
+                "requests"
+              ],
+              "default": "inbox"
+            },
+            "sortOrder": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "cursor": {
+              "type": "string"
+            },
+            "accountId": {
+              "type": "string"
+            },
+            "tags": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "createInboxConversation": {
+      "method": "POST",
+      "path": "/v1/inbox/conversations",
+      "summary": "Create conversation",
+      "description": "Start a direct message conversation with a user. If a conversation with that recipient already exists, the message is added to the existing thread.\n\nSupported platforms: X, Bluesky, Reddit, WhatsApp, SMS, Slack, iMessage, and email (Google, Microsoft and IMAP accounts). Other platforms return PLATFORM_NOT_SUPPORTED.\n\n### Email (Google, Microsoft, IMAP)\n\nPass the recipient address as participantId with `subject`, `message` and optionally `cc`. The mail is sent from the mailbox and mirrored into the inbox. The response names the inbox conversation it opened (the provider thread id, usable with the other inbox endpoints).\n\n- 412 `account_scope_missing`: the account was connected without the `email` area\n- 409: the account is disconnected\n- 402 `payment_required`: Gmail accounts need a card on file\n\nSends count toward the mailbox's daily cap and never toward managed messages.\n\n### iMessage\n\nPass the recipient as participantId: a phone number in international format (+15551234567) or an iMessage email. Senders ordered through Zernio can message contacts who never wrote to them.\n\n#### Opening message rules\n\nThe first message to such a contact must be plain text from an identifiable person or business opening a conversation.\n\nA cold introduction, including a sales one, is fine (\"Hi Mark, this is John from Pratt Media. I help local roofers get more leads. Would you be open to a quick chat?\").\n\nIt may not contain links, email addresses, phone numbers, prices or attachments (the provider's own rule for opening messages). One that does returns 400 with code `invalid_content` and a message saying what was flagged, and nothing is sent.\n\n#### New contact limits\n\nEach sender may open at most one new conversation every 15 minutes. A new sender warms up, allowing this many new conversations per 24 hours:\n\n- Days 1-2 after activation: 2\n- Days 3-4: 5\n- Days 5-7: 10\n- Days 8-14: 20\n- Days 15-21: 30\n- After that: 50\n\nBeyond that the request returns 429 with code `new_contact_limit` and a time to retry. The warm-up counts from when a sender ordered through Zernio went live. Senders registered from your own provider account are not warmed up by Zernio.\n\n#### Follow-ups before the contact replies\n\nUntil the contact replies, the thread accepts the opening and at most two follow-ups, at least 24 hours apart.\n\n- A follow-up sooner returns 429 `new_contact_limit` with the time to retry.\n- A fourth message returns 409 `recipient_must_message_first`.\n\nThe provider treats every message to a contact who has not replied as a new conversation.\n\nFollow-ups therefore follow the same content rule and count toward the 15-minute spacing and the daily warm-up like an opening. Once the contact has written, the thread behaves like any other and is not limited.\n\n#### Sender safety\n\nRecipients can report a first message as junk, and reports can get a sender blocked permanently, so keep the reply rate high (above roughly 30%).\n\n- A sender registered with your own provider account may lack the add-on for new contacts. Its sends to them return 409 `recipient_must_message_first`, and an opt-in link is the way in.\n- A contact who opted out returns 409 `recipient_opted_out`.\n\n### Slack\n\nPass a workspace member id as participantId (list them with GET /v1/accounts/{accountId}/slack-members). Zernio opens the DM channel with that member and sends the message. The thread then behaves like any other Slack conversation in the inbox. The member must belong to the connected workspace.\n\n### WhatsApp\n\nThis is the endpoint for sending an approved template message to a phone number. Put the recipient phone in participantId and provide:\n\n- templateName\n- templateLanguage\n- templateParams: variable values for the text header, body and dynamic URL buttons, in that order\n\nA template is required because WhatsApp does not permit freeform messages to open a conversation. A missing template returns TEMPLATE_REQUIRED.\n\n#### Template lookup\n\nBefore sending, Zernio must resolve an exact APPROVED template definition matching both templateName and templateLanguage. If Meta rejects that lookup, or the exact approved definition is absent, Zernio sends no message and returns the canonical platform error instead.\n\nLookup errors use code `platform_api_error`, type `platform_error`, and platform `whatsapp`. Sanitized Meta code, message, and `error_data.details` are returned in `platformError`. `details` identifies `phase: template_lookup`, the query-free endpoint, upstream status, and only safe provider usage or retry headers.\n\n#### Template headers, buttons and cards\n\n- Templates with media headers (image, video, document) are handled automatically: Zernio fills the header at send time with the approved template's sample asset.\n- To send a DIFFERENT asset per message (e.g. a distinct invoice PDF for each recipient), pass headerMedia with a public link (or a Meta media id); it overrides the sample for that send.\n- A template whose approved header format is LOCATION has no header asset to reconstruct: Meta only accepts the location at send time. Pass headerLocation (latitude and longitude required) whenever such a template is sent. headerMedia and headerLocation cannot both be supplied.\n- A button that carries its own value at send time (a copy-code button holding a Pix payment code or a coupon, a flow token) is sent with templateButtonParams, addressed by the button's index. templateParams covers text variables and dynamic URL buttons only.\n- CAROUSEL templates take per-card overrides via templateCards, each addressed by the card's card_index. Card body variables restart at {{1}} per card and cannot be expressed in the flat templateParams order.\n- Template fields are accepted on the JSON body only, not on multipart requests.\n\n#### Existing threads and the 24-hour window\n\nFor a number you already have a thread with, this sends the template into that thread. That makes it the way to re-engage a contact after the 24-hour customer-service window has closed. Once the recipient replies (opening the 24h window), send freeform messages with the send-message endpoint (POST /v1/inbox/conversations/{conversationId}/messages).\n\n#### Meta Direct Send\n\nWhatsApp Business Accounts eligible for Meta Direct Send can instead open a conversation with a business-initiated utility text message and no template. Pass category: 'utility' together with message (and no templateName). See the category field below.\n\n### X\n\n#### DM eligibility\n\nBefore sending, the endpoint checks if the recipient accepts DMs from your account (via the receives_your_dm field). If not, a 422 error with code DM_NOT_ALLOWED is returned. Skip this check with skipDmCheck: true if you have already verified eligibility.\n\n#### API tier requirement\n\nDM write endpoints require X API Pro tier ($5,000/month) or Enterprise access. This applies to BYOK (Bring Your Own Key) users who provide their own X API credentials.\n\n#### Rate limits (X only)\n\nX's DM API enforces, shared across all DM endpoints:\n\n- 200 requests per 15 minutes per connected X account\n- 1,000 per 24 hours per connected X account\n- 15,000 per 24 hours per X developer app\n\nThese limits do NOT apply to other platforms. WhatsApp sends are governed by Meta's per-number messaging tiers (unique business-initiated conversations per 24 hours) and per-number throughput instead.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "participantId": {
+              "type": "string"
+            },
+            "participantUsername": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "subject": {
+              "type": "string",
+              "maxLength": 998
+            },
+            "cc": {
+              "type": "array",
+              "maxItems": 50,
+              "items": {
+                "type": "string",
+                "format": "email"
+              }
+            },
+            "skipDmCheck": {
+              "type": "boolean",
+              "default": false
+            },
+            "templateName": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string",
+              "enum": [
+                "utility"
+              ]
+            },
+            "linkPreview": {
+              "type": "boolean",
+              "default": true
+            },
+            "templateLanguage": {
+              "type": "string"
+            },
+            "templateParams": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "templateButtonParams": {
+              "type": "array",
+              "maxItems": 10,
+              "items": {
+                "type": "object",
+                "required": [
+                  "index",
+                  "subType",
+                  "value"
+                ],
+                "properties": {
+                  "index": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9
+                  },
+                  "subType": {
+                    "type": "string",
+                    "enum": [
+                      "url",
+                      "copy_code",
+                      "flow"
+                    ]
+                  },
+                  "value": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "templateCards": {
+              "type": "array",
+              "maxItems": 10,
+              "items": {
+                "type": "object",
+                "required": [
+                  "cardIndex"
+                ],
+                "properties": {
+                  "cardIndex": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9
+                  },
+                  "params": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "headerMedia": {
+                    "type": "object",
+                    "required": [
+                      "type"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "image",
+                          "video",
+                          "document"
+                        ]
+                      },
+                      "link": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "buttons": {
+                    "type": "array",
+                    "maxItems": 2,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "index",
+                        "subType",
+                        "value"
+                      ],
+                      "properties": {
+                        "index": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "subType": {
+                          "type": "string",
+                          "enum": [
+                            "quick_reply",
+                            "url"
+                          ]
+                        },
+                        "value": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "headerMedia": {
+              "type": "object",
+              "required": [
+                "type"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "image",
+                    "video",
+                    "document"
+                  ]
+                },
+                "link": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "filename": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "headerLocation": {
+              "type": "object",
+              "required": [
+                "latitude",
+                "longitude"
+              ],
+              "properties": {
+                "latitude": {
+                  "type": "number"
+                },
+                "longitude": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "address": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "searchInboxConversations": {
+      "method": "GET",
+      "path": "/v1/inbox/conversations/search",
+      "summary": "Search conversations",
+      "description": "Search your conversations two ways at once, and get back the matching conversations, most-recent match first.\n\n### Message text\n\nMatches words inside message bodies. Case-insensitive and accent-insensitive, exact tokens only (no substrings, no stemming). Each hit carries up to 3 most-recent matching messages.\n\nWith direction=outgoing you can collect examples of how you write to customers, for example to teach an AI agent your tone of voice.\n\n### Contact identity\n\nMatches the participant's name, username, or phone number as a case-insensitive substring. These hits have matchCount 0 and an empty matches array.\n\nA conversation that matches both ways is returned once, carrying its message matches.\n\n### Searchable platforms\n\nOnly platforms whose messages are stored by Zernio are searchable: WhatsApp, SMS, Telegram, Facebook, Instagram, X and Reddit.\n\nBluesky conversations are fetched live from the platform and cannot be searched; those accounts are listed in meta.accountsSkipped.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 200
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "incoming",
+                "outgoing"
+              ]
+            },
+            "profileId": {
+              "type": "string"
+            },
+            "platform": {
+              "type": "string",
+              "enum": [
+                "facebook",
+                "instagram",
+                "telegram",
+                "whatsapp",
+                "sms",
+                "rcs",
+                "slack",
+                "imessage",
+                "line",
+                "wechat"
+              ]
+            },
+            "accountId": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            },
+            "cursor": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "getInboxConversation": {
+      "method": "GET",
+      "path": "/v1/inbox/conversations/{conversationId}",
+      "summary": "Get conversation",
+      "description": "Retrieve details and metadata for a specific conversation. Requires accountId query parameter.",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "updateInboxConversation": {
+      "method": "PUT",
+      "path": "/v1/inbox/conversations/{conversationId}",
+      "summary": "Update conversation status",
+      "description": "Archive or activate a conversation. Requires accountId in request body.",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId",
+            "status"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "active",
+                "archived"
+              ]
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "deleteInboxConversation": {
+      "method": "DELETE",
+      "path": "/v1/inbox/conversations/{conversationId}",
+      "summary": "Delete conversation",
+      "description": "Permanently deletes Zernio's stored copy of one conversation and every message in it, in one transaction, and unlinks the contact channel that pointed at it.\n\n### What is kept\n\n- Nothing is deleted on the platform (the thread stays in WhatsApp, Messenger or Instagram).\n- The contact record is kept: call DELETE /v1/contacts/{contactId} to erase the person's name and number as well.\n\nInbound media copies Zernio stored are removed on a best-effort basis.\n\n### Re-imports\n\nA platform re-sync can import the thread again:\n\n- WhatsApp coexistence numbers receive their messaging history from Meta repeatedly.\n- A Facebook or Instagram account whose DM history walk has not finished imports it on that walk.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "getInboxConversationMessages": {
+      "method": "GET",
+      "path": "/v1/inbox/conversations/{conversationId}/messages",
+      "summary": "List messages",
+      "description": "Fetch messages for a specific conversation, with cursor-based pagination and ordering control.\n\n### Pagination\n\nPass `pagination.nextCursor` from a prior response back as the `cursor` query param to fetch the next page. The cursor is opaque; do not parse or construct it client-side.\n\n### Sort order\n\nDefaults to `asc` (oldest first, chat style). For the \"show me the latest messages\" pattern, pass `?sortOrder=desc&limit=N`.\n\n- X, Instagram, Telegram, WhatsApp and Reddit honor the requested order from the local message store.\n- Facebook and Bluesky upstream APIs only return newest-first and have no order parameter. Sort order is best-effort and only reverses items within a single page (pages still walk newest→oldest).\n\nThe response field `sortOrderApplied` tells you what was actually applied.\n\n### Platform limits\n\n- **Reddit**: threads are paginated client-side because Reddit's API has no per-thread cursor. Very long threads may be upstream-truncated by Reddit's inbox/sent windows (~100 most-recent items each); this is a Reddit platform limitation.\n- **Instagram and Facebook**: conversations include history from before the account was connected, replayed from Meta. See below.\n- **X**: X's encrypted \"X Chat\" messages are not accessible via the API. Conversations where the other participant uses encrypted X Chat may only show your outgoing messages. See the list conversations endpoint for more details.\n\nThe Meta replay covers the 500 most recent messages per conversation: a longer thread keeps its newest 500 and older messages are not retrievable. Messages that arrived after the account was connected are unaffected. Replayed messages are stored as already read and emit no webhooks.\n\n### Read state\n\nThis endpoint is read-only and does NOT mark messages as read or send read receipts. To mark a conversation read (and send WhatsApp blue ticks on eligible accounts), call `POST /v1/inbox/conversations/{conversationId}/read`.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 100
+            },
+            "cursor": {
+              "type": "string"
+            },
+            "sortOrder": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "asc"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "sendInboxMessage": {
+      "method": "POST",
+      "path": "/v1/inbox/conversations/{conversationId}/messages",
+      "summary": "Send message",
+      "description": "Send a message in a conversation. Supports text, attachments, quick replies, buttons, templates, and message tags. Attachment and interactive message support varies by platform.\n\n### Email threads (Google / Microsoft accounts)\n\nThe text is sent as a reply to the latest mail of the thread, in either direction, with its recipients and a \"Re:\" subject. `cc` adds recipients. `message` is required.\n\n- 400: attachments and `replyTo` are rejected here (use POST /v1/email/messages/{messageId}/reply for a reply with attachments)\n- 412 `account_scope_missing`: the account was connected without the `email` area\n- 409: the account is disconnected\n- 402: a Gmail account without a card on file\n\nMail sends count toward the mailbox's daily cap, never toward managed messages.\n\n### WhatsApp per-recipient rate limit\n\nWhatsApp caps how many messages you may send to the same recipient in a short window. It rejects the excess with error code `131056` (\"Too many messages sent to this recipient\").\n\nPace sends to a single recipient at roughly 10 per minute; bursts above that return a `400` with code `131056`. Sends to other recipients are unaffected, so parallelise across recipients rather than flooding one.\n\n### iMessage pacing\n\nMessages to contacts who have not written to the sender in the last 24 hours must be at least 2 minutes apart per sender.\n\nA send inside that window returns `429` with code `new_contact_limit` and the time to retry. Replies to contacts who wrote within the last day are not paced.\n\nA thread opened with `POST /v1/inbox/conversations` takes at most two follow-ups before the contact replies, at least 24 hours apart:\n\n- `429 new_contact_limit`: a follow-up sent sooner\n- `409 recipient_must_message_first`: a fourth message\n\nEach such follow-up counts as a new conversation:\n\n- No links, emails, phone numbers, prices or attachments (`400 invalid_content`).\n- It uses the sender's 15-minute spacing and daily warm-up (`429 new_contact_limit`).\n\nText must be shorter than 10,000 characters.\n\n### LINE replies\n\nA reply sent within about a minute of the customer's message uses LINE's free reply token. Later replies go out as push messages, which count toward the LINE Official Account's monthly message quota (set and billed by LINE).\n\n### WeChat 48-hour window\n\nWeChat only accepts replies within 48 hours of the customer's last message, and up to 5 messages in that window. Outside it the send is rejected; the window opens again when the customer writes.\n\n### WhatsApp template messages\n\nTo send an approved template into this conversation (required when the 24-hour customer-service window is closed), use the `template` field with a single element carrying the template reference: `{ \"elements\": [{ \"name\": ..., \"language\": ..., \"components\": [...] }] }`. See the `template` field below for the exact shape.\n\nTo send a template to a phone number you have no conversation with yet, use the create-conversation endpoint (POST /v1/inbox/conversations) instead.\n\n#### Template lookup\n\nZernio resolves the exact APPROVED template name and language before any WhatsApp template send. A failed lookup or missing exact definition sends no message and returns code `platform_api_error`, type `platform_error`, and platform `whatsapp`.\n\nSanitized Meta code, message, and `error_data.details` are returned in `platformError`. `details` identifies `phase: template_lookup`, the query-free endpoint, upstream status, and only safe provider usage or retry headers.\n\n### WhatsApp interactive messages\n\nRich interactive messages (list, CTA URL, Flow, location request) are available via the `interactive` field. Tap events are delivered through the `message.received` webhook with WhatsApp-specific `metadata` fields (`interactiveType`, `interactiveId`, `flowResponseJson`, `flowResponseData`).\n\n### Idempotency\n\nSend an `Idempotency-Key` header to make retries safe (e.g. after a client-side timeout where delivery is unknown). Works for JSON and multipart (file upload) requests alike. Keys are retained for 24 hours.\n\n- Same key + same body: replays the original response (with `Idempotent-Replayed: true`) instead of sending the message a second time.\n- Same key + different body: returns 422.\n- A key still in flight: returns 409.\n\nOnly successful (2xx) responses are stored for replay. If the request throws or returns a non-2xx status, the key is released so the same key can be retried once the problem is fixed. The header therefore protects the \"request succeeded but the response was lost\" case.\n\nFor an ambiguous failure (a 5xx or a network timeout), reconcile before retrying. A failure after the platform already accepted the message also releases the key, so a blind retry could send it twice.\n\nList the conversation's messages first. Treat an empty result as inconclusive rather than as proof nothing was sent, since a send that failed while being recorded leaves no trace on our side.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "attachmentUrl": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string",
+              "enum": [
+                "utility"
+              ]
+            },
+            "linkPreview": {
+              "type": "boolean",
+              "default": true
+            },
+            "attachmentType": {
+              "type": "string",
+              "enum": [
+                "image",
+                "video",
+                "audio",
+                "file"
+              ]
+            },
+            "attachmentName": {
+              "type": "string"
+            },
+            "voiceNote": {
+              "type": "boolean"
+            },
+            "subject": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "cc": {
+              "type": "array",
+              "maxItems": 50,
+              "items": {
+                "type": "string",
+                "format": "email"
+              }
+            },
+            "effect": {
+              "type": "string",
+              "enum": [
+                "slam",
+                "loud",
+                "gentle",
+                "invisibleInk",
+                "echo",
+                "spotlight",
+                "balloons",
+                "confetti",
+                "love",
+                "lasers",
+                "fireworks",
+                "shootingStar",
+                "celebration"
+              ]
+            },
+            "contactCard": {
+              "type": "boolean"
+            },
+            "channel": {
+              "type": "string",
+              "enum": [
+                "imessage",
+                "sms",
+                "rcs",
+                "whatsapp"
+              ]
+            },
+            "sharedMediaId": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            },
+            "sticker": {
+              "type": "string",
+              "enum": [
+                "like_heart"
+              ]
+            },
+            "quickReplies": {
+              "type": "array",
+              "maxItems": 13,
+              "items": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "payload"
+                ],
+                "properties": {
+                  "payload": {
+                    "type": "string"
+                  },
+                  "imageUrl": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "buttons": {
+              "type": "array",
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "title"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "url",
+                      "postback",
+                      "phone"
+                    ]
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "template": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "generic"
+                  ]
+                },
+                "imageAspectRatio": {
+                  "type": "string",
+                  "enum": [
+                    "horizontal",
+                    "square"
+                  ]
+                },
+                "elements": {
+                  "type": "array",
+                  "maxItems": 10,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "subtitle": {
+                        "type": "string"
+                      },
+                      "imageUrl": {
+                        "type": "string"
+                      },
+                      "buttons": {
+                        "type": "array",
+                        "maxItems": 3,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "url",
+                                "postback"
+                              ]
+                            },
+                            "url": {
+                              "type": "string"
+                            },
+                            "payload": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "language": {
+                        "type": "string"
+                      },
+                      "components": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": true
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "interactive": {
+              "type": "object",
+              "required": [
+                "type"
+              ],
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "list",
+                    "cta_url",
+                    "flow",
+                    "location_request_message",
+                    "request_contact_info",
+                    "voice_call",
+                    "product",
+                    "product_list",
+                    "catalog_message",
+                    "carousel",
+                    "address_message"
+                  ]
+                },
+                "header": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "image",
+                        "video",
+                        "document"
+                      ]
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "image": {
+                      "type": "object",
+                      "properties": {
+                        "link": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "video": {
+                      "type": "object",
+                      "properties": {
+                        "link": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "document": {
+                      "type": "object",
+                      "properties": {
+                        "link": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "body": {
+                  "type": "object",
+                  "required": [
+                    "text"
+                  ],
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "footer": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "action": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "button",
+                        "sections"
+                      ],
+                      "properties": {
+                        "button": {
+                          "type": "string"
+                        },
+                        "sections": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 10,
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "rows"
+                            ],
+                            "properties": {
+                              "rows": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 10,
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "title"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "name",
+                        "parameters"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "cta_url"
+                          ]
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "required": [
+                            "display_text",
+                            "url"
+                          ],
+                          "properties": {
+                            "display_text": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string",
+                              "format": "uri"
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "name"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "voice_call"
+                          ]
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "properties": {
+                            "display_text": {
+                              "type": "string",
+                              "maxLength": 20
+                            },
+                            "ttl_minutes": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 43200
+                            },
+                            "payload": {
+                              "type": "string",
+                              "maxLength": 512
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "name",
+                        "parameters"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "flow"
+                          ]
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "required": [
+                            "flow_token",
+                            "flow_id",
+                            "flow_cta",
+                            "flow_action"
+                          ],
+                          "properties": {
+                            "flow_message_version": {
+                              "type": "string",
+                              "enum": [
+                                "3"
+                              ]
+                            },
+                            "flow_token": {
+                              "type": "string"
+                            },
+                            "flow_id": {
+                              "type": "string"
+                            },
+                            "flow_cta": {
+                              "type": "string"
+                            },
+                            "flow_action": {
+                              "type": "string",
+                              "enum": [
+                                "navigate",
+                                "data_exchange"
+                              ]
+                            },
+                            "flow_action_payload": {
+                              "type": "object",
+                              "properties": {
+                                "screen": {
+                                  "type": "string"
+                                },
+                                "data": {
+                                  "type": "object",
+                                  "additionalProperties": true
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "mode": {
+                              "type": "string",
+                              "enum": [
+                                "draft"
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "name"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "send_location"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "name"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "request_contact_info"
+                          ]
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "catalog_id",
+                        "product_retailer_id"
+                      ],
+                      "properties": {
+                        "catalog_id": {
+                          "type": "string"
+                        },
+                        "product_retailer_id": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "catalog_id",
+                        "sections"
+                      ],
+                      "properties": {
+                        "catalog_id": {
+                          "type": "string"
+                        },
+                        "sections": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 10,
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "product_items"
+                            ],
+                            "properties": {
+                              "product_items": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "product_retailer_id"
+                                  ],
+                                  "properties": {
+                                    "product_retailer_id": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "name"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "catalog_message"
+                          ]
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "properties": {
+                            "thumbnail_product_retailer_id": {
+                              "type": "string"
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "cards"
+                      ],
+                      "properties": {
+                        "cards": {
+                          "type": "array",
+                          "minItems": 2,
+                          "maxItems": 10,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": true,
+                            "properties": {
+                              "card_index": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9
+                              },
+                              "type": {
+                                "type": "string"
+                              },
+                              "header": {
+                                "type": "object"
+                              },
+                              "body": {
+                                "type": "object"
+                              },
+                              "action": {
+                                "type": "object"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "name",
+                        "parameters"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "enum": [
+                            "address_message"
+                          ]
+                        },
+                        "parameters": {
+                          "type": "object",
+                          "required": [
+                            "country"
+                          ],
+                          "properties": {
+                            "country": {
+                              "type": "string"
+                            },
+                            "values": {
+                              "type": "object",
+                              "additionalProperties": true
+                            },
+                            "saved_addresses": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": true
+                              }
+                            },
+                            "validation_errors": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "replyMarkup": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "inline_keyboard",
+                    "reply_keyboard"
+                  ]
+                },
+                "keyboard": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "text": {
+                          "type": "string"
+                        },
+                        "callbackData": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "oneTime": {
+                  "type": "boolean",
+                  "default": true
+                }
+              },
+              "additionalProperties": false
+            },
+            "messagingType": {
+              "type": "string",
+              "enum": [
+                "RESPONSE",
+                "UPDATE",
+                "MESSAGE_TAG"
+              ]
+            },
+            "messageTag": {
+              "type": "string",
+              "enum": [
+                "CONFIRMED_EVENT_UPDATE",
+                "POST_PURCHASE_UPDATE",
+                "ACCOUNT_UPDATE",
+                "HUMAN_AGENT"
+              ]
+            },
+            "replyTo": {
+              "type": "string"
+            },
+            "location": {
+              "type": "object",
+              "required": [
+                "latitude",
+                "longitude"
+              ],
+              "properties": {
+                "latitude": {
+                  "type": "number"
+                },
+                "longitude": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "address": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "contacts": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "object",
+                    "required": [
+                      "formatted_name"
+                    ],
+                    "properties": {
+                      "formatted_name": {
+                        "type": "string"
+                      },
+                      "first_name": {
+                        "type": "string"
+                      },
+                      "last_name": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "phones": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "phone": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "emails": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "email": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "editInboxMessage": {
+      "method": "PATCH",
+      "path": "/v1/inbox/conversations/{conversationId}/messages/{messageId}",
+      "summary": "Edit message",
+      "description": "Edit a previously sent message. Platform support:\n- Telegram: text and/or reply markup, any time\n- 'iMessage: text only, within 15 minutes of sending (Apple''s limit; 409 `edit_window_expired` after that). Group messages included. The stored message keeps its edit history.'\n- All others: returns 400\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "messageId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "messageId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "replyMarkup": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "inline_keyboard"
+                  ]
+                },
+                "keyboard": {
+                  "type": "array",
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "text": {
+                          "type": "string"
+                        },
+                        "callbackData": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "deleteInboxMessage": {
+      "method": "DELETE",
+      "path": "/v1/inbox/conversations/{conversationId}/messages/{messageId}",
+      "summary": "Delete message",
+      "description": "Delete a message from a conversation. Platform support varies:\n\n- Telegram: full delete (bot's own messages anytime, others if admin)\n- X: full delete (own DM events only)\n- Bluesky: delete for self only (recipient still sees it)\n- Reddit: delete from sender's view only\n- iMessage: unsend (the bubble disappears for the recipient) within 2 minutes of sending (Apple's limit; 409 `unsend_window_expired` after that). Own outbound messages only.\n- Facebook, Instagram, WhatsApp: not supported (returns 400)\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "messageId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "messageId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "sendTypingIndicator": {
+      "method": "POST",
+      "path": "/v1/inbox/conversations/{conversationId}/typing",
+      "summary": "Send typing indicator",
+      "description": "Show a typing indicator in a conversation.\n\n### Platform support\n\n- Facebook Messenger: shows \"Page is typing...\" for 20 seconds.\n- Instagram: shows \"typing...\" to the recipient (works for both Instagram Login and Facebook Login accounts). The recipient must be signed in to Instagram to see it.\n- Telegram: shows \"Bot is typing...\" for 5 seconds.\n- WhatsApp: shows \"typing...\" for up to 25 seconds. Requires a recent inbound message in the conversation (Meta references the inbound message id) and also marks that message as read as a side-effect.\n- iMessage: shows a typing bubble for ~15 seconds (1:1 conversations only; requires a recent two-way exchange).\n- All others: returns 200 but no-op (platform doesn't support it).\n\n### Response\n\nTyping indicators are best-effort. The endpoint always returns 200 even if the platform call fails.\n\n`success` reports whether a typing indicator was actually sent to the platform (`false` on unsupported platforms or when the platform call failed).\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "setConversationThreadControl": {
+      "method": "POST",
+      "path": "/v1/inbox/conversations/{conversationId}/thread-control",
+      "summary": "Change who answers a conversation (handover)",
+      "description": "Changes who answers a conversation: Meta Business Agent handover on WhatsApp, Meta's conversation routing on Facebook and Instagram. On Instagram, Conversation Routing replaced the Handover Protocol in October 2025 and kept the thread-control calls below.\n\n**WhatsApp**, on numbers with Meta Business Agent enabled:\n\n- `release`: hand the conversation back to the agent so it resumes answering. You must currently hold control (sending any message takes it implicitly).\n- `take`: take control before sending anything, so the agent stops replying while an operator reads the thread. Meta accepts this only from the business configured as the number's escalation partner; other apps take control by sending a message.\n- `pass`: transfer control to the number's configured escalation partner, or to the agent with `target: ai_agent`. Meta's Cloud API currently rejects it (\"Pass action is not supported\", verified 2026-09-08); use `release` to hand a thread back to the agent.\n\n**Facebook and Instagram** (conversation routing between the apps on the account, such as Page Inbox or the Instagram Inbox):\n\n- `pass` with `targetAppId`: give the thread to another app (`pass_thread_control`). Page Inbox is 263902037430900, the Instagram Inbox is 1217981644879628.\n- `take`: take the thread back (`take_thread_control`), only on accounts connected through a Facebook Page. Instagram Login answers 400 `platform_not_supported`.\n- `take` preconditions: a default app set in the account's conversation routing settings, and Zernio allowed to take control of conversations (Page settings > Page setup > Advanced messaging). Otherwise Meta answers code 27 (400 `platform_api_error`).\n- `request`: ask the current owner to pass the thread (`request_thread_control`); nothing changes until it does. Not available on Instagram Login connections (400 `platform_not_supported`).\n- `release`: make the thread idle (`release_thread_control`); the account's default app answers next.\n\nA send refused with `not_thread_owner` on a Facebook Login connection already tries `take` once and resends.\n\n### While another app owns the thread\n\nWhile another app owns a Facebook or Instagram thread, inbound messages arrive with `metadata.standby: true` and a send answers 409 `not_thread_owner`.\n\nThe conversation's `threadControl` follows the result. This call does not fire `conversation.control_changed`; that event fires only when Meta tells Zernio another app passed a thread to it or took one from it.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId",
+            "action"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "action": {
+              "type": "string",
+              "enum": [
+                "release",
+                "take",
+                "pass",
+                "request"
+              ]
+            },
+            "target": {
+              "type": "string",
+              "enum": [
+                "ai_agent"
+              ]
+            },
+            "targetAppId": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "metadata": {
+              "type": "string",
+              "maxLength": 2000
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "acceptConversationRequest": {
+      "method": "POST",
+      "path": "/v1/inbox/conversations/{conversationId}/accept",
+      "summary": "Accept a message request",
+      "description": "Accept a Facebook or Instagram Message Request by replying to it.\n\nFacebook Page requests are listed with `GET /v1/inbox/conversations?folder=requests`; Instagram answers PLATFORM_LIMITATION there.\n\nMeta has no separate accept call: the first reply is what moves the thread into the inbox. So this sends `message` through the same path, checks and webhooks as `POST /v1/inbox/conversations/{conversationId}/messages`, and answers the same way.\n\nSupports the `Idempotency-Key` header.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId",
+            "message"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "listInboxLabels": {
+      "method": "GET",
+      "path": "/v1/inbox/labels",
+      "summary": "List the Page's conversation labels",
+      "description": "Facebook Messenger only. Lists the custom labels defined on the Page (Graph `/{page-id}/custom_labels`). Other platforms answer 400 `platform_not_supported`.",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "createInboxLabel": {
+      "method": "POST",
+      "path": "/v1/inbox/labels",
+      "summary": "Create a conversation label",
+      "description": "Facebook Messenger only. Creates a custom label on the Page (Graph `POST /{page-id}/custom_labels`). Other platforms answer 400 `platform_not_supported`.",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId",
+            "name"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "deleteInboxLabel": {
+      "method": "DELETE",
+      "path": "/v1/inbox/labels/{labelId}",
+      "summary": "Delete a conversation label",
+      "description": "Facebook Messenger only. Deletes a custom label from the Page (Graph `DELETE /{label-id}`), which also removes it from every conversation. The id must be one of the Page's custom labels, otherwise 404 `resource_not_found`. Other platforms answer 400 `platform_not_supported`.",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "labelId": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          },
+          "required": [
+            "labelId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "listConversationLabels": {
+      "method": "GET",
+      "path": "/v1/inbox/conversations/{conversationId}/labels",
+      "summary": "List the labels on a conversation",
+      "description": "Facebook Messenger only. Lists the Page's custom labels applied to the person in this conversation (Graph `/{psid}/custom_labels`). Other platforms answer 400 `platform_not_supported`.",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "addConversationLabel": {
+      "method": "POST",
+      "path": "/v1/inbox/conversations/{conversationId}/labels",
+      "summary": "Add a label to a conversation",
+      "description": "Facebook Messenger only. Applies one of the Page's custom labels to the person in this conversation (Graph `POST /{label-id}/label?user={psid}`). The id must be one of the Page's custom labels, otherwise 404 `resource_not_found`. Other platforms answer 400 `platform_not_supported`.",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId",
+            "labelId"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "labelId": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "removeConversationLabel": {
+      "method": "DELETE",
+      "path": "/v1/inbox/conversations/{conversationId}/labels/{labelId}",
+      "summary": "Remove a label from a conversation",
+      "description": "Facebook Messenger only. Removes one of the Page's custom labels from the person in this conversation (Graph `DELETE /{label-id}/label?user={psid}`). The label itself stays on the Page. The id must be one of the Page's custom labels, otherwise 404 `resource_not_found`. Other platforms answer 400 `platform_not_supported`.",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "labelId": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          },
+          "required": [
+            "conversationId",
+            "labelId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "markConversationRead": {
+      "method": "POST",
+      "path": "/v1/inbox/conversations/{conversationId}/read",
+      "summary": "Mark a conversation as read",
+      "description": "Marks all unread incoming messages in the conversation as read.\n\nFor WhatsApp, this also sends read receipts (blue ticks) to the contact,\nEXCEPT on coexistence accounts (where the WhatsApp Business app on the\ncustomer's phone owns read state and we never override it).\n\nFor iMessage, this also marks the conversation read with the contact\n(1:1 conversations only). Best-effort.\n\nFor Instagram (Instagram Login and Facebook Login) and Facebook Messenger,\nthis also sends a `mark_seen` read receipt to the contact, so they see the\nconversation as seen. Best-effort: a Meta failure never fails the request.\n\nThis is the explicit, human-driven counterpart to `GET .../messages`,\nwhich is side-effect-free and does NOT mark anything read. Call this when\na user actually views the conversation.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "addMessageReaction": {
+      "method": "POST",
+      "path": "/v1/inbox/conversations/{conversationId}/messages/{messageId}/reactions",
+      "summary": "Add reaction",
+      "description": "Add an emoji reaction to a message.\n\n### Platform support\n\n- Telegram: supports a subset of Unicode emoji reactions\n- WhatsApp: supports any standard emoji (one reaction per message per sender)\n- Instagram and Facebook Messenger: any standard emoji, subject to Meta's 24h messaging window\n- Slack: the emoji must have a Slack name (e.g. `:thumbsup:`); unnamed characters return 400\n- iMessage: the six Apple tapbacks (❤️ 👍 👎 😂 ‼️ ❓) render natively; any other emoji is sent as a custom emoji tapback (iOS 18+ recipients)\n- All others: returns 400 (not supported)\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "messageId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "messageId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId",
+            "emoji"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "emoji": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "removeMessageReaction": {
+      "method": "DELETE",
+      "path": "/v1/inbox/conversations/{conversationId}/messages/{messageId}/reactions",
+      "summary": "Remove reaction",
+      "description": "Remove a reaction from a message.\n\n### Platform support\n\n- Telegram: send empty reaction array to clear\n- WhatsApp: send empty emoji to remove\n- Instagram and Facebook Messenger: sends Meta's `unreact` action; the emoji does not need to be repeated\n- Slack: removes the reaction we previously sent on that message\n- iMessage: retracts your existing tapback or emoji reaction on the message (400 when you have none)\n- All others: returns 400 (not supported)\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "messageId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "conversationId",
+            "messageId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "getMessageAttachment": {
+      "method": "GET",
+      "path": "/v1/inbox/conversations/{conversationId}/messages/{messageId}/attachments/{index}",
+      "summary": "Resolve message attachment",
+      "description": "Resolve one attachment on a message to a media url that works right now.\n\n### Why it exists\n\nInstagram and Facebook sign DM media urls per request and expire them. So the `url` on a message is a snapshot: it works when you read the message and stops working later.\n\nThis endpoint checks the stored url and, when it has gone stale, re-mints the message's media from Meta and persists it before answering.\n\nThe message id never expires, so this URL is the one to store. It is returned ready-made on each attachment as `refreshUrl` when you read a message over REST.\n\n### Building the URL from a webhook\n\n**Webhook payloads do not carry `refreshUrl`**, so a webhook-driven integration builds this URL itself. Every piece is in the event:\n\n- `message.conversationId`\n- `message.platformMessageId`\n- the attachment's zero-based position\n- `account.accountId`\n\n**`accountId` is a required query parameter**. Omitting it returns `400` `missing_required_field`, which is the same requirement `GET /v1/whatsapp/media/{mediaId}` has.\n\n### Response format\n\n- By default it responds `302` to the live media url, so it can be used directly as an `<img src>` on a browser session.\n- API-key integrators should pass `?format=json` and read `url` off the body, since a browser cannot attach an Authorization header to an image request.\n\n### Other platforms\n\nOnly Instagram and Facebook media can be re-minted. On other platforms the stored url is returned as-is when it still resolves, and `404` otherwise.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "conversationId": {
+              "type": "string"
+            },
+            "messageId": {
+              "type": "string"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "conversationId",
+            "messageId",
+            "index"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "format": {
+              "const": "json",
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "listInboxComments": {
+      "method": "GET",
+      "path": "/v1/inbox/comments",
+      "summary": "List commented posts",
+      "description": "Returns posts with comment counts from all connected accounts. Aggregates data across multiple accounts.\n\n### Caching\n\nResponses are cached for up to 10 minutes, so the feed may lag new comments by that window.\n\nDo not poll this endpoint for real-time updates. Subscribe to the `comment.received` webhook, which fires for every new comment across your posts and carries the post reference needed to keep this list current.\n\n### Meta ads\n\nFor users with the Ads add-on (accounts on usage-based billing always qualify), the user's Meta ads (boosted/dark posts) are included too.\n\nThere's one row per (ad, placement-with-comments). An ad that runs on both Facebook feed and Instagram feed produces up to two rows, since the Page dark post and the IG media have separate comment threads.\n\nEach ad row is flagged `isAd: true` with `adId` and `placement` (`id` is `{adId}:{placement}`). Filter with `platform`:\n\n- `?platform=metaads`: *only* ad rows.\n- `facebook`/`instagram`: *organic* posts only (no ads).\n- Omitted: both.\n\nFetch a row's thread from GET /v1/ads/{adId}/comments?placement={placement}.\n\nAd comment counts are read with the Marketing API token (Facebook side) or the connected Instagram account's token (Instagram side). A row whose count can't be read is omitted.\n\n### Pagination\n\nPagination walks each account's platform listing. Following `nextCursor` reaches past the first page on Facebook, Instagram, Threads, LinkedIn and YouTube, the platforms that support a server-side date window. On the others the listing stops at its first page.\n\nCursor pagination is only coherent for the default sort (`sortBy=date`, `sortOrder=desc`). With `sortOrder=asc`, or with `sortBy=comments`, the cursor filter does not match the sort order and the second page is unreliable.\n\n`minComments` is applied to each page after pagination. A page can hold fewer than `limit` posts, even none, while `hasMore` is true; keep following `nextCursor`.\n\n`nextCursor` is opaque: pass it back verbatim, never construct or parse it, its composition may change without notice. Because each page re-queries a live window, results can still shift between requests, so dedupe by `id` on the client.\n\n### Comment counts\n\n`commentCount` semantics differ by platform:\n\n- YouTube's includes replies.\n- Facebook's counts top-level comments only.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "profileId": {
+              "type": "string"
+            },
+            "platform": {
+              "type": "string",
+              "enum": [
+                "facebook",
+                "instagram",
+                "twitter",
+                "bluesky",
+                "threads",
+                "youtube",
+                "linkedin",
+                "reddit",
+                "tiktok",
+                "metaads"
+              ]
+            },
+            "minComments": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "since": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "sortBy": {
+              "type": "string",
+              "enum": [
+                "date",
+                "comments"
+              ],
+              "default": "date"
+            },
+            "sortOrder": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            },
+            "view": {
+              "type": "string",
+              "enum": [
+                "full",
+                "summary"
+              ],
+              "default": "full"
+            },
+            "cursor": {
+              "type": "string"
+            },
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "getInboxPostComments": {
+      "method": "GET",
+      "path": "/v1/inbox/comments/{postId}",
+      "summary": "Get post comments",
+      "description": "Fetch comments for a specific post. Requires accountId query parameter.\n\n### Replies to a comment\n\nPass `commentId` (Facebook, Instagram, Reddit, TikTok) to fetch replies to a specific comment instead of the post's top-level comments.\n\n- Facebook, Instagram and TikTok return the comment's replies, paged by `limit`/`cursor`.\n- Reddit returns the focused comment thread instead.\n- On Facebook and Instagram the requested comment itself comes back in the top-level `comment` field.\n\nOn Facebook, passing a COMMENT id as `postId` (instead of using `commentId`) is also supported for backwards compatibility. It returns that comment's replies the same way.\n\nPrefer `commentId` for new integrations; it also works on Instagram, which rejects a comment id passed as `postId`. YouTube does not support either form: `postId` must be a video id.\n\n### Caching\n\nResponses are cached for up to 10 minutes, so a page may lag new comments by that window.\n\nDo not poll this endpoint for real-time updates: subscribe to the `comment.received` webhook, which delivers new comments as they arrive. Your own writes (creating, replying to, or deleting a comment) refresh the cache immediately.\n\n### TikTok\n\nTikTok is served for accounts connected through the TikTok for Business app:\n\n- `postId` is the TikTok video id.\n- Each top-level comment carries up to three inline replies.\n- `commentId` pages the full reply list of one comment.\n\nDeveloper-app TikTok accounts return 400 with code `PLATFORM_LIMITATION`.\n\n### X (Twitter)\n\nWhen `postId` is itself a reply rather than the thread's root post, only replies to that specific post are returned, not the whole conversation thread.\n\n### Hidden comments\n\n- Facebook Pages and Instagram accounts connected through Instagram Login return them with `isHidden: true`.\n- Instagram accounts connected through Facebook Login do not return them at all (Meta omits them, together with their replies). So a hidden comment and a deleted one look the same on this read.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "subreddit": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "cursor": {
+              "type": "string"
+            },
+            "commentId": {
+              "type": "string"
+            },
+            "view": {
+              "type": "string",
+              "enum": [
+                "full",
+                "summary"
+              ],
+              "default": "full"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "replyToInboxPost": {
+      "method": "POST",
+      "path": "/v1/inbox/comments/{postId}",
+      "summary": "Reply to comment",
+      "description": "Post a reply to a post or specific comment. Requires accountId in request body.\n\n### Idempotency\n\nSend an `Idempotency-Key` header to make retries safe (e.g. after a client-side timeout where delivery is unknown).\n\n- Same key + same body replays the original response (with `Idempotent-Replayed: true`) instead of posting the comment a second time.\n- Same key + different body returns 422.\n- A key still in flight returns 409.\n\nKeys are retained for 24 hours and are scoped to the credential and to this exact path. Reusing a key against a different postId returns 422 rather than replaying the other post's response.\n\nOnly successful (2xx) responses are stored for replay. If the request throws or returns a non-2xx status the key is released, so the header protects the \"request succeeded but the response was lost\" case.\n\nAfter an ambiguous failure (a 5xx or a network timeout), list the post's comments before retrying with the same key. Treat an empty result as inconclusive rather than as proof nothing was posted.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId",
+            "message"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "attachmentUrl": {
+              "type": "string",
+              "format": "uri"
+            },
+            "commentId": {
+              "type": "string"
+            },
+            "mentionAuthor": {
+              "type": "boolean"
+            },
+            "parentCid": {
+              "type": "string"
+            },
+            "rootUri": {
+              "type": "string"
+            },
+            "rootCid": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "deleteInboxComment": {
+      "method": "DELETE",
+      "path": "/v1/inbox/comments/{postId}",
+      "summary": "Delete comment",
+      "description": "Delete a comment on a post. Supported by Facebook, Instagram, Threads, LinkedIn, Reddit, Bluesky, X (Twitter), YouTube, and TikTok (accounts connected through the TikTok for Business app). Not supported on Google Business (reviews only).\nRequires accountId and commentId query parameters.\n\nZernio does not check `canDelete` before calling the platform. When the platform refuses, the call fails with the platform's message, normally as `platform_api_error` with the platform's own 4xx status.\n\nOn Facebook, Instagram and LinkedIn organization accounts, the account can delete anyone's comment on its own posts. On Threads, Meta refuses deleting other people's replies; hide them instead. On TikTok only the account's own comments can be deleted; hide the others.\n\nOn YouTube, a comment the channel did not write is rejected instead, through the same moderation status as `setCommentModeration`, and the response still reports it as deleted. Use `setCommentModeration` directly to reverse the rejection later or to ban the author.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "commentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId",
+            "commentId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "editInboxComment": {
+      "method": "PATCH",
+      "path": "/v1/inbox/comments/{postId}/{commentId}",
+      "summary": "Edit comment",
+      "description": "Edit the body of a comment the connected account posted. Supported on Reddit only.\n\nReddit keeps the same comment id after an edit. Reddit exposes no API to edit a post\ntitle, and a link post has no editable body. To edit a published post's body, use\n`POST /v1/posts/{postId}/edit`.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            },
+            "commentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId",
+            "commentId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId",
+            "platform",
+            "content"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "platform": {
+              "type": "string",
+              "enum": [
+                "reddit"
+              ]
+            },
+            "content": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "setCommentModeration": {
+      "method": "POST",
+      "path": "/v1/inbox/comments/{postId}/{commentId}/moderation",
+      "summary": "Set comment moderation status",
+      "description": "Set a comment's moderation status. Supported on YouTube only.\n\nUse this to work a moderation queue: approve a held comment (`published`), reject it\n(`rejected`), or send it back for review (`heldForReview`).\n\nThe request must be authorized by the owner of the channel or video the comment\nbelongs to. You cannot moderate comments on videos you do not own.\n\nThis is distinct from `POST /v1/inbox/comments/{postId}/{commentId}/hide`, which\ncovers Facebook, Instagram, Threads, and X and does not apply to YouTube.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            },
+            "commentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId",
+            "commentId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId",
+            "platform",
+            "moderationStatus"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "platform": {
+              "type": "string",
+              "enum": [
+                "youtube"
+              ]
+            },
+            "moderationStatus": {
+              "type": "string",
+              "enum": [
+                "published",
+                "rejected",
+                "heldForReview"
+              ]
+            },
+            "banAuthor": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "hideInboxComment": {
+      "method": "POST",
+      "path": "/v1/inbox/comments/{postId}/{commentId}/hide",
+      "summary": "Hide comment",
+      "description": "Hide a comment on a post. Supported by Facebook, Instagram, Threads, X, and TikTok\n(accounts connected through the TikTok for Business app).\nHidden comments are only visible to the commenter and page admin.\n\nFor X, the reply must belong to a conversation started by the authenticated user.\n\nOn Threads only top-level replies can be hidden, and hiding one also hides its nested replies.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            },
+            "commentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId",
+            "commentId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "unhideInboxComment": {
+      "method": "DELETE",
+      "path": "/v1/inbox/comments/{postId}/{commentId}/hide",
+      "summary": "Unhide comment",
+      "description": "Unhide a previously hidden comment. Supported by Facebook, Instagram, Threads, X, and\nTikTok (accounts connected through the TikTok for Business app).\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            },
+            "commentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId",
+            "commentId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "pinInboxComment": {
+      "method": "POST",
+      "path": "/v1/inbox/comments/{postId}/{commentId}/pin",
+      "summary": "Pin comment",
+      "description": "Pin a top-level comment to the top of a post's comment section. TikTok accounts\nconnected through the TikTok for Business app only; every other platform returns 400.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            },
+            "commentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId",
+            "commentId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "unpinInboxComment": {
+      "method": "DELETE",
+      "path": "/v1/inbox/comments/{postId}/{commentId}/pin",
+      "summary": "Unpin comment",
+      "description": "Unpin a previously pinned comment. TikTok accounts connected through the TikTok for\nBusiness app only.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            },
+            "commentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId",
+            "commentId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "likeInboxComment": {
+      "method": "POST",
+      "path": "/v1/inbox/comments/{postId}/{commentId}/like",
+      "summary": "Like comment",
+      "description": "Like or upvote a comment on a post. Supported platforms: Facebook, X, Bluesky, Reddit, LinkedIn, and Instagram in limited release (see below).\n\n### Platform notes\n\n- Bluesky: the cid (content identifier) is required in the request body.\n- LinkedIn: pass the composite comment URN returned by the comments endpoints as commentId. An optional reactionType picks the reaction (defaults to LIKE).\n- LinkedIn: accounts connected before the social-feed scopes were requested get a 403 with code `linkedin_reconnect_required`.\n\n### Instagram (limited release)\n\nInstagram is in LIMITED RELEASE and not generally available. The call needs `instagram_manage_engagement`, which Meta has so far granted this app only under Standard Access.\n\nIt works for app admins, developers and testers of our Meta app, and returns a 403 with code `PLATFORM_BETA_RESTRICTED` for every other account. That restriction lifts when Meta App Review grants Advanced Access; the constraints below apply once it does.\n\nInstagram covers comments and replies on feed posts, reels and carousels. Only an account connected through Facebook Login can be granted `instagram_manage_engagement`.\n\n- 400 `instagram_likes_require_facebook_login`: the account is an Instagram Login connection.\n- 403 `reconnect_required`: the account's token predates the permission.\n- Content from private accounts cannot be liked.\n\nInstagram enforces a burst limit of 50 like or unlike calls per 5 seconds per Instagram account. Exceeding it locks that account out of the like API for an hour, so pace bulk loops.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            },
+            "commentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId",
+            "commentId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "reactionType": {
+              "type": "string",
+              "enum": [
+                "LIKE",
+                "PRAISE",
+                "EMPATHY",
+                "INTEREST",
+                "APPRECIATION",
+                "ENTERTAINMENT"
+              ]
+            },
+            "cid": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "unlikeInboxComment": {
+      "method": "DELETE",
+      "path": "/v1/inbox/comments/{postId}/{commentId}/like",
+      "summary": "Unlike comment",
+      "description": "Remove a like from a comment. Supported platforms: Facebook, X, Bluesky,\nReddit, LinkedIn, and Instagram in limited release. For Bluesky, the likeUri query\nparameter is required. Instagram has the same limited release, Facebook Login,\n`instagram_manage_engagement` and burst-limit constraints as liking.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            },
+            "commentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId",
+            "commentId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "likeUri": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "likePost": {
+      "method": "POST",
+      "path": "/v1/inbox/posts/{postId}/like",
+      "summary": "Like post",
+      "description": "Like (or react to) a post as a connected account.\n\n### Platform support\n\n- Supported: LinkedIn, X, Facebook, YouTube, Bluesky, and Instagram in limited release (see below).\n- Threads, TikTok and Pinterest expose no like endpoint in their APIs and return 400.\n- Reddit returns 400 too, pointing at `POST /v1/accounts/{accountId}/reddit-vote`, which covers upvote, downvote and clear on both posts and comments.\n\n### Liking as another account\n\nThe account does not have to be the one that published the post, which is what makes executive engagement possible: pass an exec's `accountId` and the brand post's ID.\n\n`postId` accepts either a Zernio post ID or the platform's native post ID. A Zernio post ID resolves to the entry for `accountId`, falling back to the post's single entry on the same platform. Two entries on that platform is a 400, so pass the native ID.\n\n### LinkedIn and YouTube\n\nLinkedIn requires the `w_member_social_feed` / `w_organization_social_feed` scopes, which are not retroactive. Accounts connected before those were requested get a 403 with code `linkedin_reconnect_required` until the user reconnects the account.\n\nYouTube spends 50 quota units per call.\n\n### Instagram (limited release)\n\nInstagram is in LIMITED RELEASE and not generally available. The call needs `instagram_manage_engagement`, which Meta has so far granted this app only under Standard Access.\n\nSo it works for app admins, developers and testers of our Meta app, and returns a 403 with code `PLATFORM_BETA_RESTRICTED` for every other account. That restriction lifts when Meta App Review grants Advanced Access; the constraints below apply once it does.\n\n- Instagram covers feed images, reels and carousels (stories and private-account media are not likeable).\n- Only an account connected through Facebook Login can be granted `instagram_manage_engagement`. An Instagram Login connection returns a 400 with code `instagram_likes_require_facebook_login`.\n- An account whose token predates the permission returns a 403 with code `reconnect_required`.\n- Instagram enforces a burst limit of 50 like or unlike calls per 5 seconds per Instagram account. Exceeding it locks that account out of the like API for an hour, so pace bulk loops.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "reactionType": {
+              "type": "string",
+              "enum": [
+                "LIKE",
+                "PRAISE",
+                "EMPATHY",
+                "INTEREST",
+                "APPRECIATION",
+                "ENTERTAINMENT"
+              ]
+            },
+            "cid": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "unlikePost": {
+      "method": "DELETE",
+      "path": "/v1/inbox/posts/{postId}/like",
+      "summary": "Unlike post",
+      "description": "Remove this account's like from a post.\n\nSupported platforms: LinkedIn, X, Facebook, YouTube, Bluesky, and Instagram in limited release.\n\n- YouTube: this clears the rating.\n- Instagram: has the same limited release, Facebook Login, `instagram_manage_engagement` and burst-limit constraints as liking.\n- Bluesky: `likeUri` (returned when the post was liked) is required.\n- Reddit: uses `POST /v1/accounts/{accountId}/reddit-vote` with `direction: 0`.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "likeUri": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "accountId"
+          ],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "sendPrivateReplyToComment": {
+      "method": "POST",
+      "path": "/v1/inbox/comments/{postId}/{commentId}/private-reply",
+      "summary": "Send private reply",
+      "description": "Send a direct message to the author of a comment. Supported on Instagram and Facebook only.\n\nOne reply per comment, must be sent within 7 days.\n\n### Interactive elements\n\nOptionally attach one of these (`quickReplies` and `buttons` are mutually exclusive):\n\n- `quickReplies`: chips above the keyboard, max 13. Chips do not render in the Instagram Message Requests folder.\n- `buttons`: 1-3 inline postback/url buttons rendered in the same bubble via Meta's button_template.\n\n### Non-followers on Instagram\n\nInstagram can refuse buttons, cards and attachments to commenters who do not follow the account. This is Meta code 2, subcode 1545133, returned here as a non-retryable 400 that says so.\n\nThe refusal is uneven: most accounts do not get it, and an affected account gets it on many of its non-followers. Only that account's own past refusals show whether it is affected.\n\nThe failed call still consumes the comment's single private reply. On an affected account, send plain text to reach non-followers and add buttons once they reply.\n\n### Errors\n\n- 400 with `details.privateReplyConsumed: true`: the comment's single private reply is spent (by this call or an earlier one). Never retry it.\n- 429 with `details.privateReplyOutcome: \"not_sent\"`: Instagram's messaging rate limit for the account (Meta code 613). The reply was not sent and the comment's private reply is not spent. Retry after the `Retry-After` header.\n- 502: Meta answered a server error after receiving the reply. It carries `details.privateReplyOutcome: \"unknown\"`. The reply is usually delivered and the comment's private reply spent, so check the conversation before retrying.\n- Meta-originated failures carry Meta's error object in `platformError` (`code`, `error_subcode`, `message`, `type`, `fbtrace_id`). Common Instagram subcodes: 2534014 commenter not found (no reason given), 2534023 already replied, 2534024 older than 7 days, 2534025 not eligible for a private reply, 2534066 declined.\n\n### Recording\n\nThe reply is recorded in the inbox conversation with the commenter (`sentVia` `api` for key auth, `human` for a session) and fires `message.sent` once.\n\nA success response and `message.sent` mean Meta accepted the reply, not that the commenter saw it. Instagram has no delivery event, and the reply can land in the commenter's Message Requests folder, where they may never open it.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "postId": {
+              "type": "string"
+            },
+            "commentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "postId",
+            "commentId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId",
+            "message"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "quickReplies": {
+              "type": "array",
+              "maxItems": 13,
+              "items": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "payload"
+                ],
+                "properties": {
+                  "payload": {
+                    "type": "string"
+                  },
+                  "imageUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "buttons": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 3,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "type",
+                      "title",
+                      "url"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "url"
+                        ]
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "type",
+                      "title",
+                      "payload"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "postback"
+                        ]
+                      },
+                      "payload": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "type",
+                      "title",
+                      "phone"
+                    ],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "enum": [
+                          "phone"
+                        ]
+                      },
+                      "phone": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "listInboxMentions": {
+      "method": "GET",
+      "path": "/v1/inbox/mentions",
+      "summary": "List mentions",
+      "description": "Returns mentions of your connected accounts from the last 7 days. Requires Inbox addon.\n\n### LinkedIn\n\nOrganization mentions, delivered by webhooks and a background pull.\n\n### Instagram\n\nComment mentions (someone tags the account in a comment on their own media) and caption mentions (someone tags it in their media caption), delivered by the Meta `mentions` webhook.\n\n- Only accounts connected through Facebook Login receive them.\n- Comments on the account's own posts are never listed, even when they contain its @handle.\n- Their text is read from Instagram in the background after the first request, so `content` can be empty on the first read, and stays empty when Meta refuses to serve the source (for example media Meta does not treat as organic).\n- Pass `mediaId` and `commentId` to `POST /v1/inbox/mentions/reply` to answer one.\n\n### Facebook\n\nPost mentions (someone tags the Page in a post) and comment mentions (someone tags it in a comment), delivered by the Page `mention` webhook with their text.\n\n- Comments on the Page's own posts and anything the Page wrote itself are never listed.\n- Facebook mentions cannot be replied to through `POST /v1/inbox/mentions/reply`.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "profileId": {
+              "type": "string"
+            },
+            "sortOrder": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "cursor": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "replyToMention": {
+      "method": "POST",
+      "path": "/v1/inbox/mentions/reply",
+      "summary": "Reply to a mention",
+      "description": "Reply to a mention of the connected account. Supported on Instagram only.\n\nTwo shapes, selected by whether `commentId` is present:\n\n- **Comment mention** (someone @mentioned the account inside a comment): pass both\n  `mediaId` and `commentId`. Instagram posts a reply under that comment.\n- **Caption mention** (someone @mentioned the account in their media caption, so no\n  comment exists): pass `mediaId` only. Instagram posts a comment on their media.\n\nStory mentions are not supported by Instagram's API.\n\n`GET /v1/inbox/mentions` returns Instagram mentions with the `mediaId` and `commentId`\nto pass here.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId",
+            "mediaId",
+            "message"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "mediaId": {
+              "type": "string"
+            },
+            "commentId": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "listInboxReviews": {
+      "method": "GET",
+      "path": "/v1/inbox/reviews",
+      "summary": "List reviews",
+      "description": "Fetch reviews from all connected Facebook Pages and Google Business Profile accounts. Aggregates data with filtering and sorting options.\nSupported platforms: Facebook, Google Business Profile.\n\nEach account's reviews are read from the platform page by page within a 20-second budget per request, so very large accounts can come back truncated. Each account's listing is cached for up to 60 seconds.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {
+            "profileId": {
+              "type": "string"
+            },
+            "platform": {
+              "type": "string",
+              "enum": [
+                "facebook",
+                "googlebusiness"
+              ]
+            },
+            "minRating": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "maxRating": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "hasReply": {
+              "type": "boolean"
+            },
+            "sortBy": {
+              "type": "string",
+              "enum": [
+                "date",
+                "rating"
+              ],
+              "default": "date"
+            },
+            "sortOrder": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 25
+            },
+            "cursor": {
+              "type": "string"
+            },
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    "replyToInboxReview": {
+      "method": "POST",
+      "path": "/v1/inbox/reviews/{reviewId}/reply",
+      "summary": "Reply to review",
+      "description": "Post a reply to a review. Requires accountId in request body.\n\n### Idempotency\n\nSend an `Idempotency-Key` header to make retries safe (e.g. after a client-side timeout where delivery is unknown).\n\n- Same key + same body: replays the original response (with `Idempotent-Replayed: true`) instead of sending the reply to the platform again.\n- Same key + different body: returns 422.\n- A key still in flight: returns 409.\n\nKeys are retained for 24 hours and are scoped to the credential and to this exact path. Reusing a key against a different reviewId returns 422 rather than replaying the other review's response.\n\n### Failed requests\n\nOnly successful (2xx) responses are stored for replay. If the request throws or returns a non-2xx status the key is released, so the header protects the \"request succeeded but the response was lost\" case.\n\nAfter an ambiguous failure (a 5xx or a network timeout), fetch the review before retrying with the same key. Treat a missing reply as inconclusive rather than as proof nothing was sent.\n",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "reviewId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reviewId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId",
+            "message"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "deleteInboxReviewReply": {
+      "method": "DELETE",
+      "path": "/v1/inbox/reviews/{reviewId}/reply",
+      "summary": "Delete review reply",
+      "description": "Delete a reply to a review (Google Business Profile only). Requires accountId in request body.",
+      "input": {
+        "path": {
+          "type": "object",
+          "properties": {
+            "reviewId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "reviewId"
+          ],
+          "additionalProperties": false
+        },
+        "query": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "body": {
+          "type": "object",
+          "required": [
+            "accountId"
+          ],
+          "properties": {
+            "accountId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  }
+}

@@ -65,6 +65,7 @@ export type View =
   | "voice"
   | "workflows"
   | "campaigns"
+  | "inbox"
   | "pipeline"
   | "contacts"
   | "tasks";
@@ -74,6 +75,7 @@ export const labels: Record<View, string> = {
   voice: "Voz",
   workflows: "Secuencias",
   campaigns: "Plantillas",
+  inbox: "Inbox",
   pipeline: "Pipeline",
   contacts: "Clientes",
   tasks: "Seguimientos",
