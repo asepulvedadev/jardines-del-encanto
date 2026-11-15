@@ -113,7 +113,8 @@ test("UI explicitly separates draft save, review and activation with accessible 
     "Reanudar",
   ])
     assert(panel.includes(copy), copy);
-  assert.match(panel, /<svg[\s\S]*aria-hidden="true"/);
+  const canvas = readFileSync(new URL("workflow-canvas.tsx", root), "utf8");
+  assert.match(canvas, /<svg[\s\S]*aria-hidden="true"/);
   assert.match(panel, /Lista de pasos/);
   assert.match(panel, /<dialog/);
   assert.match(panel, /No se enviará|no envía|No envía/);
@@ -131,7 +132,7 @@ import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
-function clientHarness() {
+function clientHarness(component = "WorkflowPanel", overrides = {}) {
   const states = [],
     refs = [],
     modules = new Map();
@@ -195,7 +196,7 @@ function clientHarness() {
     );
     return module.exports;
   }
-  const { WorkflowPanel } = load("workflow-panel.tsx");
+  const Component = load("workflow-panel.tsx")[component];
   const props = {
     csrf: "fixture-csrf",
     contacts: [
@@ -209,14 +210,15 @@ function clientHarness() {
       },
     ],
     onOpenConnections() {},
+    ...overrides,
   };
   function render() {
     stateCursor = 0;
     refCursor = 0;
-    return WorkflowPanel(props);
+    return Component(props);
   }
   render();
-  states[11] = false;
+  if (component === "WorkflowPanel") states[11] = false;
   function all(node, result = []) {
     if (!node || typeof node !== "object") return result;
     if (Array.isArray(node)) {
@@ -248,6 +250,48 @@ function clientHarness() {
   return { states, render, all, textOf, button, label };
 }
 const flush = () => new Promise((resolve) => setImmediate(resolve));
+test("canvas zoom preserves its anchor, fits negative positions and bounds node movement", () => {
+  const viewportModule = { exports: {} };
+  const viewportSource = readFileSync(
+    new URL("workflow-viewport.ts", root),
+    "utf8",
+  );
+  new Function(
+    "module",
+    "exports",
+    ts.transpileModule(viewportSource, {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+      },
+    }).outputText,
+  )(viewportModule, viewportModule.exports);
+  const { zoomAt, fitViewport, movePosition } = viewportModule.exports;
+  const view = { x: 100, y: 50, zoom: 1 };
+  const zoomed = zoomAt(view, 2, { x: 300, y: 200 });
+  assert.deepEqual(zoomed, { x: -100, y: -100, zoom: 2 });
+  assert.equal(zoomAt(view, 100, { x: 0, y: 0 }).zoom, 2);
+  assert.equal(zoomAt(view, 0.001, { x: 0, y: 0 }).zoom, 0.1);
+  const nodes = [
+    { position: { x: -300, y: -100 } },
+    { position: { x: 300, y: 500 } },
+  ];
+  const fit = fitViewport(nodes, 800, 600);
+  for (const node of nodes) {
+    const x = fit.x + node.position.x * fit.zoom;
+    const y = fit.y + node.position.y * fit.zoom;
+    assert(x >= 134 * fit.zoom && x <= 800 - 134 * fit.zoom);
+    assert(y >= 44 * fit.zoom && y <= 600 - 44 * fit.zoom);
+  }
+  assert.deepEqual(movePosition({ x: 100, y: 100 }, 50, -25, 0.5), {
+    x: 200,
+    y: 50,
+  });
+  assert.deepEqual(movePosition({ x: 99999, y: -99999 }, 500, -500, 1), {
+    x: 100000,
+    y: -100000,
+  });
+});
 test("save does not prepare or activate, and the server response alone confirms the draft", async () => {
   const harness = clientHarness(),
     calls = [];
@@ -490,4 +534,138 @@ test("prepared review expiry is never presented as execution grant expiry", () =
   );
   assert.doesNotMatch(source, /formatDate\(review\.run\.expires_at\)/);
   assert.match(source, /30 días después de activar/);
+});
+
+test("canvas controls zoom, pan, drag at the current scale and keep keyboard movement available", () => {
+  const moves = [],
+    selections = [];
+  const document = initialDocument();
+  const harness = clientHarness("WorkflowCanvas", {
+    document,
+    selected: "end",
+    onSelect: (id) => selections.push(id),
+    onMove: (id, position) => moves.push({ id, position }),
+  });
+  const find = (predicate) => harness.all(harness.render()).find(predicate);
+  const control = (label) => find((n) => n.props["aria-label"] === label);
+  const map = () => find((n) => n.props.className === "workflow-map-scroll");
+  map().props.ref.current = { clientWidth: 800, clientHeight: 600, focus() {} };
+  control("Alejar lienzo").props.onClick();
+  assert.equal(harness.states[0].zoom, 0.8);
+  control("Acercar lienzo").props.onClick();
+  assert.equal(harness.states[0].zoom, 1);
+  control("Encajar todos los pasos").props.onClick();
+  assert.equal(harness.states[0].x + 330 * harness.states[0].zoom, 400);
+  let prevented = false;
+  const mapNode = map();
+  mapNode.props.onKeyDown({
+    key: "ArrowRight",
+    target: 1,
+    currentTarget: 1,
+    preventDefault() {
+      prevented = true;
+    },
+  });
+  assert.equal(prevented, true);
+  const beforePan = harness.states[0].x;
+  const target = { setPointerCapture() {}, focus() {} };
+  map().props.onPointerDown({
+    button: 0,
+    pointerId: 1,
+    clientX: 0,
+    clientY: 0,
+    currentTarget: target,
+    target,
+    preventDefault() {},
+  });
+  map().props.onPointerMove({ pointerId: 1, clientX: 100, clientY: 50 });
+  assert.equal(harness.states[0].x, beforePan + 100);
+  map().props.onPointerUp({ pointerId: 1, clientX: 100, clientY: 50 });
+  assert.equal(moves.length, 0, "panning must never edit the workflow");
+  const card = () =>
+    find(
+      (n) =>
+        n.type === "button" && n.props.className?.includes("workflow-node "),
+    );
+  card().props.onPointerDown({
+    button: 0,
+    pointerId: 2,
+    clientX: 100,
+    clientY: 100,
+    currentTarget: target,
+    stopPropagation() {},
+  });
+  map().props.onPointerMove({ pointerId: 2, clientX: 180, clientY: 140 });
+  assert.equal(
+    moves.length,
+    0,
+    "pointer movement is a local preview, not a persisted write",
+  );
+  map().props.onPointerUp({ pointerId: 2, clientX: 180, clientY: 140 });
+  assert.deepEqual(moves, [{ id: "end", position: { x: 410, y: 190 } }]);
+  card().props.onClick();
+  assert.deepEqual(selections, [], "dragging must not open the inspector");
+  card().props.onKeyDown({
+    key: "ArrowRight",
+    altKey: true,
+    shiftKey: false,
+    preventDefault() {},
+    stopPropagation() {},
+  });
+  assert.deepEqual(moves[1], { id: "end", position: { x: 340, y: 150 } });
+  assert.deepEqual(
+    document.nodes[0].position,
+    { x: 330, y: 150 },
+    "input document remains immutable",
+  );
+});
+
+test("builder starts with a clear canvas and opens only the panel needed for the selected action", () => {
+  const harness = clientHarness();
+  harness.states[0] = {
+    nodes: [{ kind: "wait", available: true }],
+    worker: { enabled: false, available: false },
+  };
+  const aside = (label) =>
+    harness.all(harness.render()).find((n) => n.props["aria-label"] === label);
+  assert.equal(aside("Pasos disponibles").props.hidden, true);
+  assert.equal(aside("Inspector del paso seleccionado").props.hidden, true);
+  harness.button("Agregar paso").props.onClick();
+  assert.equal(aside("Pasos disponibles").props.hidden, false);
+  harness.button("Esperar").props.onClick();
+  assert.equal(aside("Pasos disponibles").props.hidden, true);
+  assert.equal(aside("Inspector del paso seleccionado").props.hidden, false);
+  assert.equal(harness.states[7].nodes.length, 2);
+});
+
+test("cancelled or locked node gestures cannot change the draft", () => {
+  for (const disabled of [false, true]) {
+    const moves = [];
+    const harness = clientHarness("WorkflowCanvas", {
+      document: initialDocument(),
+      selected: "end",
+      disabled,
+      onSelect() {},
+      onMove: (...args) => moves.push(args),
+    });
+    const find = (predicate) => harness.all(harness.render()).find(predicate);
+    const card = find(
+      (n) =>
+        n.type === "button" && n.props.className?.includes("workflow-node "),
+    );
+    const map = () => find((n) => n.props.className === "workflow-map-scroll");
+    card.props.onPointerDown({
+      button: 0,
+      pointerId: 1,
+      clientX: 0,
+      clientY: 0,
+      currentTarget: { setPointerCapture() {} },
+      stopPropagation() {},
+    });
+    map().props.onPointerMove({ pointerId: 1, clientX: 100, clientY: 100 });
+    map().props.onPointerCancel();
+    map().props.onPointerUp({ pointerId: 1, clientX: 100, clientY: 100 });
+    assert.deepEqual(moves, []);
+    assert.equal(harness.states[1], null);
+  }
 });

@@ -7,12 +7,17 @@ The shared API and execution authority contract is in `WORKFLOWS.md`.
 ## Interaction
 
 - **Constructor**: choose an existing versioned draft or create a new definition.
-  Add only catalog-enabled node kinds, select a card, edit typed fields and choose
-  labeled destinations in the inspector. The SVG is decorative; actual cards are
+  The canvas takes the full editor width until a panel is requested. `Agregar paso`
+  opens a searchable catalog; selecting a card opens its inspector and closes the
+  catalog. The name/objective, worker explanation and advanced connections are
+  expandable rather than repeated instructions. Unavailable actions remain disabled
+  and keep their provider reason in the button's accessible description/tooltip.
+  Add only catalog-enabled node kinds, edit typed fields and choose labeled
+  destinations under `Conexiones avanzadas`. The SVG is decorative; actual cards are
   buttons and an equivalent expandable ordered list exposes all connections.
   The editor prevents cyclic target choices and reports unreachable nodes before save.
   Adding inserts a step before the final node; a condition initially routes both
-  branches there until explicitly reconnected. Order cards with `Ordenar pasos`.
+  branches there until explicitly reconnected. Order cards with `Ordenar`.
 - **Programación**: ISO days 1–7 (Monday–Sunday), Colombia timezone, start/end
   interval without overnight windows, daily action limit 1–100 and verified-reply
   stop policy. These settings remain part of the draft until saved.
@@ -22,6 +27,26 @@ The shared API and execution authority contract is in `WORKFLOWS.md`.
   requires all social-message nodes in that run to use the same account/platform.
   Preparation is additionally limited to 10 external actions: audience size times
   the number of WhatsApp/social-message/call nodes. This is separate from daily limits.
+
+### Canvas navigation
+
+- Drag the background, use the wheel, or scroll with two trackpad fingers to pan.
+  Ctrl/Cmd + wheel (including trackpad pinch events) zooms around the pointer.
+  Buttons offer 10–200% zoom, 100% reset and fit-to-content. `Ampliar lienzo`
+  increases the editing height without entering a modal or changing the draft.
+- Drag a card to move it with a 10-unit snap. A move is local until pointer release;
+  cancellation discards the preview. Positions use the existing document fields
+  and are saved only through `Guardar borrador`. Pan/zoom never dirty the draft.
+- With the canvas focused: arrows pan, +/− zoom, 0 resets and 1 fits. On a card,
+  Alt + arrows moves it; Alt + Shift + arrows uses larger increments. Enter/Space
+  opens the inspector. The expandable step list remains an equivalent selection
+  and connection-navigation surface.
+- At narrow widths, the requested panel overlays the canvas instead of shrinking
+  the graph into a tiny column. Both panels have labeled close controls. The catalog
+  focuses its search on opening; Escape closes it and restores its trigger.
+
+These controls do not add node kinds, activation authority or provider capability.
+They do not change the cycle/reachability, audience, consent or execution checks.
 
 Provider identity selectors use only normalized `/options` records. Existing saved
 values not present in the current options remain visibly unverified, not connected.
@@ -60,3 +85,11 @@ Browser checks must use the parent's synthetic local API fixture only, never
 production contacts or paid messaging providers. The intended viewport coverage is
 320/390/768/1440 px plus keyboard and modal focus checks. Automated source/unit checks
 alone do not certify visual or WCAG conformance.
+
+`node tests/fixtures/workflow-preview.mjs` opens a loopback-only synthetic preview
+on port 4336 (override with `PORT`). It bundles the actual editor using the installed
+Next.js webpack and TypeScript, has no real contacts or provider credentials, and
+rejects every attempted write. Stop it with SIGINT/SIGTERM to remove its temporary
+bundle. It is a manual browser fixture, not a production route or an automated E2E
+test. Unit tests additionally exercise anchored zoom, negative-position framing,
+bounded movement, pointer panning/dragging and progressive panel visibility.

@@ -415,7 +415,7 @@ export function Workspace({
                       : view === "voice"
                         ? "Agentes, voces y conversaciones, conectados con Sara IA."
                         : view === "workflows"
-                          ? "Diseña el seguimiento, revisa su alcance y activa solo lo que apruebes."
+                          ? "Conecta los pasos de tu seguimiento."
                           : view === "pipeline"
                             ? "Una vista clara de cada conversación y su siguiente paso."
                             : view === "contacts"

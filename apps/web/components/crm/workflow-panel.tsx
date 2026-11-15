@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "./icon";
+import { WorkflowCanvas } from "./workflow-canvas";
+export { WorkflowCanvas };
+import { kindIcons } from "./workflow-node-presentation";
 import {
   phoneLabel,
   sourceLabel,
@@ -18,7 +21,6 @@ import {
   insertNode,
   layoutDocument,
   nodeLabels,
-  outgoing,
   prepareArguments,
   removeNode,
   runLabels,
@@ -48,16 +50,6 @@ const tabs: [Tab, string][] = [
   ["schedule", "Programación"],
   ["history", "Clientes e historial"],
 ];
-const kindIcons = {
-  whatsapp_template: "message",
-  social_message: "send",
-  retell_call: "phone",
-  wait: "history",
-  condition: "connections",
-  crm_note: "edit",
-  crm_task: "task",
-  end: "check",
-} as const;
 const emptyZernio: ZernioOptions = {
   available: false,
   accounts: [],
@@ -82,29 +74,6 @@ const signature = (
   description: string,
   document: WorkflowDocument,
 ) => JSON.stringify({ name, description, document });
-const nodeSummary = (node: WorkflowNode) => {
-  const s = node.settings;
-  switch (node.kind) {
-    case "wait":
-      return `${s.hours} horas de espera`;
-    case "condition":
-      return `${s.field === "stage" ? "Etapa" : "Medio"} = ${s.value}`;
-    case "crm_note":
-      return String(s.body || "Escribe la nota para el CRM");
-    case "crm_task":
-      return String(s.title || "Define el próximo seguimiento");
-    case "social_message":
-      return String(s.text || "Selecciona cuenta y mensaje");
-    case "whatsapp_template":
-      return String(s.template_name || "Selecciona una plantilla aprobada");
-    case "retell_call":
-      return s.agent_id
-        ? `Agente ${s.agent_id}`
-        : "Selecciona agente y número de salida";
-    default:
-      return "Sin más acciones para este cliente";
-  }
-};
 
 export function WorkflowPanel({
   csrf,
@@ -154,6 +123,24 @@ export function WorkflowPanel({
   const [retell, setRetell] = useState<RetellOptions>(emptyRetell);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [stepQuery, setStepQuery] = useState("");
+  const [wideCanvas, setWideCanvas] = useState(false);
+  const paletteTrigger = useRef<HTMLButtonElement>(null);
+  const stepSearch = useRef<HTMLInputElement>(null);
+  const stepName = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (inspectorOpen) stepName.current?.focus({ preventScroll: true });
+  }, [inspectorOpen, selectedNodeId]);
+  useEffect(() => {
+    if (paletteOpen) stepSearch.current?.focus();
+  }, [paletteOpen]);
+  function selectStep(id: string) {
+    setSelectedNodeId(id);
+    setInspectorOpen(true);
+    setPaletteOpen(false);
+  }
   const busy = useRef(false),
     optionsBusy = useRef(false),
     reviewDialog = useRef<HTMLDialogElement>(null),
@@ -190,14 +177,14 @@ export function WorkflowPanel({
   const reviewBudgetExceeded = externalActions > 10;
   const canPrepare = Boolean(
     workflowId &&
-    !dirty &&
-    !conflict &&
-    audience.length &&
-    audienceConsent &&
-    !missingBinding &&
-    !reviewBudgetExceeded &&
-    !issues.length &&
-    !pending,
+      !dirty &&
+      !conflict &&
+      audience.length &&
+      audienceConsent &&
+      !missingBinding &&
+      !reviewBudgetExceeded &&
+      !issues.length &&
+      !pending,
   );
   const workerReady = Boolean(
     catalog?.worker.enabled && catalog.worker.available,
@@ -331,6 +318,8 @@ export function WorkflowPanel({
     setDocument(nextDocument);
     setBaseline(signature(nextName, nextDescription, nextDocument));
     setSelectedNodeId(nextDocument.entry_id);
+    setInspectorOpen(false);
+    setPaletteOpen(false);
     setConflict(false);
     setError("");
     setNotice("");
@@ -551,7 +540,7 @@ export function WorkflowPanel({
     try {
       const id = crypto.randomUUID();
       changeDocument(insertNode(document, kind, id));
-      setSelectedNodeId(id);
+      selectStep(id);
     } catch (cause) {
       setError((cause as Error).message);
     }
@@ -641,11 +630,14 @@ export function WorkflowPanel({
                   ? "Ejecutor no disponible"
                   : "Ejecución automática deshabilitada"}
           </strong>
-          <p>
-            {workerReady
-              ? "Solo se ejecuta la audiencia y la versión que apruebes. No se inscriben clientes nuevos automáticamente."
-              : "Puedes diseñar y guardar borradores. La activación permanece bloqueada hasta confirmar un ejecutor disponible."}
-          </p>
+          <details className="workflow-worker-details">
+            <summary>Detalles</summary>
+            <p>
+              {workerReady
+                ? "Solo se ejecuta la audiencia y la versión que apruebes. No se inscriben clientes nuevos automáticamente."
+                : "Puedes guardar borradores. La activación está bloqueada hasta confirmar un ejecutor disponible."}
+            </p>
+          </details>
         </div>
         <button
           className="workflow-text-button"
@@ -731,52 +723,90 @@ export function WorkflowPanel({
           >
             {tab === "builder" ? (
               <>
-                <div className="workflow-definition">
-                  <label>
-                    Nombre de la secuencia
-                    <input
-                      maxLength={120}
-                      value={name}
-                      disabled={pending}
-                      onChange={(event) => {
-                        setName(event.target.value);
-                        invalidateReview();
-                      }}
-                    />
-                  </label>
-                  <label>
-                    Objetivo interno <span>(opcional)</span>
-                    <input
-                      maxLength={1000}
-                      value={description}
-                      disabled={pending}
-                      placeholder="¿Qué seguimiento quieres organizar?"
-                      onChange={(event) => {
-                        setDescription(event.target.value);
-                        invalidateReview();
-                      }}
-                    />
-                  </label>
-                </div>
-                <div className="workflow-editor">
+                <details className="workflow-properties">
+                  <summary>
+                    <Icon name="edit" size={16} />
+                    {name || "Nueva secuencia"}
+                    <span>Editar nombre y objetivo</span>
+                  </summary>
+                  <div className="workflow-definition">
+                    <label>
+                      Nombre de la secuencia
+                      <input
+                        maxLength={120}
+                        value={name}
+                        disabled={pending}
+                        onChange={(event) => {
+                          setName(event.target.value);
+                          invalidateReview();
+                        }}
+                      />
+                    </label>
+                    <label>
+                      Objetivo interno <span>(opcional)</span>
+                      <input
+                        maxLength={1000}
+                        value={description}
+                        disabled={pending}
+                        placeholder="¿Qué seguimiento quieres organizar?"
+                        onChange={(event) => {
+                          setDescription(event.target.value);
+                          invalidateReview();
+                        }}
+                      />
+                    </label>
+                  </div>
+                </details>
+                <div
+                  className={`workflow-editor ${paletteOpen ? "has-palette" : ""} ${inspectorOpen ? "has-inspector" : ""} ${wideCanvas ? "is-wide" : ""}`}
+                >
                   <aside
                     className="workflow-palette"
                     aria-label="Pasos disponibles"
+                    hidden={!paletteOpen}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        setPaletteOpen(false);
+                        paletteTrigger.current?.focus();
+                      }
+                    }}
                   >
-                    <div className="workflow-section-title">
-                      <span className="crm-eyebrow">CONSTRUIR</span>
-                      <h2>Agregar un paso</h2>
+                    <div className="workflow-panel-heading">
+                      <h2>Agregar paso</h2>
+                      <button
+                        className="workflow-icon-button"
+                        aria-label="Cerrar pasos disponibles"
+                        onClick={() => {
+                          setPaletteOpen(false);
+                          paletteTrigger.current?.focus();
+                        }}
+                      >
+                        <Icon name="close" />
+                      </button>
                     </div>
-                    <p>
-                      Se conecta antes del final. Edita sus salidas en el
-                      inspector.
-                    </p>
+                    <label className="workflow-step-search">
+                      <Icon name="search" size={16} />
+                      <input
+                        ref={stepSearch}
+                        aria-label="Buscar paso"
+                        placeholder="Buscar paso…"
+                        value={stepQuery}
+                        onChange={(event) => setStepQuery(event.target.value)}
+                      />
+                    </label>
                     {catalog?.nodes.length ? (
                       catalog.nodes
-                        .filter((item) => item.kind !== "end")
+                        .filter(
+                          (item) =>
+                            item.kind !== "end" &&
+                            nodeLabels[item.kind]
+                              .toLocaleLowerCase("es")
+                              .includes(stepQuery.toLocaleLowerCase("es")),
+                        )
                         .map((item) => (
                           <div key={item.kind}>
                             <button
+                              className="workflow-palette-step"
                               disabled={
                                 pending ||
                                 !item.available ||
@@ -794,11 +824,6 @@ export function WorkflowPanel({
                               </span>
                               <Icon name="plus" size={14} />
                             </button>
-                            {!item.available && item.reason ? (
-                              <small className="workflow-palette-reason">
-                                {item.reason}
-                              </small>
-                            ) : null}
                           </div>
                         ))
                     ) : (
@@ -807,9 +832,18 @@ export function WorkflowPanel({
                         de agregar acciones.
                       </p>
                     )}
+                    {catalog?.nodes.length &&
+                    !catalog.nodes.some(
+                      (item) =>
+                        item.kind !== "end" &&
+                        nodeLabels[item.kind]
+                          .toLocaleLowerCase("es")
+                          .includes(stepQuery.toLocaleLowerCase("es")),
+                    ) ? (
+                      <p role="status">No hay pasos con ese nombre.</p>
+                    ) : null}
                     <div className="workflow-palette-footer">
                       <strong>{document.nodes.length} de 20 pasos</strong>
-                      <p>Sin código ejecutable ni envíos al guardar.</p>
                       <button
                         className="workflow-text-button"
                         onClick={onOpenConnections}
@@ -820,31 +854,72 @@ export function WorkflowPanel({
                   </aside>
                   <div className="workflow-canvas-column">
                     <div className="workflow-canvas-toolbar">
-                      <span>
-                        <Icon name="connections" />
-                        Mapa de la secuencia
-                      </span>
                       <button
-                        className="workflow-text-button"
+                        ref={paletteTrigger}
+                        className="crm-button workflow-add-step"
+                        aria-expanded={paletteOpen}
                         disabled={pending}
-                        onClick={() => changeDocument(layoutDocument(document))}
+                        onClick={() => {
+                          setPaletteOpen(!paletteOpen);
+                          setInspectorOpen(false);
+                          setStepQuery("");
+                        }}
                       >
-                        Ordenar pasos
+                        <Icon name="plus" size={16} />
+                        Agregar paso
                       </button>
+                      <div className="workflow-canvas-actions">
+                        <span className="workflow-step-count">
+                          {document.nodes.length}/20 pasos
+                        </span>
+                        <button
+                          className="workflow-text-button"
+                          disabled={pending}
+                          onClick={() =>
+                            changeDocument(layoutDocument(document))
+                          }
+                        >
+                          Ordenar
+                        </button>
+                        <button
+                          className="workflow-icon-button"
+                          aria-label={
+                            wideCanvas ? "Reducir lienzo" : "Ampliar lienzo"
+                          }
+                          aria-pressed={wideCanvas}
+                          onClick={() => {
+                            setWideCanvas(!wideCanvas);
+                            setPaletteOpen(false);
+                            setInspectorOpen(false);
+                          }}
+                        >
+                          <Icon name={wideCanvas ? "close" : "arrow"} />
+                        </button>
+                      </div>
                     </div>
                     <WorkflowCanvas
+                      key={workflowId ?? "new"}
                       document={document}
                       selected={selectedNodeId}
-                      onSelect={setSelectedNodeId}
+                      onSelect={selectStep}
+                      disabled={pending}
+                      onMove={(id, position) =>
+                        changeDocument({
+                          ...document,
+                          nodes: document.nodes.map((node) =>
+                            node.id === id ? { ...node, position } : node,
+                          ),
+                        })
+                      }
                     />
                     <details className="workflow-step-list">
-                      <summary>Lista de pasos · navegación con teclado</summary>
+                      <summary>Lista de pasos</summary>
                       <ol aria-label="Lista de pasos">
                         {document.nodes.map((node) => (
                           <li key={node.id}>
                             <button
                               aria-pressed={selectedNodeId === node.id}
-                              onClick={() => setSelectedNodeId(node.id)}
+                              onClick={() => selectStep(node.id)}
                             >
                               {node.label}
                               {node.id === document.entry_id ? " · Inicio" : ""}
@@ -864,11 +939,30 @@ export function WorkflowPanel({
                   <aside
                     className="workflow-inspector"
                     aria-label="Inspector del paso seleccionado"
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        setInspectorOpen(false);
+                        paletteTrigger.current?.focus();
+                      }
+                    }}
+                    hidden={!inspectorOpen}
                   >
+                    <div className="workflow-panel-heading">
+                      <h2>Configurar paso</h2>
+                      <button
+                        className="workflow-icon-button"
+                        aria-label="Cerrar configuración del paso"
+                        onClick={() => {
+                          setInspectorOpen(false);
+                          paletteTrigger.current?.focus();
+                        }}
+                      >
+                        <Icon name="close" />
+                      </button>
+                    </div>
                     {selectedNode ? (
                       <fieldset disabled={pending}>
                         <div className="workflow-section-title">
-                          <span className="crm-eyebrow">PASO SELECCIONADO</span>
                           <h2>
                             <Icon name={kindIcons[selectedNode.kind]} />
                             {nodeLabels[selectedNode.kind]}
@@ -878,6 +972,7 @@ export function WorkflowPanel({
                           Nombre del paso
                           <input
                             maxLength={120}
+                            ref={stepName}
                             value={selectedNode.label}
                             onChange={(event) =>
                               updateNode({ label: event.target.value })
@@ -894,11 +989,8 @@ export function WorkflowPanel({
                           optionsLoading={optionsLoading}
                           loadOptions={loadOptions}
                         />
-                        <div className="workflow-connections">
-                          <h3>Conectar pasos</h3>
-                          <p>
-                            Sin arrastrar: elige un destino para cada salida.
-                          </p>
+                        <details className="workflow-connections">
+                          <summary>Conexiones avanzadas</summary>
                           <label>
                             Inicio de la secuencia
                             <select
@@ -978,7 +1070,7 @@ export function WorkflowPanel({
                           ) : (
                             <p>Este paso finaliza la ejecución del cliente.</p>
                           )}
-                        </div>
+                        </details>
                         {selectedNode.kind !== "end" ? (
                           <button
                             className="workflow-delete"
@@ -1015,11 +1107,7 @@ export function WorkflowPanel({
                 ) : null}
                 <div className="workflow-next">
                   <div>
-                    <strong>Diseña primero. Revisa antes de ejecutar.</strong>
-                    <p>
-                      Guarda esta versión y selecciona los clientes que podrán
-                      recorrerla.
-                    </p>
+                    <span>Guardar no envía mensajes ni inicia llamadas.</span>
                   </div>
                   <button
                     className="crm-button crm-secondary"
@@ -1683,111 +1771,6 @@ export function WorkflowPanel({
         ) : null}
       </dialog>
     </section>
-  );
-}
-
-export function WorkflowCanvas({
-  document,
-  selected,
-  onSelect,
-}: {
-  document: WorkflowDocument;
-  selected: string;
-  onSelect: (id: string) => void;
-}) {
-  const width = Math.max(
-    660,
-    ...document.nodes.map((node) => node.position.x + 180),
-  );
-  const height = Math.max(
-    480,
-    ...document.nodes.map((node) => node.position.y + 100),
-  );
-  const positions = new Map(
-    document.nodes.map((node) => [node.id, node.position]),
-  );
-  return (
-    <div
-      className="workflow-map-scroll"
-      aria-label="Mapa visual de pasos; también disponible en la lista inferior"
-      tabIndex={0}
-    >
-      <div className="workflow-map" style={{ width, height }}>
-        <svg
-          width={width}
-          height={height}
-          aria-hidden="true"
-          className="workflow-wires"
-        >
-          <defs>
-            <marker
-              id="workflow-arrow"
-              markerWidth="8"
-              markerHeight="8"
-              refX="7"
-              refY="4"
-              orient="auto"
-            >
-              <path d="M0 0L8 4L0 8" fill="none" stroke="currentColor" />
-            </marker>
-          </defs>
-          {document.nodes.flatMap((node) =>
-            outgoing(node).map((target, index) => {
-              const end = positions.get(target);
-              if (!end) return null;
-              const branch = node.kind === "condition";
-              const offset = branch ? (index === 0 ? -55 : 55) : 0;
-              const x = node.position.x + offset,
-                y = node.position.y + 48,
-                targetY = end.y - 48;
-              return (
-                <g key={`${node.id}-${target}-${index}`}>
-                  <path
-                    d={`M${x},${y} C${x},${y + 55} ${end.x},${targetY - 55} ${end.x},${targetY}`}
-                    fill="none"
-                    stroke={branch && index === 1 ? "#855708" : "#507010"}
-                    strokeWidth="1.8"
-                    markerEnd="url(#workflow-arrow)"
-                  />
-                  {branch ? (
-                    <text
-                      x={x + 8}
-                      y={y + 23}
-                      fill={index === 0 ? "#507010" : "#855708"}
-                    >
-                      {index === 0 ? "Sí" : "No"}
-                    </text>
-                  ) : null}
-                </g>
-              );
-            }),
-          )}
-        </svg>
-        {document.nodes.map((node, index) => (
-          <button
-            key={node.id}
-            className={`workflow-node ${selected === node.id ? "is-selected" : ""} is-${node.kind}`}
-            style={{ left: node.position.x, top: node.position.y }}
-            aria-pressed={selected === node.id}
-            aria-label={`Paso ${index + 1}: ${node.label}. ${nodeSummary(node)}`}
-            onClick={() => onSelect(node.id)}
-          >
-            <span className="workflow-node-icon">
-              <Icon name={kindIcons[node.kind]} size={20} />
-            </span>
-            <span className="workflow-node-body">
-              <small>
-                {node.id === document.entry_id ? "INICIO · " : ""}
-                {nodeLabels[node.kind]}
-              </small>
-              <strong>{node.label}</strong>
-              <span>{nodeSummary(node)}</span>
-            </span>
-            <span className="workflow-node-number">{index + 1}</span>
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }
 
