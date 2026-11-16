@@ -53,12 +53,20 @@ export function LeadCaptureStatus({
     !status.failed &&
     !status.scans.some((scan) => scan.last_error);
   return (
-    <p className="inbox-muted" role="status">
-      {healthy
-        ? `Captura automática activa · respaldo cada minuto · ${status.pending} conversaciones por completar.`
-        : status && !status.enabled
-          ? "Captura automática desactivada."
-          : "Captura automática pendiente de verificación. Revisa los chats para completar los datos faltantes."}
-    </p>
+    <>
+      <p className="inbox-muted" role="status">
+        {healthy
+          ? `Captura automática activa · respaldo cada minuto · ${status.pending} conversaciones por completar.`
+          : status && !status.enabled
+            ? "Captura automática desactivada."
+            : "Captura automática pendiente de verificación. Revisa los chats para completar los datos faltantes."}
+      </p>
+      <details className="inbox-raw">
+        <summary>Estado de la captura automática</summary>
+        <pre>
+          {JSON.stringify(status ?? { status: "unavailable" }, null, 2)}
+        </pre>
+      </details>
+    </>
   );
 }

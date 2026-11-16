@@ -156,7 +156,14 @@ def marker(row):
         json.dumps(
             {
                 k: row.get(k)
-                for k in ("id", "participantId", "participantName", "lastMessageAt", "lastMessage")
+                for k in (
+                    "id",
+                    "participantId",
+                    "participantName",
+                    "lastMessageAt",
+                    "updatedTime",
+                    "lastMessage",
+                )
             },
             sort_keys=True,
             default=str,
