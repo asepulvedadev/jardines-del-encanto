@@ -22,7 +22,7 @@ from .retell.routes import router as retell_router
 from .sara import simulations
 from .sara.profile_routes import router as sara_profile_router
 from .sara.routes import router as sara_router
-from .social import lead_capture_worker, whatsapp_agent
+from .social import lead_capture_worker, lead_notifications_worker, whatsapp_agent
 from .social.mcp_routes import router as social_mcp_router
 from .social.routes import router as social_router
 from .social.routes import webhook_router
@@ -34,6 +34,7 @@ from .workflows.routes import router as workflows_router
 @asynccontextmanager
 async def lifespan(app):
     lead_capture_worker.start()
+    lead_notifications_worker.start()
     workflows_worker.start()
     whatsapp_agent.start()
     simulations.start()
@@ -43,6 +44,7 @@ async def lifespan(app):
         yield
     finally:
         lead_capture_worker.stop()
+        lead_notifications_worker.stop()
         workflows_worker.stop()
         whatsapp_agent.stop()
         simulations.stop()
