@@ -22,6 +22,7 @@ SCRIPT = (
     "domingo veintidós de noviembre en la Cámara de Comercio de Bogotá en Soacha."
 )
 WEBSITE = "https://jardinesdelencanto.site/"
+DAILY_WELCOME_LIMIT = 1000
 WELCOME_UNTIL = datetime(2026, 11, 23, 5, tzinfo=UTC)  # End of fair date, Bogotá.
 FIELDS = re.compile(
     r"(?P<label>full name|nombre completo|phone number|n[uú]mero de (?:tel[eé]fono|celular)|"
@@ -247,7 +248,7 @@ def enqueue(db, payload, profile_id):
         db.execute(
             "SELECT count(*) AS n FROM crm.social_onboarding WHERE created_at>now()-interval '24 hours'"
         ).fetchone()["n"]
-        >= 100
+        >= DAILY_WELCOME_LIMIT
     ):
         return True
     if not old:

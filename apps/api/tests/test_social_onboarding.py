@@ -834,3 +834,33 @@ def test_historical_sibling_stop_prevents_new_and_queued_dispatch(intake, new_th
             )
     onboarding.tick()
     assert deliveries == []
+
+
+@pytest.mark.parametrize("existing,admitted", [(100, True), (999, True), (1000, False)])
+def test_welcome_rolling_daily_limit_is_one_thousand(intake, existing, admitted):
+    incoming, deliveries, _, _, owner = intake
+    incoming(text="Hola", suffix="budget-source")
+    with psycopg.connect(owner) as db:
+        db.execute(
+            """INSERT INTO crm.social_onboarding(profile_id,account_id,conversation_id,
+            participant_id,platform,config_version,source,state,created_at)
+            SELECT profile_id,account_id,'quota-thread-'||n,'quota-person-'||n,platform,
+            config_version,source,'completed',now()-interval '2 hours'
+            FROM crm.social_onboarding CROSS JOIN generate_series(1,%s) n
+            WHERE conversation_id='thread-budget-source' """,
+            (existing - 1,),
+        )
+    incoming(text="Hola", suffix="budget-candidate")
+    with psycopg.connect(owner) as db:
+        assert (
+            bool(
+                db.execute(
+                    "SELECT 1 FROM crm.social_onboarding WHERE conversation_id='thread-budget-candidate'"
+                ).fetchone()
+            )
+            is admitted
+        )
+        assert db.execute("SELECT count(*) FROM crm.social_onboarding").fetchone()[
+            0
+        ] == existing + int(admitted)
+    assert deliveries == []

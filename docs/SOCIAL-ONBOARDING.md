@@ -49,7 +49,7 @@ MP3 acceptance is not a delivery/read receipt or a native WhatsApp voice-note gu
   only. `blocked` and `unknown` require operator inspection, not blind resets.
 - Explicit SALIR/STOP and Spanish no-contact requests suppress the thread. This does
   not constitute a global marketing-consent database or authorize broadcasts.
-- At most100 new threads are admitted per rolling24hours, with at most10 immutable
+- At most 1,000 new threads are admitted per rolling 24 hours, with at most10 immutable
   audio cache entries. Raw content and MP3 bytes remain private; no public media URL.
 - This specific fair welcome expires at the end of November22,2026 in Bogotá. It
   must not keep advertising an already elapsed event. No hour was supplied or invented.

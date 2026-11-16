@@ -24,6 +24,7 @@ from . import config, workflow
 
 router = APIRouter(prefix="/crm/social/whatsapp-agent")
 Admin = Annotated[dict, Depends(security.session)]
+DAILY_REPLY_LIMIT = 1000
 _stop = threading.Event()
 _thread = None
 _heartbeat = 0.0
@@ -359,7 +360,7 @@ def claim():
         budget = db.execute("""SELECT count(*) FILTER(WHERE claimed_at>now()-interval '1 minute') AS minute,
             count(*) FILTER(WHERE claimed_at>now()-interval '24 hours') AS day
             FROM crm.whatsapp_agent_jobs WHERE claimed_at>now()-interval '24 hours'""").fetchone()
-        if budget["minute"] >= 6 or budget["day"] >= 100:
+        if budget["minute"] >= 6 or budget["day"] >= DAILY_REPLY_LIMIT:
             return None
         job = db.execute(
             "SELECT * FROM crm.whatsapp_agent_jobs WHERE state='pending' ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1"

@@ -562,3 +562,51 @@ def test_real_webhook_rest_and_reply_contract_without_matcher_mocks(vendor):
     assert len(posts) == 1
     assert posts[0][1] == "/api/v1/inbox/conversations/internal-thread/messages"
     assert posts[0][2] == {"accountId": DOC["account_id"], "message": "Hola, soy Sara."}
+
+
+def seed_claim_budget(owner, count, kind="day"):
+    with psycopg.connect(owner) as db:
+        db.execute(
+            """INSERT INTO crm.whatsapp_agent_jobs(event_id,account_id,profile_id,
+            conversation_id,participant_id,message_id,agent_version,sent_at,content,
+            shared_profile_version,state,claimed_at,finished_at)
+            SELECT 'quota-event-'||n,account_id,profile_id,
+            CASE WHEN %s='conversation' THEN conversation_id ELSE 'quota-thread-'||n END,
+            participant_id,'quota-message-'||n,agent_version,sent_at,content,
+            shared_profile_version,'completed',
+            CASE WHEN %s='minute' THEN now() ELSE now()-interval '2 hours' END,now()
+            FROM crm.whatsapp_agent_jobs CROSS JOIN generate_series(1,%s) n
+            WHERE state='pending' """,
+            (kind, kind, count),
+        )
+
+
+@pytest.mark.parametrize("existing,admitted", [(100, True), (999, True), (1000, False)])
+def test_agent_rolling_daily_limit_is_one_thousand(configured, existing, admitted):
+    client, owner, credentials = configured
+    assert send(client, credentials, payload("573001110003")).status_code == 200
+    seed_claim_budget(owner, existing)
+    claimed = agent.claim()
+    assert bool(claimed) is admitted
+    with psycopg.connect(owner) as db:
+        assert db.execute(
+            "SELECT count(*) FROM crm.whatsapp_agent_jobs WHERE state='generating'"
+        ).fetchone()[0] == int(admitted)
+        assert db.execute(
+            "SELECT count(*) FROM crm.whatsapp_agent_jobs WHERE claimed_at>now()-interval '24 hours'"
+        ).fetchone()[0] == existing + int(admitted)
+
+
+@pytest.mark.parametrize(
+    "kind,count,expected", [("minute", 6, "pending"), ("conversation", 30, "blocked")]
+)
+def test_daily_limit_increase_preserves_short_term_budgets(configured, kind, count, expected):
+    client, owner, credentials = configured
+    assert send(client, credentials, payload("573001110003")).status_code == 200
+    seed_claim_budget(owner, count, kind)
+    assert agent.claim() is None
+    with psycopg.connect(owner) as db:
+        row = db.execute(
+            "SELECT state,error FROM crm.whatsapp_agent_jobs WHERE event_id='event-1'"
+        ).fetchone()
+        assert row == (expected, "conversation_budget" if kind == "conversation" else None)
