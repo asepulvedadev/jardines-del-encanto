@@ -339,6 +339,11 @@ def test_provider_change_and_verified_reply_hold(fake_social):
     from app.crm.database import connect
 
     with connect() as db:
+        # PostgreSQL now() is real time; align the persisted start with the fixture clock.
+        db.execute(
+            "UPDATE crm.workflow_runs SET started_at=%s WHERE id=%s",
+            (service.now(), run2["id"]),
+        )
         worker.verified_reply(
             db,
             {
