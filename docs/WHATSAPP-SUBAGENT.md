@@ -121,6 +121,38 @@ missing; an enabled flag is not reported as verified availability.
 
 ## Verification
 
+The owner-requested November 16 welcome runs once per verified participant,
+account, profile and channel, not once per incoming message. On WhatsApp and
+Facebook its separate, durably reserved messages are **audio → official website
+→ WhatsApp group**. Each URL has its own explanation; the group invitation
+explains that it provides information before the event. The existing recording,
+voice/model, URLs and routing identity remain unchanged.
+
+An initial greeting without identity still receives the three-message welcome.
+Only genuine name/phone details create a CRM contact through `capture_contact()`.
+Missing identity is requested after the group invitation, never before the audio.
+Verified follow-up inputs are queued separately (maximum 30 per conversation per
+rolling day), so later chatter cannot overwrite a pending registration form.
+The existing independent intake repair remains available. STOP suppresses all
+known conversations for the same scoped participant.
+
+Migration 026 adds participant claims, separate text receipts and the input queue.
+Migration 027 indexes the input budget. Migration 028 corrects historical claim
+selection: opt-outs and uncertain sends take priority over unfinished welcome
+progress, and accepted audio takes priority over an older pending conversation.
+Historical opt-outs propagate across the scoped participant; runtime guards also
+check sibling conversations rather than trusting only the canonical claim.
+It preserves completed/ambiguous history; interrupted reservations become unknown.
+An accepted old audio resumes at the website, not the audio. Old combined-link
+receipts remain historical and are never replayed. An additional conversation for
+an existing participant may capture real identity but cannot repeat the welcome.
+Unknown send outcomes are never retried automatically.
+
+TikTok remains excluded: Zernio documents text/image replies, not audio; the
+existing eligibility guard is not bypassed. No fallback, account activation or
+TikTok send is implied. The fair-specific expiration remains November 23, 2026,
+00:00 Colombia; this change does not extend the dated campaign.
+
 All ordinary tests use synthetic phone numbers, isolated `jardines_crm_test` data,
 and mocked provider traffic. No real customer message, campaign, provider key or
 administrator conversation is required. Browser visual checks and a pinned-Hermes

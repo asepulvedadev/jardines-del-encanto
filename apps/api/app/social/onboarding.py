@@ -217,56 +217,81 @@ def enqueue(db, payload, profile_id):
     ):
         return True
     key = (profile_id, event["account_id"], event["conversation_id"])
+    # Serialize participant claims across distinct conversations, including STOP.
+    db.execute("SELECT pg_advisory_xact_lock(9142041)")
     old = db.execute(
         "SELECT * FROM crm.social_onboarding WHERE profile_id=%s AND account_id=%s AND conversation_id=%s FOR UPDATE",
         key,
     ).fetchone()
+    if old and (
+        old["participant_id"] != event["participant_id"] or old["platform"] != event["platform"]
+    ):
+        return True
+    participant = (profile_id, event["account_id"], event["platform"], event["participant_id"])
+    claim = db.execute(
+        "SELECT onboarding_id FROM crm.social_welcome_claims WHERE (profile_id,account_id,platform,participant_id)=(%s,%s,%s,%s)",
+        participant,
+    ).fetchone()
+    suppressed = opted_out(event["text"]) or participant_suppressed(db, participant)
+    if suppressed:
+        db.execute(
+            "UPDATE crm.social_onboarding SET suppressed=true WHERE (profile_id,account_id,platform,participant_id)=(%s,%s,%s,%s)",
+            participant,
+        )
     if old:
-        if opted_out(event["text"]):
-            db.execute("UPDATE crm.social_onboarding SET suppressed=true WHERE id=%s", (old["id"],))
+        if suppressed or old["suppressed"]:
             return True
-        if old["suppressed"]:
-            return True
-        if old["state"] == "waiting":
-            db.execute(
-                "UPDATE crm.social_onboarding SET source=%s,state='pending',updated_at=now() WHERE id=%s",
-                (Jsonb(event), old["id"]),
-            )
-        elif old["state"] in {"pending", "question_reserved"}:
-            db.execute(
-                "UPDATE crm.social_onboarding SET next_source=%s WHERE id=%s",
-                (Jsonb(event), old["id"]),
-            )
-        return old["state"] != "completed" or event["platform"] == "facebook"
-    db.execute("SELECT pg_advisory_xact_lock(9142041)")
-    # Another first message may have inserted this thread while we waited for quota.
-    # Re-enter the existing-thread path so a concurrent STOP is never discarded.
-    if db.execute(
-        "SELECT 1 FROM crm.social_onboarding WHERE profile_id=%s AND account_id=%s AND conversation_id=%s",
-        key,
-    ).fetchone():
-        return enqueue(db, payload, profile_id)
-    if (
+        if old["state"] == "completed" and old["contact_id"]:
+            return event["platform"] == "facebook"
+    elif (
         db.execute(
             "SELECT count(*) AS n FROM crm.social_onboarding WHERE created_at>now()-interval '24 hours'"
         ).fetchone()["n"]
         >= 100
     ):
         return True
-    db.execute(
-        """INSERT INTO crm.social_onboarding(profile_id,account_id,conversation_id,participant_id,
-        platform,config_version,source,suppressed) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)
-        ON CONFLICT(profile_id,account_id,conversation_id) DO NOTHING""",
-        (
-            *key,
-            event["participant_id"],
-            event["platform"],
-            cfg["version"],
-            Jsonb(event),
-            opted_out(event["text"]),
-        ),
-    )
+    if not old:
+        old = db.execute(
+            """INSERT INTO crm.social_onboarding(profile_id,account_id,conversation_id,participant_id,
+            platform,config_version,source,suppressed,welcome_required)
+            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
+            (
+                *key,
+                event["participant_id"],
+                event["platform"],
+                cfg["version"],
+                Jsonb(event),
+                suppressed,
+                not bool(claim),
+            ),
+        ).fetchone()
+        if not claim:
+            db.execute(
+                "INSERT INTO crm.social_welcome_claims(profile_id,account_id,platform,participant_id,onboarding_id) VALUES(%s,%s,%s,%s,%s)",
+                (*participant, old["id"]),
+            )
+    if (
+        not old["suppressed"]
+        and db.execute(
+            "SELECT count(*) AS n FROM crm.social_onboarding_inputs WHERE onboarding_id=%s AND created_at>now()-interval '24 hours'",
+            (old["id"],),
+        ).fetchone()["n"]
+        < 30
+    ):
+        db.execute(
+            "INSERT INTO crm.social_onboarding_inputs(onboarding_id,message_id,source) VALUES(%s,%s,%s) ON CONFLICT DO NOTHING",
+            (old["id"], event["message_id"], Jsonb(event)),
+        )
     return True
+
+
+def participant_suppressed(db, participant):
+    return bool(
+        db.execute(
+            "SELECT 1 FROM crm.social_onboarding WHERE (profile_id,account_id,platform,participant_id)=(%s,%s,%s,%s) AND suppressed LIMIT 1",
+            participant,
+        ).fetchone()
+    )
 
 
 def guard(db, row):
@@ -277,6 +302,9 @@ def guard(db, row):
         or not cfg["enabled"]
         or not actual
         or actual["suppressed"]
+        or participant_suppressed(
+            db, (row["profile_id"], row["account_id"], row["platform"], row["participant_id"])
+        )
         or actual["config_version"] != cfg["version"]
         or actual["source"] != row["source"]
         or datetime.now(UTC) >= WELCOME_UNTIL
@@ -355,22 +383,37 @@ def tick():
         db.execute("SELECT pg_advisory_lock(2026111105)")
         db.commit()
         row = None
+        incoming = None
         reserved = False
         try:
             # These durable reservations can only remain after an interrupted process.
             db.execute(
-                "UPDATE crm.social_onboarding SET state='unknown',error='interrupted' WHERE state IN ('audio_reserved','links_reserved','question_reserved')"
+                "UPDATE crm.social_onboarding SET state='unknown',error='interrupted' WHERE state IN ('audio_reserved','links_reserved','question_reserved','website_reserved','group_reserved')"
             )
             row = db.execute(
-                """SELECT * FROM crm.social_onboarding WHERE state IN ('pending','captured','audio_accepted')
-                AND NOT suppressed ORDER BY created_at,id LIMIT 1"""
+                """SELECT o.* FROM crm.social_onboarding o WHERE NOT suppressed AND (
+                state IN ('pending','captured','audio_accepted','website_accepted') OR
+                (state='waiting' AND NOT asked) OR EXISTS(
+                SELECT 1 FROM crm.social_onboarding_inputs i WHERE i.onboarding_id=o.id AND NOT i.processed))
+                ORDER BY created_at,id LIMIT 1"""
             ).fetchone()
             db.commit()
             if not row:
                 return
+            incoming = db.execute(
+                "SELECT * FROM crm.social_onboarding_inputs WHERE onboarding_id=%s AND NOT processed ORDER BY created_at,id LIMIT 1",
+                (row["id"],),
+            ).fetchone()
+            if incoming:
+                db.execute(
+                    "UPDATE crm.social_onboarding SET source=%s WHERE id=%s",
+                    (Jsonb(incoming["source"]), row["id"]),
+                )
+                row["source"] = incoming["source"]
+                db.commit()
             guard(db, row)
             source = check(row)
-            if row["state"] == "pending":
+            if not row["contact_id"]:
                 value = details(row["source"]["text"], source["sender"], row["details"])
                 # Plain name is accepted only in response to our explicit missing-name question.
                 if row["asked"] and "name" not in value and valid_name(row["source"]["text"]):
@@ -379,26 +422,7 @@ def tick():
                     "UPDATE crm.social_onboarding SET details=%s WHERE id=%s",
                     (Jsonb(value), row["id"]),
                 )
-                if set(value) != {"name", "phone"}:
-                    followup = db.execute(
-                        "SELECT next_source FROM crm.social_onboarding WHERE id=%s", (row["id"],)
-                    ).fetchone()["next_source"]
-                    if followup:
-                        db.execute(
-                            "UPDATE crm.social_onboarding SET source=next_source,next_source=NULL WHERE id=%s",
-                            (row["id"],),
-                        )
-                        db.commit()
-                        return
-                    if row["asked"]:
-                        db.execute(
-                            "UPDATE crm.social_onboarding SET state='waiting' WHERE id=%s",
-                            (row["id"],),
-                        )
-                        db.commit()
-                        return
-                    phase = "question"
-                else:
+                if set(value) == {"name", "phone"}:
                     record, deal = capture_contact(
                         db,
                         ContactInput(
@@ -409,14 +433,33 @@ def tick():
                         ),
                     )
                     db.execute(
-                        "UPDATE crm.social_onboarding SET contact_id=%s,deal_id=%s,state='captured' WHERE id=%s",
+                        "UPDATE crm.social_onboarding SET contact_id=%s,deal_id=%s WHERE id=%s",
                         (record["id"], deal["id"], row["id"]),
                     )
-                    db.commit()  # Registration MUST exist before synthesis or sending.
-                    row["state"] = "captured"
-                    phase = "audio"
+                    row.update(contact_id=record["id"], deal_id=deal["id"])
+            if incoming:
+                db.execute(
+                    "UPDATE crm.social_onboarding_inputs SET processed=true WHERE id=%s",
+                    (incoming["id"],),
+                )
+            db.commit()  # Real identity capture never waits for a media delivery.
+            if row["state"] in {"unknown", "blocked"}:
+                return
+            if row["welcome_required"] and row["state"] in {"pending", "captured"}:
+                phase = "audio"
+            elif row["welcome_required"] and row["state"] == "audio_accepted":
+                phase = "website"
+            elif row["welcome_required"] and row["state"] == "website_accepted":
+                phase = "group"
             else:
-                phase = "audio" if row["state"] == "captured" else "links"
+                if row["contact_id"] or row["asked"]:
+                    db.execute(
+                        "UPDATE crm.social_onboarding SET state=%s WHERE id=%s",
+                        ("completed" if row["contact_id"] else "waiting", row["id"]),
+                    )
+                    db.commit()
+                    return
+                phase = "question"
             if phase == "audio":
                 data = cached_audio(db)
                 db.execute(
@@ -432,35 +475,42 @@ def tick():
             result = media._isolated({"operation": "welcome_" + phase, "id": str(row["id"])})
             if result.get("state") != "completed":
                 raise ValueError("welcome_delivery_unconfirmed")
-            target = {"audio": "audio_accepted", "links": "completed", "question": "waiting"}[phase]
+            target = {
+                "audio": "audio_accepted",
+                "website": "website_accepted",
+                "group": "completed" if row["contact_id"] else "waiting",
+                "question": "waiting",
+            }[phase]
             db.execute(
                 """UPDATE crm.social_onboarding SET state=%s,asked=asked OR %s,
                 audio_receipt=CASE WHEN %s THEN %s ELSE audio_receipt END,
-                links_receipt=CASE WHEN %s THEN %s ELSE links_receipt END,
+                website_receipt=CASE WHEN %s THEN %s ELSE website_receipt END,
+                group_receipt=CASE WHEN %s THEN %s ELSE group_receipt END,
                 audio=NULL,updated_at=now() WHERE id=%s""",
                 (
                     target,
                     phase == "question",
                     phase == "audio",
                     Jsonb(result.get("receipt", {})),
-                    phase == "links",
+                    phase == "website",
+                    Jsonb(result.get("receipt", {})),
+                    phase == "group",
                     Jsonb(result.get("receipt", {})),
                     row["id"],
                 ),
             )
-            if phase == "question":
-                db.execute(
-                    """UPDATE crm.social_onboarding SET state='pending',source=next_source,next_source=NULL
-                WHERE id=%s AND next_source IS NOT NULL""",
-                    (row["id"],),
-                )
             db.commit()
         except Exception:  # noqa: BLE001 - no provider errors, PII or credentials in logs
             db.rollback()
             if row:
+                if incoming:
+                    db.execute(
+                        "UPDATE crm.social_onboarding_inputs SET processed=true WHERE id=%s",
+                        (incoming["id"],),
+                    )
                 db.execute(
                     "UPDATE crm.social_onboarding SET state=%s,error='welcome_not_confirmed',audio=NULL WHERE id=%s",
-                    ("unknown" if reserved else "blocked", row["id"]),
+                    ("unknown" if reserved or row["state"] == "unknown" else "blocked", row["id"]),
                 )
                 db.commit()
         finally:

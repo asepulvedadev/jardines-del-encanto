@@ -161,7 +161,13 @@ def transmit_audio(row, credentials):
 
 def execute(operation, identifier):
     identifier = str(UUID(identifier))
-    if operation not in {"welcome_check", "welcome_question", "welcome_audio", "welcome_links"}:
+    if operation not in {
+        "welcome_check",
+        "welcome_question",
+        "welcome_audio",
+        "welcome_website",
+        "welcome_group",
+    }:
         raise ValueError("invalid_welcome_operation")
     with connect() as db, config.locked():
         # Serialize the final source check and bounded send with authenticated opt-outs.
@@ -176,19 +182,32 @@ def execute(operation, identifier):
         phase = operation.removeprefix("welcome_")
         if row["state"] != phase + "_reserved":
             raise ValueError("welcome_reservation_changed")
-        if phase != "question" and (not row["contact_id"] or not row["deal_id"]):
-            raise ValueError("welcome_registration_required")
+        if not row["welcome_required"] and phase != "question":
+            raise ValueError("welcome_already_claimed")
+        if phase == "website" and row["audio_receipt"].get("status") != "accepted":
+            raise ValueError("welcome_audio_required")
+        if phase == "group" and row["website_receipt"].get("status") != "accepted":
+            raise ValueError("welcome_website_required")
+        if (
+            phase == "question"
+            and row["welcome_required"]
+            and not any(
+                row[column].get("status") == "accepted"
+                for column in ("group_receipt", "links_receipt")
+            )
+        ):
+            raise ValueError("welcome_group_required")
         if phase == "audio":
             accepted = transmit_audio(row, credentials)
         else:
-            if phase == "links" and row["audio_receipt"].get("status") != "accepted":
-                raise ValueError("welcome_audio_required")
-            message = (
-                "Página web: " + onboarding.WEBSITE + "\nGrupo del proyecto: " + cfg["group_url"]
-                if phase == "links"
-                else "Hola, soy Sara. Para registrarte, envíame tu nombre completo y número de celular. "
-                "Puedes escribir: Nombre completo: … Celular: …"
-            )
+            message = {
+                "website": "Aquí puedes ver la página oficial de nuestro proyecto:\n"
+                + onboarding.WEBSITE,
+                "group": "Para estar al tanto de toda la información previa al evento, "
+                "ingresa a nuestro grupo de WhatsApp:\n" + cfg["group_url"],
+                "question": "Hola, soy Sara. Para registrarte, envíame tu nombre completo y número de celular. "
+                "Puedes escribir: Nombre completo: … Celular: …",
+            }[phase]
             command = Execute(
                 operation="sendInboxMessage",
                 account_id=row["account_id"],
