@@ -6,6 +6,61 @@ SEO authorization enables only approved public pages; see `SEO-GEO.md`. Deployme
 and preview operations are documented in `DEPLOY.md`.
 `DESIGN.md` remains the shared visual contract. UI copy uses professional `es-CO`.
 
+## Soacha event invitation — November 22, 2026
+
+The secondary Bogotá/Soacha invitation is now its own full-bleed section after
+the buyer guide introduction, rather than an aside inside its two-column grid.
+On desktop (1024px and wider) it has a minimum height of one small viewport;
+smaller screens use content-driven height. A larger section heading, date/venue
+emphasis and 64px-minimum WhatsApp CTA preserve the same owner-supplied copy and
+destination. This changes no registration, messaging or attendance behavior.
+Local verification: 29 web checks passed, with seven optional browser skips.
+The separate browser case passed at 320, 390, 768 and 1440px, including measured
+viewport width, desktop viewport height, adaptive mobile/tablet height and the
+WhatsApp link (intercepted locally). TypeScript and the production build passed.
+
+The owner supplied the Sunday, November 22 event at Cámara de Comercio de Soacha.
+The home page presents an editorial forest-green invitation immediately after the
+hero, a date panel, a hero anchor, buyer-section and final-contact
+reminders, and two event FAQs. The venue is not a project location or an assertion
+of institutional sponsorship: the lots remain in Acacías, Meta.
+
+`components/soacha-event.tsx` centralizes the date, venue and WhatsApp message.
+Three event links reuse the existing `whatsappLink` destination, opening a draft
+request for the schedule, exact address and attendance coordination. These details
+were not supplied, so no time, street address, entrance fee, exclusive discount or
+automatic attendance confirmation is invented. Existing cupo buttons still open
+the same interest-registration dialog. No new tracking, dependency or API call is
+introduced. The date panel is CSS, not a third-party asset or venue logo.
+
+Initially verified locally, this landing update was authorized for publication on
+November 16 through the existing main-branch GitHub Actions deployment and its
+restricted CI credential. Check the workflow and public site before declaring it
+live. Remove or revise the dated invitations after the event; no scheduled removal
+is implemented.
+Verification: `npm run test:web`, `npm run typecheck`, `npm run build`, and the
+optional browser test in `tests/landing.test.mjs` with `HERO_PLAYWRIGHT_MODULE`.
+The browser test checks 320/390/768/1440px, event access, focus, FAQs and cupo-dialog
+preservation. It intercepts WhatsApp locally and never sends a customer message.
+
+### Original logo and navigation removal
+
+The owner requested removing the landing's desktop navigation and mobile menu.
+The header is now a non-sticky brand bar, retaining the existing desktop visit
+CTA. Header and footer display the original green SVG already served at
+`/brand/jardines-del-encanto-refinado.svg`, identical to the owner-supplied source
+under `assets/campaign-drafts/brand/`. No logo was recreated, cropped or recolored.
+Intrinsic image dimensions preserve its portrait proportions; mobile uses a
+centered logo. The buyer guide and CRM branding are not changed.
+
+The previous date/venue emphasis and Bogotá/Soacha invitation remain in place.
+Local checks: the focused logo/CTA tests and the web suite passed (28 checks,
+seven optional browser skips). The separate browser case checks original SVG
+loading/proportions, no menu, event access, focus, FAQs and the cupo dialog.
+No external WhatsApp message is sent by these checks.
+The browser case passed at all four widths; TypeScript and the production build
+also passed. The local preview was refreshed from that build, without publishing.
+
 ## Verified local redesign — 2026-11-11
 
 The current owner request moves the architectural video into the hero, uses heavier

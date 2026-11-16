@@ -109,6 +109,26 @@
   height: 90px;
   gap: 24px;
 }
+.landing .landing-brand-header {
+  position: static;
+}
+.landing .landing-brand-header .header-inner {
+  height: 152px;
+}
+.landing .brand-lockup {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding-block: 12px;
+}
+.landing .brand-logo {
+  display: block;
+  width: 108px;
+  height: auto;
+}
+.landing .footer-brand .brand-logo {
+  width: 132px;
+}
 .landing .wordmark {
   font-weight: 800;
   font-size: 24px;
@@ -491,6 +511,13 @@
   }
 }
 @media (max-width: 639px) {
+  .landing .landing-brand-header .header-inner {
+    height: 128px;
+    justify-content: center;
+  }
+  .landing .landing-brand-header .brand-logo {
+    width: 88px;
+  }
   .landing {
     padding-bottom: 87px;
   }

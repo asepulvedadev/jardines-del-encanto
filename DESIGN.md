@@ -41,6 +41,10 @@ not certified original brand values. Recheck them when source artwork is supplie
   and `jardines-del-encanto-blanco.svg`. Use green on light backgrounds and the
   approved white variant on dark backgrounds; do not invent substitute leaf marks.
   This campaign update does not authorize a global landing or CRM rebrand.
+- On 2026-11-16, the owner separately authorized the existing green SVG lockup
+  in the main landing header and footer, replacing the typeset project name.
+  The main landing has no desktop navigation or mobile menu; use a non-sticky
+  brand header and keep in-content CTAs. Buyer-guide and CRM branding are unchanged.
 - Preserve the wordmark, palms, leaf, proportions and approved color variants.
 - Request the original SVG or transparent high-resolution artwork before public launch.
   The poster is a reference, not a production-ready logo or verified standalone photograph.

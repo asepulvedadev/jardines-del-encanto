@@ -3,50 +3,6 @@ import { useRef, useState } from "react";
 import { photographs } from "../lib/project";
 import { ProjectPhoto } from "./project-photo";
 
-const navigation = [
-  ["El proyecto", "#proyecto"],
-  ["Espacios", "#espacios"],
-  ["Plano", "#plano"],
-  ["Preguntas", "#preguntas"],
-] as const;
-
-export function MobileNavigation() {
-  const [open, setOpen] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
-  return (
-    <div
-      className="mobile-navigation"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          setOpen(false);
-          trigger.current?.focus();
-        }
-      }}
-    >
-      <button
-        ref={trigger}
-        className="menu-toggle"
-        aria-expanded={open}
-        aria-controls="mobile-links"
-        onClick={() => setOpen(!open)}
-      >
-        {open ? "Cerrar" : "Menú"}{" "}
-        <span aria-hidden="true">{open ? "×" : "+"}</span>
-      </button>
-      {open && (
-        <nav id="mobile-links" aria-label="Navegación móvil">
-          {navigation.map(([label, href]) => (
-            <a href={href} key={href} onClick={() => setOpen(false)}>
-              {label}
-              <span aria-hidden="true">↗</span>
-            </a>
-          ))}
-        </nav>
-      )}
-    </div>
-  );
-}
-
 export function PhotoGallery() {
   const dialog = useRef<HTMLDialogElement>(null);
   const [index, setIndex] = useState(0);

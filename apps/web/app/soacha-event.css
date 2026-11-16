@@ -1,0 +1,213 @@
+.landing .hero-event-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  margin-top: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.landing .soacha-event {
+  background: var(--forest);
+  color: white;
+}
+.landing .event-invitation {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 48px 80px;
+  padding-block: 64px 32px;
+}
+.landing .event-copy .eyebrow {
+  color: var(--launch-lime);
+  font-size: 12px;
+  margin-bottom: 24px;
+}
+.landing .event-copy h2 {
+  font-size: clamp(48px, 5.5vw, 80px);
+  line-height: 1.05;
+}
+.landing .event-copy h2 span {
+  color: var(--launch-lime);
+}
+.landing .event-main-venue {
+  max-width: 600px;
+  margin-top: 24px;
+  font-size: clamp(24px, 2.5vw, 36px);
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+}
+.landing .event-description {
+  max-width: 600px;
+  color: #e4eadf;
+  margin-block: 24px 32px;
+}
+.landing .event-detail-note {
+  max-width: 440px;
+  margin-top: 16px;
+  font-size: 14px;
+  color: #d9e1d5;
+}
+.landing .event-date-card {
+  padding: 32px;
+  background: var(--launch-lime);
+  color: var(--forest);
+  border-radius: 16px;
+  text-align: center;
+  transform: rotate(2deg);
+}
+.landing .event-date-label {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  font-weight: 800;
+}
+.landing .event-date-card time {
+  display: grid;
+  gap: 8px;
+  margin-block: 24px;
+}
+.landing .event-weekday,
+.landing .event-month {
+  font-size: 18px;
+  font-weight: 700;
+}
+.landing .event-date-card strong {
+  font-size: 128px;
+  line-height: 1;
+  letter-spacing: -0.06em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.landing .event-venue {
+  font-size: clamp(24px, 2.5vw, 36px);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+}
+.landing .event-place-note {
+  margin-top: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.landing .event-topics {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+.landing .event-topics p {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 14px;
+}
+.landing .event-topics span {
+  color: var(--launch-lime);
+  font-size: 12px;
+  font-weight: 800;
+}
+.landing .soacha-event :focus-visible,
+.landing .event-secondary-action:focus-visible {
+  outline-color: white;
+}
+.landing .event-buyer-reminder {
+  display: grid;
+  place-items: center;
+  padding-block: 64px;
+  background: #eef3e8;
+  scroll-margin-top: 0;
+}
+.landing .event-buyer-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  text-align: center;
+}
+.landing .event-buyer-reminder .eyebrow {
+  font-size: 14px;
+  color: var(--leaf);
+}
+.landing .event-buyer-reminder h2 {
+  max-width: 1000px;
+  font-size: clamp(36px, 5vw, 72px);
+  line-height: 1.08;
+  letter-spacing: -0.055em;
+}
+.landing .event-buyer-details {
+  max-width: 780px;
+  font-size: clamp(18px, 2vw, 24px);
+  line-height: 1.65;
+  color: var(--muted);
+}
+.landing .event-buyer-details time,
+.landing .event-buyer-details strong {
+  color: var(--forest);
+  font-weight: 800;
+}
+.landing .event-buyer-reminder .button {
+  margin-top: 8px;
+  min-height: 64px;
+  max-width: 100%;
+  padding: 16px 32px;
+  font-size: 16px;
+  white-space: normal;
+}
+@media (min-width: 1024px) {
+  .landing .event-buyer-reminder {
+    min-height: 100svh;
+    padding-block: 96px;
+  }
+}
+.landing .event-contact-reminder {
+  margin: 32px auto 0;
+  max-width: 600px;
+}
+.landing .event-contact-reminder p {
+  margin-bottom: 24px;
+  color: #e4eadf;
+}
+.landing .event-contact-reminder strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--launch-lime);
+  font-size: 20px;
+}
+.landing .event-secondary-action {
+  color: white;
+  border-color: #d9e1d5;
+  background: transparent;
+}
+.landing .event-secondary-action:hover {
+  color: var(--forest);
+  background: white;
+}
+@media (max-width: 900px) {
+  .landing .event-invitation {
+    gap: 32px;
+  }
+  .landing .event-date-card {
+    padding: 24px;
+    transform: none;
+  }
+  .landing .event-topics {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+@media (max-width: 639px) {
+  .landing .event-invitation {
+    grid-template-columns: 1fr;
+    padding-block: 48px 32px;
+  }
+  .landing .event-copy .button,
+  .landing .event-buyer-reminder .button,
+  .landing .event-contact-reminder .button {
+    width: 100%;
+    white-space: normal;
+    text-align: center;
+    gap: 12px;
+  }
+}

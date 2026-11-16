@@ -7,13 +7,16 @@ import {
   publicMetadata,
   serializeGraph,
 } from "../lib/public-seo";
-import {
-  MobileNavigation,
-  PhotoGallery,
-} from "../components/landing-interactions";
+import { PhotoGallery } from "../components/landing-interactions";
 import { LandingMotion, LaunchBanner } from "../components/landing-experience";
 import { HeroExperience } from "../components/hero-experience";
 import { MasterplanExplorer } from "../components/masterplan-explorer";
+import {
+  EventContactLink,
+  SoachaEvent,
+  SoachaEventQuestions,
+  soachaEvent,
+} from "../components/soacha-event";
 import {
   LeadCaptureButton,
   LeadCaptureProvider,
@@ -26,6 +29,7 @@ import {
 } from "../lib/project";
 import "./landing.css";
 import "./buyer-guide.css";
+import "./soacha-event.css";
 
 export const metadata = publicMetadata(homeTitle, homeDescription, "/");
 
@@ -69,28 +73,24 @@ export default function Home() {
           Saltar al contenido
         </a>
         <LaunchBanner />
-        <header className="site-header">
+        <header className="site-header landing-brand-header">
           <div className="container header-inner">
             <a
               href="#inicio"
-              className="wordmark"
+              className="brand-lockup"
               aria-label="Jardines del Encanto, inicio"
             >
-              <span>Jardines</span>
-              <span>
-                del Encanto<span className="wordmark-period">.</span>
-              </span>
+              <img
+                className="brand-logo"
+                src="/brand/jardines-del-encanto-refinado.svg"
+                width={980}
+                height={1160}
+                alt="Jardines del Encanto"
+              />
             </a>
-            <nav className="desktop-nav" aria-label="Navegación principal">
-              <a href="#proyecto">El proyecto</a>
-              <a href="#espacios">Espacios</a>
-              <a href="#plano">Plano</a>
-              <a href="#preguntas">Preguntas</a>
-            </nav>
             <ContactLink className="button button-primary header-contact">
               Agendar visita
             </ContactLink>
-            <MobileNavigation />
           </div>
         </header>
         <main id="contenido">
@@ -131,8 +131,13 @@ export default function Home() {
               <p className="hero-contact-note">
                 Habla con un asesor. Sin pagos ni reservas automáticas.
               </p>
+              <a className="hero-event-link" href="#encuentro-soacha">
+                Bogotá y Soacha: la cita es el domingo 22{" "}
+                <span aria-hidden="true">↗</span>
+              </a>
             </div>
           </section>
+          <SoachaEvent />
           <section
             className="facts-section"
             aria-label="Información principal de los lotes"
@@ -312,6 +317,26 @@ export default function Home() {
             </div>
           </section>
           <section
+            id="invitacion-bogota-soacha"
+            className="event-buyer-reminder"
+            aria-labelledby="event-buyer-title"
+          >
+            <div className="container event-buyer-inner">
+              <p className="eyebrow">UNA INVITACIÓN PARA BOGOTÁ Y SOACHA</p>
+              <h2 id="event-buyer-title">
+                Bogotá y Soacha, nos vemos este domingo.
+              </h2>
+              <p className="event-buyer-details">
+                <time dateTime={soachaEvent.date}>{soachaEvent.dateLabel}.</time>
+                {" "}Nos vemos en la <strong>{soachaEvent.venue}</strong> para
+                conversar sobre el proyecto en Acacías y resolver tus dudas.
+              </p>
+              <EventContactLink className="button button-primary">
+                Consultar el evento por WhatsApp
+              </EventContactLink>
+            </div>
+          </section>
+          <section
             id="preguntas"
             className="section container faq-section"
             aria-labelledby="faq-title"
@@ -332,6 +357,7 @@ export default function Home() {
               </ContactLink>
             </div>
             <div className="faq-list">
+              <SoachaEventQuestions />
               {questions.map((item) => (
                 <details key={item.question}>
                   <summary>
@@ -360,7 +386,14 @@ export default function Home() {
                 Hablemos de tu lote, la financiación y tu próxima visita a
                 Jardines del Encanto.
               </p>
-              <LeadCaptureButton className="button button-lime contact-main-action" />
+              <div className="event-contact-reminder">
+                <p>
+                  <strong>Bogotá y Soacha: están invitados.</strong>
+                  {soachaEvent.dateLabel} · {soachaEvent.venue}
+                </p>
+                <EventContactLink />
+              </div>
+              <LeadCaptureButton className="button button-outline contact-main-action event-secondary-action" />
               <a className="contact-phone" href={`tel:+${project.whatsapp}`}>
                 {project.phone}
               </a>
@@ -374,8 +407,15 @@ export default function Home() {
         <footer className="site-footer">
           <div className="container">
             <div className="footer-top">
-              <a href="#inicio" className="footer-brand">
-                Jardines del Encanto
+              <a href="#inicio" className="footer-brand brand-lockup">
+                <img
+                  className="brand-logo"
+                  src="/brand/jardines-del-encanto-refinado.svg"
+                  width={980}
+                  height={1160}
+                  alt="Jardines del Encanto"
+                  loading="lazy"
+                />
               </a>
               <p>
                 Un espacio para lo que viene.
