@@ -23,8 +23,9 @@ The shared API and execution authority contract is in `WORKFLOWS.md`.
   stop policy. These settings remain part of the draft until saved.
 - **Clientes e historial**: select at most 50 existing workspace contacts; no new
   customer fields or sample customers are inserted. Social conversations are
-  explicit run metadata, never inferred from a phone. One binding per recipient
-  requires all social-message nodes in that run to use the same account/platform.
+  explicit run metadata, never inferred from a phone. Each recipient's conversation
+  is selected separately for each sender account. A single run can contain Facebook,
+  Instagram and WhatsApp nodes without sharing their recipient identities.
   Preparation is additionally limited to 10 external actions: audience size times
   the number of WhatsApp/social-message/call nodes. This is separate from daily limits.
 
@@ -93,3 +94,27 @@ rejects every attempted write. Stop it with SIGINT/SIGTERM to remove its tempora
 bundle. It is a manual browser fixture, not a production route or an automated E2E
 test. Unit tests additionally exercise anchored zoom, negative-position framing,
 bounded movement, pointer panning/dragging and progressive panel visibility.
+
+## Reviewed multichannel replies
+
+Facebook and Instagram steps require an unchecked-by-default ownership consent.
+Changing their sender account or platform clears it. Preparation repeats the vendor's
+automatic ownership recovery/resend consequence alongside the exact message and
+recipient. This permits replies in a verified 24-hour inbound window, not cold DMs.
+WhatsApp free text still requires that window; initiating outreach requires a supported
+approved Meta template, not an unapproved local campaign draft.
+
+`Clientes e historial` offers a separate selector and options refresh per sender
+account. Only selected contacts and accounts used by the current document enter
+`channel_bindings`; legacy preparation clients remain supported.
+
+Retell remains an actual call step, but the integration still has no verified +57
+route. Its inspector and review preflight say so and block a mixed run containing
+a +57 recipient and call step. Remove the call to review messages alone, or separately
+provision and verify a supported telephony route. No local test proves live carrier
+coverage or authorizes paid calls.
+
+For an isolated multichannel UI preview, run
+`MULTICHANNEL=1 PORT=4341 node tests/fixtures/workflow-preview.mjs`. It uses one
+synthetic contact and three fake channels. Only its fixed options POST is read-only;
+all save/prepare/activate writes remain rejected. No provider is contacted.

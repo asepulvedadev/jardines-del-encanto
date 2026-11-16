@@ -14,6 +14,7 @@ import {
 } from "./types";
 import {
   canActivate,
+  channelBindingKey,
   connectionOptions,
   dayLabels,
   graphIssues,
@@ -21,7 +22,7 @@ import {
   insertNode,
   layoutDocument,
   nodeLabels,
-  prepareArguments,
+  multichannelPrepareArguments,
   removeNode,
   runLabels,
   workflowError,
@@ -120,6 +121,9 @@ export function WorkflowPanel({
     ZernioOptions["accounts"]
   >([]);
   const [zernioAccountId, setZernioAccountId] = useState("");
+  const [channelConversations, setChannelConversations] = useState<
+    Record<string, ZernioOptions["conversations"]>
+  >({});
   const [retell, setRetell] = useState<RetellOptions>(emptyRetell);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -159,14 +163,19 @@ export function WorkflowPanel({
       .toLocaleLowerCase("es")
       .includes(contactQuery.toLocaleLowerCase("es")),
   );
+  const socialAccountIds = [
+    ...new Set(
+      socialNodes.map((node) => String(node.settings.account_id ?? "")),
+    ),
+  ];
   const missingBinding =
     socialNodes.length > 0 &&
-    audience.some(
-      (id) =>
-        !bindings[id]?.conversation_id ||
-        !socialNodes.every(
-          (node) => node.settings.account_id === bindings[id]?.account_id,
-        ),
+    audience.some((id) =>
+      socialAccountIds.some(
+        (accountId) =>
+          !accountId ||
+          !bindings[channelBindingKey(id, accountId)]?.conversation_id,
+      ),
     );
   const externalActions =
     document.nodes.filter((node) =>
@@ -175,16 +184,22 @@ export function WorkflowPanel({
       ),
     ).length * audience.length;
   const reviewBudgetExceeded = externalActions > 10;
+  const callRouteBlocked =
+    document.nodes.some((node) => node.kind === "retell_call") &&
+    audience.some((id) =>
+      contacts.find((person) => person.id === id)?.phone.startsWith("+57"),
+    );
   const canPrepare = Boolean(
     workflowId &&
-      !dirty &&
-      !conflict &&
-      audience.length &&
-      audienceConsent &&
-      !missingBinding &&
-      !reviewBudgetExceeded &&
-      !issues.length &&
-      !pending,
+    !dirty &&
+    !conflict &&
+    audience.length &&
+    audienceConsent &&
+    !missingBinding &&
+    !reviewBudgetExceeded &&
+    !callRouteBlocked &&
+    !issues.length &&
+    !pending,
   );
   const workerReady = Boolean(
     catalog?.worker.enabled && catalog.worker.available,
@@ -287,7 +302,10 @@ export function WorkflowPanel({
     invalidateReview();
     setNotice("");
   }
-  function updateSetting(key: string, value: string | number | string[]) {
+  function updateSetting(
+    key: string,
+    value: string | number | boolean | string[],
+  ) {
     setDocument((previous) => ({
       ...previous,
       nodes: previous.nodes.map((node) =>
@@ -416,7 +434,13 @@ export function WorkflowPanel({
       const result = await request<RunReview>(
         `definitions/${encodeURIComponent(workflowId)}/prepare`,
         "POST",
-        prepareArguments(version, audience, bindings, audienceConsent),
+        multichannelPrepareArguments(
+          version,
+          audience,
+          bindings,
+          audienceConsent,
+          socialAccountIds,
+        ),
       );
       setReview(result);
       setApprovalConsent(false);
@@ -521,6 +545,11 @@ export function WorkflowPanel({
         setZernio(result);
         setZernioAccountId(accountId);
         setZernioAccounts(result.accounts);
+        if (accountId)
+          setChannelConversations((previous) => ({
+            ...previous,
+            [accountId]: result.available ? result.conversations : [],
+          }));
       } else
         setRetell(
           await request<RetellOptions>("options", "POST", { provider }),
@@ -1301,73 +1330,117 @@ export function WorkflowPanel({
                                 </span>
                               </span>
                             </label>
-                            {audience.includes(contact.id) &&
-                            socialNodes.length > 0 ? (
-                              <label className="workflow-binding">
-                                Conversación social de este cliente
-                                <select
-                                  value={
-                                    bindings[contact.id]
-                                      ? `${bindings[contact.id].account_id}|${bindings[contact.id].conversation_id}`
-                                      : ""
-                                  }
-                                  disabled={pending}
-                                  onChange={(event) => {
-                                    const conversation =
-                                      zernio.conversations.find(
-                                        (item) =>
-                                          `${item.account_id}|${item.id}` ===
-                                          event.target.value,
-                                      );
-                                    setBindings((previous) => ({
-                                      ...previous,
-                                      [contact.id]: conversation
-                                        ? {
-                                            account_id: conversation.account_id,
-                                            conversation_id: conversation.id,
-                                          }
-                                        : {
-                                            account_id: "",
-                                            conversation_id: "",
-                                          },
-                                    }));
-                                    invalidateReview();
-                                  }}
-                                >
-                                  <option value="">
-                                    Sin vincular · no se inferirá del celular
-                                  </option>
-                                  {zernio.conversations.map((item) => (
-                                    <option
-                                      key={`${item.account_id}|${item.id}`}
-                                      value={`${item.account_id}|${item.id}`}
-                                      disabled={
-                                        (!item.can_reply &&
-                                          item.reason !==
-                                            "zernio_window_verification_required") ||
-                                        !socialNodes.every(
-                                          (node) =>
-                                            String(node.settings.account_id) ===
-                                              item.account_id &&
-                                            String(node.settings.platform) ===
-                                              item.platform,
-                                        )
+                            {audience.includes(contact.id)
+                              ? socialAccountIds.map((accountId) => (
+                                  <label
+                                    className="workflow-binding"
+                                    key={accountId}
+                                  >
+                                    Conversación ·{" "}
+                                    {zernioAccounts.find(
+                                      (item) => item.id === accountId,
+                                    )?.name ??
+                                      (accountId ||
+                                        "Selecciona una cuenta en el paso")}
+                                    <select
+                                      aria-label={`Conversación de ${contact.name} en ${accountId}`}
+                                      value={
+                                        bindings[
+                                          channelBindingKey(
+                                            contact.id,
+                                            accountId,
+                                          )
+                                        ]?.conversation_id ?? ""
                                       }
+                                      disabled={pending || !accountId}
+                                      onChange={(event) => {
+                                        const conversation =
+                                          channelConversations[accountId]?.find(
+                                            (item) =>
+                                              item.id === event.target.value &&
+                                              item.account_id === accountId,
+                                          );
+                                        setBindings((previous) => ({
+                                          ...previous,
+                                          [channelBindingKey(
+                                            contact.id,
+                                            accountId,
+                                          )]: {
+                                            account_id: accountId,
+                                            conversation_id:
+                                              conversation?.id ?? "",
+                                          },
+                                        }));
+                                        invalidateReview();
+                                      }}
                                     >
-                                      {item.label} ·{" "}
-                                      {item.participant_name ??
-                                        item.participant_id}
-                                      {!item.can_reply
-                                        ? item.reason ===
-                                          "zernio_window_verification_required"
-                                          ? " · Ventana pendiente de verificar"
-                                          : " · No disponible"
-                                        : ""}
-                                    </option>
-                                  ))}
-                                </select>
-                              </label>
-                            ) : null}
+                                      <option value="">
+                                        Sin vincular · no se inferirá del
+                                        celular
+                                      </option>
+                                      {bindings[
+                                        channelBindingKey(contact.id, accountId)
+                                      ]?.conversation_id &&
+                                      !channelConversations[accountId]?.some(
+                                        (item) =>
+                                          item.id ===
+                                          bindings[
+                                            channelBindingKey(
+                                              contact.id,
+                                              accountId,
+                                            )
+                                          ].conversation_id,
+                                      ) ? (
+                                        <option
+                                          value={
+                                            bindings[
+                                              channelBindingKey(
+                                                contact.id,
+                                                accountId,
+                                              )
+                                            ].conversation_id
+                                          }
+                                          disabled
+                                        >
+                                          Vinculación pendiente de verificar
+                                        </option>
+                                      ) : null}
+                                      {(
+                                        channelConversations[accountId] ?? []
+                                      ).map((item) => (
+                                        <option
+                                          key={item.id}
+                                          value={item.id}
+                                          disabled={
+                                            (!item.can_reply &&
+                                              item.reason !==
+                                                "zernio_window_verification_required") ||
+                                            !socialNodes
+                                              .filter(
+                                                (node) =>
+                                                  node.settings.account_id ===
+                                                  accountId,
+                                              )
+                                              .every(
+                                                (node) =>
+                                                  node.settings.platform ===
+                                                  item.platform,
+                                              )
+                                          }
+                                        >
+                                          {item.label} · {item.platform}
+                                          {!item.can_reply
+                                            ? item.reason ===
+                                              "zernio_window_verification_required"
+                                              ? " · Ventana pendiente de verificar"
+                                              : " · No disponible"
+                                            : ""}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                ))
+                              : null}
                           </div>
                         ))
                       ) : (
@@ -1383,25 +1456,25 @@ export function WorkflowPanel({
                         <p>
                           Cada destinatario necesita una conversación real de la
                           cuenta elegida. El teléfono no es una identidad
-                          social. Una vinculación por cliente solo puede cubrir
-                          pasos de la misma cuenta y canal.
+                          social. Vincula una conversación por cliente y cuenta;
+                          puedes combinar Facebook, Instagram y WhatsApp en el
+                          mismo recorrido.
                         </p>
-                        <button
-                          className="crm-button crm-secondary"
-                          disabled={
-                            optionsLoading ||
-                            pending ||
-                            !socialNodes[0]?.settings.account_id
-                          }
-                          onClick={() =>
-                            void loadOptions(
-                              "zernio",
-                              String(socialNodes[0].settings.account_id),
-                            )
-                          }
-                        >
-                          Consultar conversaciones
-                        </button>
+                        {socialAccountIds.map((accountId) => (
+                          <button
+                            key={accountId}
+                            className="crm-button crm-secondary"
+                            disabled={optionsLoading || pending || !accountId}
+                            onClick={() =>
+                              void loadOptions("zernio", accountId)
+                            }
+                          >
+                            Consultar conversaciones ·{" "}
+                            {zernioAccounts.find(
+                              (item) => item.id === accountId,
+                            )?.name ?? accountId}
+                          </button>
+                        ))}
                         {missingBinding ? (
                           <p>
                             Faltan conversaciones vinculadas para la audiencia
@@ -1449,6 +1522,14 @@ export function WorkflowPanel({
                         <dd>{externalActions} / 10</dd>
                       </div>
                     </dl>
+                    {callRouteBlocked ? (
+                      <p className="workflow-warning-text">
+                        Hay destinatarios +57 y un paso de llamada. Falta
+                        verificar la ruta telefónica de Colombia; elimina ese
+                        paso para revisar solo mensajes o configura primero la
+                        telefonía.
+                      </p>
+                    ) : null}
                     {reviewBudgetExceeded ? (
                       <p className="workflow-warning-text">
                         Esta revisión supera el límite de 10 acciones externas
@@ -1785,7 +1866,7 @@ function NodeSettings({
   loadOptions,
 }: {
   node: WorkflowNode;
-  onChange: (key: string, value: string | number | string[]) => void;
+  onChange: (key: string, value: string | number | boolean | string[]) => void;
   zernio: ZernioOptions;
   accounts: ZernioOptions["accounts"];
   zernioAccountId: string;
@@ -1893,6 +1974,11 @@ function NodeSettings({
       ) : null}
       {node.kind === "retell_call" ? (
         <>
+          <p className="workflow-warning-text">
+            Llamadas a Colombia (+57): requieren una ruta telefónica verificada;
+            siguen bloqueadas mientras no esté configurada. Tener la API de
+            Retell conectada no confirma cobertura ni autoriza llamadas.
+          </p>
           <button
             className="crm-button crm-secondary"
             disabled={optionsLoading}
@@ -1979,6 +2065,7 @@ function NodeSettings({
                   onChange("language", "");
                   onChange("parameters", []);
                 } else {
+                  onChange("allow_provider_takeover", false);
                   onChange(
                     "platform",
                     accounts.find((item) => item.id === event.target.value)
@@ -2123,7 +2210,10 @@ function NodeSettings({
             Canal de esta cuenta
             <select
               value={value("platform")}
-              onChange={(event) => onChange("platform", event.target.value)}
+              onChange={(event) => {
+                onChange("platform", event.target.value);
+                onChange("allow_provider_takeover", false);
+              }}
             >
               <option value="">Seleccionar canal verificado</option>
               {account &&
@@ -2143,6 +2233,22 @@ function NodeSettings({
               ) : null}
             </select>
           </label>
+          {["facebook", "instagram"].includes(value("platform")) ? (
+            <label className="workflow-check">
+              <input
+                type="checkbox"
+                checked={s.allow_provider_takeover === true}
+                onChange={(event) =>
+                  onChange("allow_provider_takeover", event.target.checked)
+                }
+              />
+              <span>
+                Autorizo que Zernio recupere el control de esta conversación y
+                reenvíe una vez si Meta cambia su propietario. Solo respuestas
+                dentro de 24 horas; no mensajes fríos ni HUMAN_AGENT automático.
+              </span>
+            </label>
+          ) : null}
           <label>
             Mensaje exacto
             <textarea

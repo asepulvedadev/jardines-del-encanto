@@ -24,7 +24,43 @@ const {
   prepareArguments,
   canActivate,
   workflowError,
+  channelBindingKey,
+  multichannelPrepareArguments,
 } = model.exports;
+test("multichannel review binds each selected client to each explicit sender account", () => {
+  const bindings = {
+    [channelBindingKey("one", "fb")]: {
+      account_id: "fb",
+      conversation_id: "fb-thread",
+    },
+    [channelBindingKey("one", "ig")]: {
+      account_id: "ig",
+      conversation_id: "ig-thread",
+    },
+    [channelBindingKey("other", "fb")]: {
+      account_id: "fb",
+      conversation_id: "private-other",
+    },
+    [channelBindingKey("one", "unused")]: {
+      account_id: "unused",
+      conversation_id: "old-thread",
+    },
+  };
+  const result = multichannelPrepareArguments(3, ["one"], bindings, true, [
+    "fb",
+    "ig",
+    "fb",
+  ]);
+  assert.deepEqual(result.channel_bindings, [
+    { contact_id: "one", account_id: "fb", conversation_id: "fb-thread" },
+    { contact_id: "one", account_id: "ig", conversation_id: "ig-thread" },
+  ]);
+  assert.deepEqual(result.bindings, []);
+  assert.throws(() =>
+    multichannelPrepareArguments(3, ["one"], {}, true, ["fb"]),
+  );
+  assert.notEqual(channelBindingKey("a|b", "c"), channelBindingKey("a", "b|c"));
+});
 test("editor inserts genuine linked steps before the end without mutating the draft", () => {
   const original = initialDocument();
   const next = insertNode(original, "wait", "wait-one");

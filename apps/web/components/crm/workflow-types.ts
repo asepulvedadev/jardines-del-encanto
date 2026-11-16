@@ -15,7 +15,7 @@ export type WorkflowNode = {
   next_id?: string | null;
   on_true?: string | null;
   on_false?: string | null;
-  settings: Record<string, string | number | string[]>;
+  settings: Record<string, string | number | boolean | string[]>;
 };
 export type WorkflowDocument = {
   entry_id: string;
@@ -155,6 +155,7 @@ export type RetellOptions = {
   reason?: string;
   agents: { id: string; name: string }[];
   numbers: { number: string; label: string }[];
+  destination_policy?: { colombia_available: boolean; reason: string };
 };
 export type ConversationBinding = {
   account_id: string;
@@ -384,6 +385,32 @@ export function prepareArguments(
     consent_confirmed: true,
   };
 }
+export function channelBindingKey(contactId: string, accountId: string) {
+  return JSON.stringify([contactId, accountId]);
+}
+export function multichannelPrepareArguments(
+  version: number,
+  ids: string[],
+  bindings: Record<string, ConversationBinding>,
+  consent: boolean,
+  accountIds: string[],
+) {
+  const base = prepareArguments(version, ids, {}, consent);
+  const accounts = [...new Set(accountIds)];
+  const channel_bindings = ids.flatMap((contact_id) =>
+    accounts.map((account_id) => {
+      const binding = bindings[channelBindingKey(contact_id, account_id)];
+      if (!binding?.conversation_id || binding.account_id !== account_id)
+        throw new Error("Vincula una conversación real por cliente y cuenta.");
+      return {
+        contact_id,
+        account_id,
+        conversation_id: binding.conversation_id,
+      };
+    }),
+  );
+  return channel_bindings.length ? { ...base, channel_bindings } : base;
+}
 export function canActivate(
   review: RunReview | null,
   worker: WorkflowCatalog["worker"] | undefined,
@@ -404,6 +431,14 @@ export function canActivate(
 export function workflowError(code: unknown): string {
   const key = typeof code === "string" ? code : "";
   const errors: Record<string, string> = {
+    zernio_provider_takeover_consent_required:
+      "Facebook e Instagram requieren autorizar explícitamente el control de la conversación en el paso. No se ha enviado nada.",
+    zernio_window_unconfirmed:
+      "No se pudo verificar un mensaje entrante del destinatario en las últimas 24 horas. No se envió el mensaje; en WhatsApp puedes usar una plantilla aprobada.",
+    zernio_thread_control_unconfirmed:
+      "La conversación pertenece a otra aplicación o está en espera. Revisa el control en Inbox antes de preparar la secuencia.",
+    retell_route_confirmation_required:
+      "Las llamadas a Colombia (+57) requieren una ruta telefónica verificada. La secuencia no hará esa llamada hasta configurarla.",
     record_changed:
       "La versión cambió en otra sesión. Tu borrador se conserva; recarga la versión guardada antes de volver a editar.",
     workflow_version_conflict:

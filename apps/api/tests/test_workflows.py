@@ -482,3 +482,81 @@ def test_predispatch_crossing_schedule_is_held_without_replay(fake_social, monke
     assert client.get(f"/crm/workflows/runs/{run['id']}").json()["run"]["status"] == "blocked"
     worker.tick()
     assert calls == []
+
+
+def test_multichannel_review_freezes_each_explicit_account_binding(fake_social, monkeypatch):
+    from app.social import workflow
+
+    client, owner, calls, _ = fake_social
+    with psycopg.connect(owner) as db:
+        db.execute(
+            "UPDATE crm.control_connections SET enabled=true WHERE key IN ('facebook','instagram')"
+        )
+    received = []
+
+    def prepare_channel(db, n, c, binding=None, cache=None):
+        assert binding is not None
+        assert binding["account_id"] == n["settings"]["account_id"]
+        received.append((n["id"], binding["conversation_id"]))
+        return {"summary": {"description": binding["conversation_id"]}}
+
+    monkeypatch.setattr(workflow, "prepare", prepare_channel)
+    person = customer(client, "3001234567")
+    doc = document(
+        [
+            node(
+                "one",
+                "social_message",
+                {
+                    "account_id": "fb",
+                    "platform": "facebook",
+                    "text": "Hola",
+                    "allow_provider_takeover": True,
+                },
+                "ig",
+            ),
+            node(
+                "ig",
+                "social_message",
+                {
+                    "account_id": "ig",
+                    "platform": "instagram",
+                    "text": "Hola",
+                    "allow_provider_takeover": True,
+                },
+                "end",
+            ),
+            node("end", "end"),
+        ]
+    )
+    saved = client.post("/crm/workflows/definitions", json={"name": "Multicanal", "document": doc})
+    assert saved.status_code == 201
+    payload = {
+        "version": 1,
+        "contact_ids": [person["id"]],
+        "consent_confirmed": True,
+        "channel_bindings": [
+            {"contact_id": person["id"], "account_id": "fb", "conversation_id": "thread-fb"},
+            {"contact_id": person["id"], "account_id": "ig", "conversation_id": "thread-ig"},
+        ],
+    }
+    review = client.post(f"/crm/workflows/definitions/{saved.json()['id']}/prepare", json=payload)
+    assert review.status_code == 200, review.text
+    assert received == [("one", "thread-fb"), ("ig", "thread-ig")]
+    assert "thread-fb" in review.json()["steps"][0]["description"]
+    assert "thread-ig" in review.json()["steps"][1]["description"]
+    assert calls == []
+    with psycopg.connect(owner) as db:
+        frozen = db.execute(
+            "SELECT snapshot,status FROM crm.workflow_runs WHERE id=%s",
+            (review.json()["run"]["id"],),
+        ).fetchone()
+    assert frozen[1] == "prepared"
+    assert frozen[0]["channel_bindings"][person["id"]]["ig"]["conversation_id"] == "thread-ig"
+    payload["channel_bindings"].append(payload["channel_bindings"][0])
+    assert (
+        client.post(
+            f"/crm/workflows/definitions/{saved.json()['id']}/prepare", json=payload
+        ).status_code
+        == 422
+    )

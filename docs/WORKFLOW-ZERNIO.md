@@ -16,10 +16,14 @@ was checked against official Zernio documentation on 2026-11-14.
   provider participant must equal the selected contact phone. A recent incoming
   message must prove the current 24-hour service window. Outgoing messages, activity
   timestamps, another sender, future timestamps and standby messages are not proof.
-- **Facebook/Instagram:** blocked as `provider_control_policy_unreviewed`. Official
-  documentation states that Zernio may take thread control and resend after a
-  `not_thread_owner` failure. Reading `threadControl=app` cannot rule out a later
-  ownership race, so workflow approval does not silently authorize this behavior.
+- **Facebook/Instagram:** existing conversations can be explicitly bound to each
+  selected CRM contact and account. `social_message.settings.allow_provider_takeover`
+  defaults to `false` and must be the strict Boolean `true` before preparation.
+  The inspector discloses Zernio's automatic take-and-resend behavior after an ownership
+  race; the frozen review repeats that consequence. A current `threadControl=app`
+  and a verified incoming message within 24 hours remain required before preparation
+  and dispatch. No workflow sends a `HUMAN_AGENT` tag, accepts a message request, or
+  directly changes thread control. A changed owner/window holds the step.
 - **TikTok:** blocked as `zernio_tiktok_eligibility_unverified`, not described as
   categorically unsupported. The platform-specific documentation supports eligible
   Business app replies (10 messages in 48 hours), but the aggregate list reference
@@ -133,3 +137,28 @@ Tests replace configuration, connection preferences and TLS connections with
 synthetic fixtures. They do not need a database, real credentials, OAuth sessions,
 provider requests or paid effects. Engine reservation, approval, scheduling and
 authenticated webhook integration require the separate workflow engine checks.
+
+## Multichannel extension (local verification, 2026-11-15)
+
+`Prepare.channel_bindings` adds explicit contact/account/conversation records. The
+legacy `bindings` list remains supported. Duplicate contact/account entries, overlap
+with legacy entries, and unselected contacts are rejected. Each node uses its account's
+binding; frozen per-step summaries expose the actual participant. No Facebook or
+Instagram identity is inferred from the CRM phone. Stop-on-reply continues to compare
+the frozen profile, account, platform, participant and conversation in each plan.
+
+The UI caches options only in component memory per account. A failed options refresh
+cannot authorize anything; preparation and predispatch always validate live identities.
+This extension changes no production configuration, webhook subscription or campaign
+status. The production executor was observed disabled on 2026-11-15. Deployment and
+worker enablement remain separate authorized operations; enabling a worker must not
+activate existing drafts or runs without their original human grants.
+
+Verification for the local extension: 507 API tests passed against the guarded local
+PostgreSQL test database; 233 gateway/UI tests passed; focused workflow/model/worker
+checks passed (53). TypeScript, Ruff, production Next build, Prettier and diff checks
+passed. An independent read-only review found no change-caused blockers. The synthetic
+browser fixture verified three separate account bindings, consent reset on sender
+change and no document overflow at 320px. No real outbound message, read receipt,
+call, campaign activation, worker enablement or deployment was performed for this
+extension. Live production UI reported its automatic executor disabled.

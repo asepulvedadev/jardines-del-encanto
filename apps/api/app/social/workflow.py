@@ -210,10 +210,6 @@ def _account(credentials, account_id, cache=None):
     account = rows[0]
     if account.get("isActive") is not True or account.get("needsReconnection") is True:
         _fail("zernio_account_unavailable")
-    if account.get("platform") in {"facebook", "instagram"}:
-        # Vendor documents automatic take+resend on not_thread_owner. A fresh
-        # read cannot exclude a later handover race; workflow consent grants no takeover.
-        _fail("provider_control_policy_unreviewed")
     if account.get("platform") not in PLATFORMS:
         _fail(
             "zernio_tiktok_eligibility_unverified"
@@ -221,6 +217,16 @@ def _account(credentials, account_id, cache=None):
             else "zernio_personal_channel_unsupported"
         )
     return account
+
+
+def _takeover_consent(platform, settings):
+    # A fresh ownership read cannot exclude a race. Meta automation must explicitly
+    # disclose Zernio's documented automatic take+resend, never use HUMAN_AGENT.
+    if (
+        platform in {"facebook", "instagram"}
+        and settings.get("allow_provider_takeover") is not True
+    ):
+        _fail("zernio_provider_takeover_consent_required")
 
 
 def _conversations(credentials, account_id, complete=False, cache=None):
@@ -399,6 +405,7 @@ def prepare(db, node, contact, binding=None, cache=None):
     account_id = _identifier(settings.get("account_id"), 160)
     account = _account(credentials, account_id, cache)
     platform, kind = account["platform"], node.get("kind")
+    _takeover_consent(platform, settings)
     require_connections(db, "zernio", platform)
     plan = {
         "kind": kind,
@@ -413,6 +420,8 @@ def prepare(db, node, contact, binding=None, cache=None):
         "template_revision": None,
     }
     summary = {"account_id": account_id, "platform": platform}
+    if platform in {"facebook", "instagram"}:
+        plan["allow_provider_takeover"] = True
     if kind == "whatsapp_template":
         if platform != "whatsapp":
             _fail("zernio_template_account_mismatch")
@@ -492,6 +501,12 @@ def prepare(db, node, contact, binding=None, cache=None):
             conversation_id=conversation_id,
             text=text,
         )
+        if platform in {"facebook", "instagram"}:
+            summary["description"] += (
+                " Autorización explícita: Zernio puede recuperar el control de esta"
+                " conversación y reenviar una vez si Meta cambia su propietario."
+                " Solo ventana de 24 horas; nunca HUMAN_AGENT automatizado."
+            )
     else:
         _fail("zernio_unsupported_workflow_action")
     plan["participant_id"] = participant
@@ -513,6 +528,7 @@ def _check(plan, credentials):
         _fail("zernio_plan_changed")
     if _digest(credentials) != plan["credential_revision"]:
         _fail("zernio_connection_changed")
+    _takeover_consent(plan["platform"], plan)
     account = _account(credentials, plan["account_id"])
     if _digest(account) != plan["account_revision"]:
         _fail("zernio_account_changed")
@@ -586,7 +602,7 @@ def options(db, account_id=None):
         for account in accounts:
             platform = account.get("platform")
             available = (
-                platform == "whatsapp"
+                platform in PLATFORMS
                 and account.get("isActive") is True
                 and account.get("needsReconnection") is not True
             )
@@ -598,8 +614,6 @@ def options(db, account_id=None):
                     if platform == "tiktok"
                     else "zernio_personal_channel_unsupported"
                     if platform == "telegram"
-                    else "provider_control_policy_unreviewed"
-                    if platform in {"facebook", "instagram"}
                     else "zernio_account_unavailable"
                 )
             )

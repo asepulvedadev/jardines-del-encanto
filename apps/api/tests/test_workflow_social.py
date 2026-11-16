@@ -213,12 +213,40 @@ def test_no_personal_recipient_inference_on_unsupported_channel(vendor, platform
 
 
 @pytest.mark.parametrize("platform", ["facebook", "instagram"])
-def test_provider_implicit_takeover_policy_cannot_be_authorized(vendor, platform):
+def test_meta_reply_requires_explicit_provider_takeover_consent(vendor, platform):
     node, binding = conversation(vendor, platform=platform)
     with pytest.raises(HTTPException) as exc:
         workflow.prepare(None, node, CONTACT, binding)
-    assert exc.value.detail == "provider_control_policy_unreviewed"
-    assert workflow.options(None)["accounts"][0]["available"] is False
+    assert exc.value.detail == "zernio_provider_takeover_consent_required"
+    assert workflow.options(None)["accounts"][0]["available"] is True
+
+
+@pytest.mark.parametrize("platform", ["facebook", "instagram"])
+def test_meta_reply_with_consent_freezes_exact_identity_and_one_dispatch(vendor, platform):
+    node, binding = conversation(vendor, platform=platform)
+    node["settings"]["allow_provider_takeover"] = True
+    plan = workflow.prepare(None, node, CONTACT, binding)
+    assert plan["allow_provider_takeover"] is True
+    assert "recuperar el control" in plan["summary"]["description"]
+    assert all(call[0] == "GET" for call in vendor["calls"])
+    assert "messageTag" not in plan["payload"]
+    assert workflow.dispatch(plan, "reserved-meta-1")["state"] == "completed"
+    assert len([call for call in vendor["calls"] if call[0] == "POST"]) == 1
+
+
+@pytest.mark.parametrize("platform", ["facebook", "instagram"])
+def test_meta_consent_never_bypasses_ownership_or_window(vendor, platform):
+    node, binding = conversation(vendor, platform=platform, age=25)
+    node["settings"]["allow_provider_takeover"] = True
+    with pytest.raises(HTTPException) as exc:
+        workflow.prepare(None, node, CONTACT, binding)
+    assert exc.value.detail == "zernio_window_unconfirmed"
+    node, binding = conversation(vendor, platform=platform, control="other")
+    node["settings"]["allow_provider_takeover"] = True
+    with pytest.raises(HTTPException) as exc:
+        workflow.prepare(None, node, CONTACT, binding)
+    assert exc.value.detail == "zernio_thread_control_unconfirmed"
+    assert not any(call[0] == "POST" for call in vendor["calls"])
 
 
 def test_prepare_cache_is_per_request_and_never_used_for_dispatch(vendor):

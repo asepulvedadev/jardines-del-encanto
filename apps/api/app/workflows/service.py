@@ -196,6 +196,14 @@ def prepare(db, record_id, data, admin):
         )
     )
     bindings = {str(b.contact_id): b.model_dump(mode="json") for b in data.bindings}
+    channel_bindings = {
+        str(b.contact_id): {
+            item.account_id: item.model_dump(mode="json")
+            for item in data.channel_bindings
+            if item.contact_id == b.contact_id
+        }
+        for b in data.channel_bindings
+    }
     audience, plans = [], {}
     for contact_id in data.contact_ids:
         recipient = contact(db, contact_id)
@@ -206,13 +214,21 @@ def prepare(db, record_id, data, admin):
             if monotonic() >= deadline:
                 raise HTTPException(503, "workflow_review_budget_exceeded")
             plans[str(contact_id)][node["id"]] = prepare_plan(
-                db, node, recipient, bindings.get(str(contact_id)), admin, cache
+                db,
+                node,
+                recipient,
+                channel_bindings.get(str(contact_id), {}).get(
+                    node["settings"].get("account_id"), bindings.get(str(contact_id))
+                ),
+                admin,
+                cache,
             )
     frozen = {
         "document": doc,
         "audience": audience,
         "plans": plans,
         "bindings": bindings,
+        "channel_bindings": channel_bindings,
         "revisions": revisions,
         "max_external_actions": len(audience) * sum(n["kind"] in EXTERNAL for n in doc["nodes"]),
     }
@@ -540,6 +556,10 @@ def options(db, data, admin):
         raise HTTPException(503, "retell_options_unavailable")
     return {
         "available": True,
+        "destination_policy": {
+            "colombia_available": False,
+            "reason": "retell_route_confirmation_required",
+        },
         "agents": [
             {"id": x["agent_id"], "name": x.get("agent_name", x["agent_id"])}
             for x in agents

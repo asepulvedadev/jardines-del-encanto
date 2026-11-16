@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL("../../", import.meta.url));
-export async function startWorkflowPreview(port = 0) {
+export async function startWorkflowPreview(port = 0, multichannel = false) {
   const scratch = await mkdtemp(join(tmpdir(), "jardines-workflow-"));
   const { webpack } = require("next/dist/compiled/webpack/webpack");
   const loader = join(scratch, "loader.cjs");
@@ -18,7 +18,7 @@ export async function startWorkflowPreview(port = 0) {
   await writeFile(join(scratch, "empty.cjs"), "module.exports = () => ''; ");
   await writeFile(
     join(scratch, "entry.tsx"),
-    `import React from 'react'; import { createRoot } from 'react-dom/client'; import { WorkflowPanel } from ${JSON.stringify(join(root, "apps/web/components/crm/workflow-panel"))}; createRoot(document.getElementById('app')!).render(<WorkflowPanel csrf="fixture-only" contacts={[]} onOpenConnections={() => {}} />);`,
+    `import React from 'react'; import { createRoot } from 'react-dom/client'; import { WorkflowPanel } from ${JSON.stringify(join(root, "apps/web/components/crm/workflow-panel"))}; createRoot(document.getElementById('app')!).render(<WorkflowPanel csrf="fixture-only" contacts={${JSON.stringify(multichannel ? [{ id: "00000000-0000-4000-8000-000000000001", name: "Cliente de prueba", phone: "+573000000000", source: "web" }] : [])}} onOpenConnections={() => {}} />);`,
   );
   try {
     await new Promise((done, reject) =>
@@ -93,6 +93,35 @@ export async function startWorkflowPreview(port = 0) {
       stop_on_reply: true,
     },
   };
+  const channels = ["facebook", "instagram", "whatsapp"];
+  const accounts = channels.map((platform) => ({
+    id: `fixture-${platform}`,
+    name: `Jardines · ${platform}`,
+    platform,
+    available: true,
+  }));
+  if (multichannel) {
+    fixture.name = "Seguimiento multicanal · prueba local";
+    fixture.document.entry_id = "facebook";
+    fixture.document.nodes = channels.map((platform, index) =>
+      node(
+        platform,
+        "social_message",
+        `Mensaje · ${platform}`,
+        90 + index * 150,
+        channels[index + 1] ?? "end",
+        {
+          account_id: `fixture-${platform}`,
+          platform,
+          text: "Hola {{nombre}}, ¿quieres conocer el proyecto?",
+          allow_provider_takeover: false,
+        },
+      ),
+    );
+    fixture.document.nodes.push(
+      node("end", "end", "Fin de la secuencia", 540, null),
+    );
+  }
   const writes = [];
   const server = createServer(async (req, res) => {
     try {
@@ -121,6 +150,49 @@ export async function startWorkflowPreview(port = 0) {
       }
       if (req.url.startsWith("/api/")) {
         res.setHeader("Content-Type", "application/json");
+        if (
+          multichannel &&
+          req.url.endsWith("/options") &&
+          req.method === "POST"
+        ) {
+          let body = "";
+          for await (const chunk of req) body += chunk;
+          const input = JSON.parse(body);
+          const account = accounts.find((item) => item.id === input.account_id);
+          res.end(
+            JSON.stringify(
+              input.provider === "retell"
+                ? {
+                    available: true,
+                    agents: [],
+                    numbers: [],
+                    destination_policy: {
+                      colombia_available: false,
+                      reason: "retell_route_confirmation_required",
+                    },
+                  }
+                : {
+                    available: true,
+                    accounts,
+                    templates: [],
+                    conversations: account
+                      ? [
+                          {
+                            id: `thread-${account.platform}`,
+                            account_id: account.id,
+                            platform: account.platform,
+                            participant_id: `person-${account.platform}`,
+                            label: "Cliente de prueba",
+                            can_reply: false,
+                            reason: "zernio_window_verification_required",
+                          },
+                        ]
+                      : [],
+                  },
+            ),
+          );
+          return;
+        }
         if (req.method !== "GET") {
           let body = "";
           for await (const chunk of req) body += chunk;
@@ -147,18 +219,22 @@ export async function startWorkflowPreview(port = 0) {
                     "end",
                   ].map((kind) => ({
                     kind,
-                    available: ![
-                      "whatsapp_template",
-                      "social_message",
-                      "retell_call",
-                    ].includes(kind),
-                    reason: [
-                      "whatsapp_template",
-                      "social_message",
-                      "retell_call",
-                    ].includes(kind)
-                      ? "Proveedor no conectado en esta prueba local."
-                      : undefined,
+                    available:
+                      multichannel ||
+                      ![
+                        "whatsapp_template",
+                        "social_message",
+                        "retell_call",
+                      ].includes(kind),
+                    reason:
+                      !multichannel &&
+                      [
+                        "whatsapp_template",
+                        "social_message",
+                        "retell_call",
+                      ].includes(kind)
+                        ? "Proveedor no conectado en esta prueba local."
+                        : undefined,
                   })),
                 }
               : kind === "definitions"
@@ -192,7 +268,10 @@ if (
   process.argv[1] &&
   resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  const fixture = await startWorkflowPreview(Number(process.env.PORT || 4336));
+  const fixture = await startWorkflowPreview(
+    Number(process.env.PORT || 4336),
+    process.env.MULTICHANNEL === "1",
+  );
   console.log(fixture.url);
   const close = async () => {
     await fixture.close();

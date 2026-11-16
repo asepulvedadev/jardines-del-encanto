@@ -26,6 +26,7 @@ class Message(Input):
     account_id: str = Field(min_length=1, max_length=160)
     platform: Literal["facebook", "instagram", "telegram", "tiktok", "whatsapp"]
     text: str = Field(min_length=1, max_length=2000)
+    allow_provider_takeover: bool = Field(default=False, strict=True)
 
 
 class Call(Input):
@@ -193,15 +194,21 @@ class Prepare(Input):
     version: int = Field(ge=1, strict=True)
     contact_ids: list[UUID] = Field(min_length=1, max_length=50)
     bindings: list[Binding] = Field(default_factory=list, max_length=50)
+    channel_bindings: list[Binding] = Field(default_factory=list, max_length=150)
     consent_confirmed: bool = Field(strict=True)
 
     @model_validator(mode="after")
     def unique(self):
         ids = [b.contact_id for b in self.bindings]
+        channel_keys = [(b.contact_id, b.account_id) for b in self.channel_bindings]
+        legacy_keys = {(b.contact_id, b.account_id) for b in self.bindings}
         if (
             len(set(self.contact_ids)) != len(self.contact_ids)
             or len(set(ids)) != len(ids)
             or not set(ids) <= set(self.contact_ids)
+            or len(set(channel_keys)) != len(channel_keys)
+            or bool(set(channel_keys) & legacy_keys)
+            or not {b.contact_id for b in self.channel_bindings} <= set(self.contact_ids)
         ):
             raise ValueError("duplicate_or_unbound_contact")
         return self

@@ -16,6 +16,32 @@ worker thread; shutdown signals its stop. Readiness requires a live worker and
 recent successful schema/database probe. Saving/preparing never starts workers.
 Activation rejects unavailable workers, even for CRM-only sequences.
 
+### Production opt-in and recovery
+
+Worker enablement is an administrator-authorized runtime change, separate from
+publishing code and separate from approving an audience. Before enabling it, inspect
+the live run/step counts: do not start a disabled worker with outstanding active runs
+or reservations without explicit approval of those existing effects.
+
+Preserve a root-only copy of the existing project runtime environment, then set only
+`CRM_WORKFLOWS_WORKER_ENABLED=1` in
+`/srv/jardines-del-encanto/secrets/crm-runtime.env`. Never print or copy its other
+values into release files. The existing root-owned deployment gate recreates the API
+with that environment and refreshes its dependent private bridges. Do not restart
+Docker, Nginx, databases or sibling applications to enable this worker.
+
+After rollout, verify the authenticated sequence catalogue reports both `enabled`
+and `available`; container health alone does not establish a live worker heartbeat.
+Recheck run/step counts to establish that setup created no executions or sends.
+Provider windows, approved templates, inbound webhook verification and telephony
+routing remain independent prerequisites; enabling the worker verifies none of them.
+
+To disable scheduling, restore the previous flag (or set it to `0`) in that same
+private runtime file and recreate the API through the existing deployment policy.
+Do not restore an old copy of the entire environment if unrelated settings changed
+since the checkpoint. Preserve all definitions, grants, steps and uncertain receipts;
+disabling or rolling back code does not authorize replaying outbound actions.
+
 The API never applies migrations on startup. Migration privileges and schema
 version must be provisioned separately. No production activation, provider call,
 root policy, configuration or deployment is implied by this implementation.
