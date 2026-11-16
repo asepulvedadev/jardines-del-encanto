@@ -19,6 +19,13 @@ def lead_capture_status(admin: Admin):
     return status()
 
 
+@router.get("/comment-moderation")
+def comment_moderation_status(admin: Admin):
+    from ..social.comment_moderation import status
+
+    return status()
+
+
 @router.get("/catalog")
 def catalog(admin: Admin):
     return REGISTRY

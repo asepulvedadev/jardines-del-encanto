@@ -119,6 +119,7 @@ test("gateway allows exact private inbox methods and forwards session and CSRF",
   const id = "11111111-1111-4111-8111-111111111111";
   for (const [method, path] of [
     ["GET", "inbox/lead-capture"],
+    ["GET", "inbox/comment-moderation"],
     ["GET", "inbox/catalog"],
     ["GET", "inbox/accounts"],
     ["GET", "inbox/actions"],
