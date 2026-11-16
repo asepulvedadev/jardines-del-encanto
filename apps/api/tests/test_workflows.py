@@ -363,7 +363,7 @@ def test_provider_change_and_verified_reply_hold(fake_social):
                 "participant_id": "participant",
                 "profile_id": "profile",
                 "platform": "whatsapp",
-                "sent_at": datetime.now(UTC).isoformat(),
+                "sent_at": service.now().isoformat(),
             },
         )
     assert (
