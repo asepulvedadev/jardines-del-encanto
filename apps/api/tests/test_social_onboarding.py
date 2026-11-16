@@ -1069,3 +1069,40 @@ def test_recovery_live_read_does_not_drop_fresh_public_enrollment(intake, config
             "SELECT 1 FROM crm.social_onboarding WHERE conversation_id=%s",
             (fresh["conversation"]["id"],),
         ).fetchone()
+
+
+@pytest.mark.parametrize("platform", ["whatsapp", "facebook"])
+def test_ambiguous_identity_never_blocks_welcome_or_creates_a_contact(intake, platform):
+    incoming, deliveries, _, _, owner = intake
+    incoming(
+        platform, text="Full name: Mariana Torres Phone number: 3001110099 Phone number: 3001110088"
+    )
+    for _ in range(4):
+        onboarding.tick()
+    assert [d[0] for d in deliveries] == ["audio", "website", "group", "question"]
+    row = state(owner)[0]
+    assert row["contact_id"] is None and row["details"] == {}
+    with psycopg.connect(owner) as db:
+        assert db.execute("SELECT count(*) FROM crm.contacts").fetchone()[0] == 0
+
+
+def test_operator_recovers_proven_pre_send_blocked_row_without_replaying_a_receipt(
+    intake, configured
+):
+    event = missed_signed_event(intake, configured)
+    _, deliveries, _, _, owner = intake
+    with connect() as db:
+        actor = onboarding.settings(db)["owner_id"]
+        onboarding.recover_unanswered(db, event["id"], actor_id=actor)
+        db.execute("UPDATE crm.social_onboarding SET state='blocked',error='welcome_not_confirmed'")
+    with connect() as db:
+        assert onboarding.recover_unanswered(db, event["id"], actor_id=actor)["state"] == "queued"
+    for _ in range(3):
+        onboarding.tick()
+    assert [d[0] for d in deliveries] == ["audio", "website", "group"]
+    assert len(state(owner)) == 1
+    with connect() as db:
+        db.execute("UPDATE crm.social_onboarding SET state='blocked'")
+    with connect() as db, pytest.raises(ValueError, match="recovery_existing_history"):
+        onboarding.recover_unanswered(db, event["id"], actor_id=actor)
+    assert len(deliveries) == 3

@@ -81,8 +81,10 @@ Ordinary webhook enrollment retains its fifteen-minute freshness requirement.
 Explicit recovery may consider the original incoming event within the existing
 24-hour reply window, after activation and before the fair expiry. It never
 rewrites source timestamps, replays a webhook or resets an existing job. Any prior
-onboarding or agent-job history for the participant excludes recovery, including
-completed, blocked, uncertain and suppressed records.
+agent-job, completed, uncertain, suppressed or already-sent welcome history excludes
+recovery. A single current-version blocked welcome may be recovered only when it
+has no receipts, no asked question, no competing queued input and the canonical
+participant claim. Its live history must independently prove no outgoing reply.
 
 Recovery reuses canonical enrollment, its daily quota, participant claim and input
 queue. Migration 029 adds a private source-event audit marker. Live Inbox reads run before taking the shared enrollment lock, so recovery does
@@ -93,3 +95,6 @@ any outgoing message excludes the candidate. Before every welcome phase, the wor
 that no other reply appeared; only its own accepted phase receipts are exempt.
 Once the group phase is accepted, ordinary identity capture continues unchanged.
 A failed proof rolls back enrollment, and uncertain submissions remain held.
+
+Ambiguous identity fields do not halt a verified welcome. No ambiguous name or
+phone is saved; the existing identity question follows the group invitation.

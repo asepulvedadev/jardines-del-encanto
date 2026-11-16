@@ -227,20 +227,47 @@ def recover_unanswered(db, event_id, *, actor_id):
             raise ValueError("recovery_opted_out")
         scope = (receipt["profile_id"], event["account_id"], event["participant_id"])
 
-        def require_no_history():
+        def recoverable_history():
+            prior = db.execute(
+                "SELECT * FROM crm.social_onboarding WHERE profile_id=%s AND account_id=%s AND participant_id=%s",
+                scope,
+            ).fetchall()
+            if db.execute(
+                "SELECT 1 FROM crm.whatsapp_agent_jobs WHERE profile_id=%s AND account_id=%s AND participant_id=%s LIMIT 1",
+                scope,
+            ).fetchone():
+                raise ValueError("recovery_existing_history")
+            if not prior:
+                return None
             if (
-                db.execute(
-                    "SELECT 1 FROM crm.social_onboarding WHERE profile_id=%s AND account_id=%s AND participant_id=%s LIMIT 1",
-                    scope,
+                len(prior) != 1
+                or prior[0]["state"] != "blocked"
+                or prior[0]["suppressed"]
+                or prior[0]["asked"]
+                or not prior[0]["welcome_required"]
+                or prior[0]["config_version"] != cfg["version"]
+                or any(
+                    prior[0][key]
+                    for key in (
+                        "audio_receipt",
+                        "website_receipt",
+                        "group_receipt",
+                        "links_receipt",
+                    )
+                )
+                or not db.execute(
+                    "SELECT 1 FROM crm.social_welcome_claims WHERE onboarding_id=%s",
+                    (prior[0]["id"],),
                 ).fetchone()
                 or db.execute(
-                    "SELECT 1 FROM crm.whatsapp_agent_jobs WHERE profile_id=%s AND account_id=%s AND participant_id=%s LIMIT 1",
-                    scope,
+                    "SELECT 1 FROM crm.social_onboarding_inputs WHERE onboarding_id=%s AND NOT processed AND message_id<>%s LIMIT 1",
+                    (prior[0]["id"], event["message_id"]),
                 ).fetchone()
             ):
                 raise ValueError("recovery_existing_history")
+            return prior[0]
 
-        require_no_history()
+        prior = recoverable_history()
         candidate = {
             **event,
             "id": None,
@@ -256,12 +283,20 @@ def recover_unanswered(db, event_id, *, actor_id):
         # webhooks continue enrolling while the operator checks this candidate.
         onboarding_transport.recovery_source(db, candidate)
         db.execute("SELECT pg_advisory_xact_lock(9142041)")
-        require_no_history()  # A live webhook may have enrolled it during the read.
+        fresh_prior = recoverable_history()
+        if (prior["id"] if prior else None) != (fresh_prior["id"] if fresh_prior else None):
+            raise ValueError("recovery_existing_history")
         guard_scope(db, candidate)  # Configuration/owner may also have changed.
         _enqueue(db, receipt["body"], receipt["profile_id"], earliest=earliest)
         row = db.execute(
-            "UPDATE crm.social_onboarding SET recovery_event_id=%s WHERE profile_id=%s AND account_id=%s AND conversation_id=%s RETURNING *",
-            (event_id, receipt["profile_id"], event["account_id"], event["conversation_id"]),
+            "UPDATE crm.social_onboarding SET recovery_event_id=%s,source=%s,state='pending',error=NULL WHERE profile_id=%s AND account_id=%s AND conversation_id=%s RETURNING *",
+            (
+                event_id,
+                Jsonb(event),
+                receipt["profile_id"],
+                event["account_id"],
+                event["conversation_id"],
+            ),
         ).fetchone()
         if not row:
             raise ValueError("recovery_not_admitted")
@@ -502,29 +537,33 @@ def tick():
             guard(db, row)
             source = check(row)
             if not row["contact_id"]:
-                value = details(row["source"]["text"], source["sender"], row["details"])
-                # Plain name is accepted only in response to our explicit missing-name question.
-                if row["asked"] and "name" not in value and valid_name(row["source"]["text"]):
-                    value["name"] = valid_name(row["source"]["text"])
-                db.execute(
-                    "UPDATE crm.social_onboarding SET details=%s WHERE id=%s",
-                    (Jsonb(value), row["id"]),
-                )
-                if set(value) == {"name", "phone"}:
-                    record, deal = capture_contact(
-                        db,
-                        ContactInput(
-                            **value,
-                            source="whatsapp"
-                            if row["platform"] == "whatsapp"
-                            else "social_campaign",
-                        ),
-                    )
+                try:
+                    value = details(row["source"]["text"], source["sender"], row["details"])
+                except ValueError:
+                    value = None  # Ask for corrected identity after the welcome; never guess.
+                if value is not None:
+                    # Plain name is accepted only in response to our explicit missing-name question.
+                    if row["asked"] and "name" not in value and valid_name(row["source"]["text"]):
+                        value["name"] = valid_name(row["source"]["text"])
                     db.execute(
-                        "UPDATE crm.social_onboarding SET contact_id=%s,deal_id=%s WHERE id=%s",
-                        (record["id"], deal["id"], row["id"]),
+                        "UPDATE crm.social_onboarding SET details=%s WHERE id=%s",
+                        (Jsonb(value), row["id"]),
                     )
-                    row.update(contact_id=record["id"], deal_id=deal["id"])
+                    if set(value) == {"name", "phone"}:
+                        record, deal = capture_contact(
+                            db,
+                            ContactInput(
+                                **value,
+                                source="whatsapp"
+                                if row["platform"] == "whatsapp"
+                                else "social_campaign",
+                            ),
+                        )
+                        db.execute(
+                            "UPDATE crm.social_onboarding SET contact_id=%s,deal_id=%s WHERE id=%s",
+                            (record["id"], deal["id"], row["id"]),
+                        )
+                        row.update(contact_id=record["id"], deal_id=deal["id"])
             if incoming:
                 db.execute(
                     "UPDATE crm.social_onboarding_inputs SET processed=true WHERE id=%s",
