@@ -9,91 +9,127 @@
       "number": 1,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-01.png",
-      "sha256": "aaca018227b903d950e9d12d78829d81369fdd89762a96f2d6f6b4f15d5f785d"
+      "sha256": "0d7d2b59cae514f388053fda395e49a5ec0c7ce16427dc329779e66737e99510",
+      "previousSha256": "aaca018227b903d950e9d12d78829d81369fdd89762a96f2d6f6b4f15d5f785d",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-lots-roads.png"
     },
     {
       "number": 2,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-02.png",
-      "sha256": "fddea29d559a2323ab90965380d995a89809e0986d18750c531db3d1ca7f1180"
+      "sha256": "66361531456021bede5a07c8e165a7c4aee1accc42ef20d9fe805428512290b0",
+      "previousSha256": "fddea29d559a2323ab90965380d995a89809e0986d18750c531db3d1ca7f1180",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-lots-roads.png"
     },
     {
       "number": 3,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-03.png",
-      "sha256": "95cbabfa88187582895c35df2cfbd0d99db3bb95d63baf3897ca85d6811f115f"
+      "sha256": "dfca48a46c56f3c501815dac9048cf2d4f0bad625dc89160282141352b1d7d90",
+      "previousSha256": "95cbabfa88187582895c35df2cfbd0d99db3bb95d63baf3897ca85d6811f115f",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-entrance-court.png"
     },
     {
       "number": 4,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-04.png",
-      "sha256": "a036026e104845e420891832b63b7127359391b3a2401e3853243e6b9d7a6d82"
+      "sha256": "c6533ba4c84946d8abb86072031e238c3c4daf4d45f2e972d1d3eb99e1fdc5a7",
+      "previousSha256": "a036026e104845e420891832b63b7127359391b3a2401e3853243e6b9d7a6d82",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-lots-roads.png"
     },
     {
       "number": 5,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-05.png",
-      "sha256": "c77a07b744556b535a4b11c410f7e7336384b5e44f535261d52087be54797de5"
+      "sha256": "c741769a5847eacdcffa6f31c4ef81f54853dc84ee18deabe0683dbc57ccd3ba",
+      "previousSha256": "c77a07b744556b535a4b11c410f7e7336384b5e44f535261d52087be54797de5",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-lots-roads.png"
     },
     {
       "number": 6,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-06.png",
-      "sha256": "715cc83dc52d0270ae552f6d921b1ad8356a73acb044740d72e7d222fe5a7ee3"
+      "sha256": "97a4735d9d813c9154d3e4c52dc7d3cc19d509d7e2908f4dbdc46704106cf2e2",
+      "previousSha256": "715cc83dc52d0270ae552f6d921b1ad8356a73acb044740d72e7d222fe5a7ee3",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-lots-roads.png"
     },
     {
       "number": 7,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-07.png",
-      "sha256": "d02d7b11911d444a62448e952784fd9f36a30088f4a4ae65391af5c0065a3c17"
+      "sha256": "b40e2571dfa775091ac855d18698174ed69d2741b0313295ef7fbac61b8a9b49",
+      "previousSha256": "d02d7b11911d444a62448e952784fd9f36a30088f4a4ae65391af5c0065a3c17",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-entrance-court.png"
     },
     {
       "number": 8,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-08.png",
-      "sha256": "32b43231c5981337655992e6ff3426201c569946e7c05f9192f2089cabd567d2"
+      "sha256": "4ac54de4cdcbafc202f712beb6710a1271182742d790a896ffe1b1e7169dbeb1",
+      "previousSha256": "32b43231c5981337655992e6ff3426201c569946e7c05f9192f2089cabd567d2",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-lots-roads.png"
     },
     {
       "number": 9,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-09.png",
-      "sha256": "83e76e85bca789649a224e266a4970728059799f9dcfdab2d5bac5543f113773"
+      "sha256": "782a45ee0da7b6dd47dced9bf6c1424138da92876636fd24677d3fc6a54ffd86",
+      "previousSha256": "83e76e85bca789649a224e266a4970728059799f9dcfdab2d5bac5543f113773",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-lots-roads.png"
     },
     {
       "number": 10,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-10.png",
-      "sha256": "70825910768a5da88be04f5da7039597dfc965272382cdd2b615defc486de2bc"
+      "sha256": "f5842dd2970feaa44f04ebfc6d5b556e9a0b4a67fc33c3f209582db9dba2b7d1",
+      "previousSha256": "70825910768a5da88be04f5da7039597dfc965272382cdd2b615defc486de2bc",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-entrance-court.png"
     },
     {
       "number": 11,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-11.png",
-      "sha256": "ab557a80ae47423f47d20dde970ce41fd40b75f1188cf676ca292b78e82c5d0c"
+      "sha256": "33d6253879f5d99d675b2270c7d8cc88766a5fdcebcde63bcfc8954647b10cbb",
+      "previousSha256": "ab557a80ae47423f47d20dde970ce41fd40b75f1188cf676ca292b78e82c5d0c",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-lots-roads.png"
     },
     {
       "number": 12,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-12.png",
-      "sha256": "8964a6a5ca3f42b9e00079d4196347d1f6d56dfe94841f5da18394b32ba02c86"
+      "sha256": "2fda8c2d0e4690d471aa1b4a2c1e0667bf28f871f4b470bdbaa66ba3e88c9e33",
+      "previousSha256": "8964a6a5ca3f42b9e00079d4196347d1f6d56dfe94841f5da18394b32ba02c86",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-lots-roads.png"
     },
     {
       "number": 13,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-13.png",
-      "sha256": "b7f63e4fc023a9c3b08da29bc636d602248717bed103fea145a277f2baea38bd"
+      "sha256": "17b075a71812e6d9ea7186e248c1e4191e631cb3175acd0e030e23b74f039b4c",
+      "previousSha256": "b7f63e4fc023a9c3b08da29bc636d602248717bed103fea145a277f2baea38bd",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-lots-roads.png"
     },
     {
       "number": 14,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-14.png",
-      "sha256": "0b4b8881daa1235a8bce8afc4c281b3b5bbd9128baf0a27e652b6e28415b6596"
+      "sha256": "6a86f60ae5d17872c635fa15c7a5574ecc239abba6c3ca4b45ddd89d0ea9c398",
+      "previousSha256": "0b4b8881daa1235a8bce8afc4c281b3b5bbd9128baf0a27e652b6e28415b6596",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-entrance-court.png"
     },
     {
       "number": 15,
       "source": "built-in image_gen",
       "file": "apps/api/app/campaigns/assets/campaign-15.png",
-      "sha256": "d3664c3ce99f39e6a4bc080d8188897ec4acbb7af8d6818f598add9b93efb2da"
+      "sha256": "da33bed3843f7b912505780cef9e379d25d7eb7595a43fa2c34bc4c614dfe55f",
+      "previousSha256": "d3664c3ce99f39e6a4bc080d8188897ec4acbb7af8d6818f598add9b93efb2da",
+      "photoSource": "assets/campaign-drafts/2026-11/source-photos/owner-lots-roads.png"
     }
-  ]
+  ],
+  "photoRefresh": {
+    "date": "2026-11-16",
+    "scope": "Only property photographs replaced using two owner-supplied photos; existing visual layouts and copy visually checked. Message bodies, variables and buttons unchanged.",
+    "method": "built-in image_gen edit, one original poster and one supplied photograph per image; reference-guided, not pixel-identical compositing",
+    "submittedToMeta": false
+  }
 }

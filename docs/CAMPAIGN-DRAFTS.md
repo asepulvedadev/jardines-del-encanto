@@ -147,6 +147,30 @@ QR codes, testimonials, sales deadlines or illustration captions were requested.
 Earlier local visual revisions remain separate, with source locators in
 `assets/campaign-drafts/2026-11/official-logo-manifest.json`.
 
+### Owner photo refresh — November 16, 2026
+
+The owner requested the same fifteen pieces with only their property photographs
+replaced by two newly supplied site photographs. The original source copies are
+`assets/campaign-drafts/2026-11/source-photos/owner-lots-roads.png` and
+`assets/campaign-drafts/2026-11/source-photos/owner-entrance-court.png`.
+Pieces 03, 07, 10 and 14 use the entrance/court photograph; the remaining pieces
+use the lots/roads photograph. All fifteen existing private PNG paths and dimensions
+are retained, so the existing image selections continue to resolve.
+
+Each built-in `image_gen` edit received the original poster as its edit target and
+one owner photograph as its replacement input. The prompt requested replacement
+of the photograph rectangle only, preserving the logo, layout, colors, typography,
+Spanish copy and commercial qualifications, without inventing property features.
+The full outputs were visually checked. This remains reference-guided image editing,
+not a guarantee of pixel-identical preservation outside the photograph.
+
+The manifest records updated hashes, prior hashes and the source photograph for
+each piece. Message documents, variables, dates, button definitions and review
+snapshots are unchanged. This local refresh does not submit to Meta, change an
+existing provider template or send messages. Production publication remains a
+separate authorized release. Previously issued image capabilities remain bound to
+their original hashes; changed image bytes do not inherit previous review approval.
+
 ## Verification
 
 - API tests: strict models, 15 valid seeds, seven dates, authenticated private media,
