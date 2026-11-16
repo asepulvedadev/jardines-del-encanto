@@ -315,9 +315,66 @@ def test_compose_uses_disjoint_network_and_secret_boundaries():
         assert "@sha256:" in service["image"]
     mounted = {item["target"]: item for item in provider["volumes"]}
     assert mounted["/opt/jardines-images/brand"]["read_only"]
-    assert mounted["/opt/jardines-images/brand"]["bind"]["create_host_path"] is False
+    # Compose versions differ: normalized JSON can omit a false Go bool.
+    # Keep the authored fail-closed setting explicit; never accept normalized true.
+    assert (
+        "bind: { create_host_path: false }"
+        in (ROOT / "ops/hermes/operator.compose.yaml").read_text()
+    )
+    assert (
+        mounted["/opt/jardines-images/brand"]
+        .get("bind", {})
+        .get("create_host_path", False)
+        is False
+    )
     for name in ("hermes-bridge", "operator-provider"):
         assert not any(
             "operator_images" in item["target"] or "jardines-images" in item["target"]
             for item in services[name]["volumes"]
         )
+
+
+@pytest.mark.parametrize("host_path", ["omitted", False, True])
+def test_compose_host_path_serialization_preserves_fail_closed_check(
+    monkeypatch, host_path
+):
+    import os
+    import subprocess
+    from types import SimpleNamespace
+
+    result = subprocess.run(
+        [
+            "docker",
+            "compose",
+            "-f",
+            str(ROOT / "ops/hermes/operator.compose.yaml"),
+            "config",
+            "--format",
+            "json",
+        ],
+        env={**os.environ, "HERMES_OPENAI_SECRET_FILE": "/tmp/not-a-real-secret"},
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    config = json.loads(result.stdout)
+    mount = next(
+        item
+        for item in config["services"]["image-provider"]["volumes"]
+        if item["target"] == "/opt/jardines-images/brand"
+    )
+    binding = mount.setdefault("bind", {})
+    if host_path == "omitted":
+        binding.pop("create_host_path", None)
+    else:
+        binding["create_host_path"] = host_path
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(stdout=json.dumps(config)),
+    )
+    if host_path is True:
+        with pytest.raises(AssertionError):
+            test_compose_uses_disjoint_network_and_secret_boundaries()
+    else:
+        test_compose_uses_disjoint_network_and_secret_boundaries()

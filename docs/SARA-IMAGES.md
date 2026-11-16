@@ -144,3 +144,10 @@ a nonexistent dummy secret pathname and do not read actual keys or start contain
 Real PostgreSQL checks must use the guarded isolated test harness and run serially
 with other CRM fixtures, which reset users with cascading truncation. Visual/browser
 review and paid generation are separate verification steps, not inferred from mocks.
+
+## Compose verification portability
+
+The brand bind mount keeps an explicit `create_host_path: false` in the authored
+policy. Some Compose versions omit false boolean values in normalized JSON; the
+isolation regression checks both the explicit policy and normalized false/omitted
+representations, while still rejecting `true`. This does not change runtime policy.
