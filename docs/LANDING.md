@@ -6,6 +6,35 @@ SEO authorization enables only approved public pages; see `SEO-GEO.md`. Deployme
 and preview operations are documented in `DEPLOY.md`.
 `DESIGN.md` remains the shared visual contract. UI copy uses professional `es-CO`.
 
+## Owner gallery update — November 16, 2026
+
+The gallery keeps its four-tile layout and now presents, in order:
+
+1. A 6.5-second house presentation, from `BRUTOS/VIDEO1/video 1/video 3.MOV`
+   in the owner's `VIDEOS-JARDINES` library (source offset 0.2 seconds).
+2. The newly supplied aerial photograph of the internal roads and lots.
+3. The newly supplied aerial photograph of the gate and sports court.
+4. A 7.6-second playground presentation, from `BRUTOS/VIDEO1/video 1/video 4.MOV`
+   (source offset zero), not the unrelated Acacías town-park video.
+
+Original footage and attachments remain unchanged. The clips are encoded as
+720 × 1280 H.264/yuv420p at 30 fps, AAC 96 kbps, with MP4 fast-start.
+House CRF is 24; playground CRF is 28. Each clip is under 4 MB.
+Photographs have 640px/1280px WebP sources; videos use static WebP posters.
+The browser requests video metadata only after opening its tile. Native controls
+start playback explicitly; closing or changing media unmounts the player.
+The dialog preserves previous/next controls, Escape and native-video arrow keys.
+The architectural hero and its illustration disclaimer remain separate.
+Local checks: 34 web tests passed (seven optional browser skips), TypeScript and
+the production build passed. Both clips played in the real browser; gallery
+navigation/closing removed the player. Layout and dialog checks passed at 958px
+and 390px without document overflow.
+
+The owner also corrected the venue label to
+“Cámara de Comercio de Bogotá en Soacha” across landing sections, FAQs, WhatsApp
+drafts and Sara's deterministic welcome script. The script-based audio cache key
+changes for future welcomes; no past message is replayed or modified.
+
 ## Soacha event invitation — November 22, 2026
 
 The secondary Bogotá/Soacha invitation is now its own full-bleed section after
@@ -19,7 +48,7 @@ The separate browser case passed at 320, 390, 768 and 1440px, including measured
 viewport width, desktop viewport height, adaptive mobile/tablet height and the
 WhatsApp link (intercepted locally). TypeScript and the production build passed.
 
-The owner supplied the Sunday, November 22 event at Cámara de Comercio de Soacha.
+The owner supplied the Sunday, November 22 event at Cámara de Comercio de Bogotá en Soacha.
 The home page presents an editorial forest-green invitation immediately after the
 hero, a date panel, a hero anchor, buyer-section and final-contact
 reminders, and two event FAQs. The venue is not a project location or an assertion

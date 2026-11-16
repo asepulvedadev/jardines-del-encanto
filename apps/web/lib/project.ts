@@ -9,26 +9,32 @@ export function whatsappLink(
 ) {
   return `https://wa.me/${project.whatsapp}?text=${encodeURIComponent(message)}`;
 }
-export const photographs = [
+export const galleryMedia = [
   {
-    name: "aerial",
-    title: "Tu próxima historia, vista desde arriba",
-    alt: "Fotografía aérea real del proyecto Jardines del Encanto, con lotes verdes, vías internas, cancha y portería.",
+    type: "video",
+    name: "casa-construida",
+    title: "Conoce la casa construida",
+    alt: "Presentación de una edificación construida en Jardines del Encanto.",
+    duration: "0:07",
   },
   {
-    name: "neighborhood",
-    title: "Una mirada al proyecto",
-    alt: "Fotografía aérea real de los lotes, las vías internas y la cancha multifuncional de Jardines del Encanto.",
+    type: "image",
+    name: "vias-actuales",
+    title: "Recorre nuestras vías y lotes",
+    alt: "Vista aérea real de las vías internas, los lotes y un kiosco del proyecto.",
   },
   {
-    name: "entrance",
+    type: "image",
+    name: "porteria-actual",
     title: "La entrada a tu nuevo comienzo",
-    alt: "Fotografía real de la portería y el área de administración, con trabajos de obra visibles.",
+    alt: "Vista aérea real de la portería, el letrero de Jardines del Encanto y la cancha.",
   },
   {
-    name: "gate",
-    title: "Los detalles de la portería",
-    alt: "Vista frontal real de los accesos de la portería y su entorno, con acabados y trabajos en curso.",
+    type: "video",
+    name: "parque-infantil",
+    title: "Un espacio para jugar",
+    alt: "Recorrido real del parque infantil y sus jardines en Jardines del Encanto.",
+    duration: "0:08",
   },
 ] as const;
 export const amenityGroups = [
@@ -82,7 +88,7 @@ export const questions = [
   {
     question: "¿Todas las zonas comunes están terminadas?",
     answer:
-      "Las fotografías muestran el proyecto y el video es una visualización arquitectónica. El listado describe las zonas informadas por el proyecto, no certifica su estado de entrega. Durante tu visita puedes revisar los avances y confirmar el alcance de cada espacio.",
+      "Las fotografías y los videos de la galería muestran el proyecto. El video del inicio es una visualización arquitectónica. El listado describe las zonas informadas por el proyecto, no certifica su estado de entrega. Durante tu visita puedes revisar los avances y confirmar el alcance de cada espacio.",
   },
   {
     question: "¿El plano muestra los lotes disponibles?",

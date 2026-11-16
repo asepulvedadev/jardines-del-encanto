@@ -188,7 +188,7 @@ export default function Home() {
             </div>
             <PhotoGallery />
             <div className="gallery-note">
-              <p>Conoce el proyecto a través de sus fotografías reales.</p>
+              <p>Conoce el proyecto a través de fotografías y videos reales.</p>
               <ContactLink className="button button-primary">
                 Quiero conocerlo en persona
               </ContactLink>

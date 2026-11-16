@@ -13,7 +13,7 @@ test("the Bogotá and Soacha invitation is a standalone full-width section", asy
   assert.match(invitation, /<h2[^>]*id="event-buyer-title"/);
   assert.match(invitation, /Bogotá y Soacha, nos vemos este domingo/);
   assert.match(invitation, /dateTime="2026-11-22"/i);
-  assert.match(invitation, /Cámara de Comercio de Soacha/);
+  assert.match(invitation, /Cámara de Comercio de Bogotá en Soacha/);
   assert.match(invitation, /Consultar el evento por WhatsApp/);
   assert.match(invitation, /data-soacha-event-contact="true"/);
 });
@@ -106,7 +106,7 @@ test("the Soacha event follows the hero and distinguishes the venue from the pro
   const event = main.match(/<section[^>]*id="encuentro-soacha"[\s\S]*?<\/section>/)?.[0] ?? "";
   assert.match(event, /dateTime="2026-11-22"/i);
   assert.match(event, /Domingo/);
-  assert.match(event, /Cámara de Comercio de Soacha/);
+  assert.match(event, /Cámara de Comercio de Bogotá en Soacha/);
   assert.match(event, /Acacías, Meta/);
   assert.doesNotMatch(event, /entrada gratis|cupos limitados|descuento exclusivo|\d+:\d{2}/i);
 });
@@ -121,7 +121,7 @@ test("event calls to action use the existing WhatsApp with an accurate prefilled
     assert.equal(url.origin, "https://wa.me");
     assert.equal(url.pathname, "/573008348478");
     assert.match(url.searchParams.get("text"), /domingo 22 de noviembre de 2026/);
-    assert.match(url.searchParams.get("text"), /Cámara de Comercio de Soacha/);
+    assert.match(url.searchParams.get("text"), /Cámara de Comercio de Bogotá en Soacha/);
     assert.match(url.searchParams.get("text"), /horario.*dirección exacta/);
     assert.match(anchor, /target="_blank"/);
     assert.match(anchor, /rel="noopener noreferrer"/);
@@ -171,7 +171,7 @@ test("the event reflows, navigates and opens only the intended WhatsApp draft", 
       const event = page.locator("#encuentro-soacha");
       assert.equal(await event.locator("time").getAttribute("datetime"), "2026-11-22");
       assert.ok((await event.locator("h2").innerText()).includes("Domingo 22"));
-      assert.equal(await event.locator(".event-main-venue").innerText(), "Cámara de Comercio de Soacha");
+      assert.equal(await event.locator(".event-main-venue").innerText(), "Cámara de Comercio de Bogotá en Soacha");
       assert.ok((await event.innerText()).includes("BOGOTÁ Y SOACHA"));
       const contact = event.locator("[data-soacha-event-contact]");
       await contact.focus();
