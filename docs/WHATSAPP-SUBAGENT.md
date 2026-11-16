@@ -12,6 +12,10 @@ In **Configuraciones → Sara WhatsApp**, set the existing Zernio account ID,
 international business number, instructions, reference knowledge and up to two
 trusted developer numbers. Names are labels only; authorization uses the exact
 E.164 number proven in authenticated, freshly revalidated inbound messages.
+The developer run receives the verified developer's configured name alongside the
+unaltered message in a structured prompt. It receives neither developer's phone
+number or the other developer's name. This label grants no additional capability;
+source-bound authorization and revocation checks still run independently.
 Developer authorization and channel routing numbers are not embedded as configuration
 in the public repository. The existing owner-approved public adviser contact remains
 in the immutable customer-assistance floor.

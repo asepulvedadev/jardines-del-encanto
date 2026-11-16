@@ -1,6 +1,7 @@
 """Verified channel grants, scoped tool dispatch and browser-independent revocation."""
 # ruff: noqa: F811
 import copy
+import json
 from uuid import uuid4
 
 import psycopg
@@ -40,6 +41,22 @@ def issue(configured, monkeypatch, phone="573001110001"):
 
 def call(client, headers, action, arguments, key=None):
     return client.post("/internal/hermes/call", json={"call_id": key or uuid4().hex, "action": action, "arguments": arguments}, headers=headers)
+
+
+@pytest.mark.parametrize("phone,name", [("573001110001", "Developer One"), ("573001110002", "Developer Two")])
+def test_claim_identifies_only_the_current_verified_developer(configured, monkeypatch, phone, name):
+    client, owner, job, _row, _run_id, headers = issue(configured, monkeypatch, phone)
+    claim = client.post("/internal/hermes/claim", json={}, headers=headers)
+    assert claim.status_code == 200
+    context = json.loads(claim.json()["prompt"])
+    assert context == {
+        "channel": "whatsapp_developer",
+        "verified_developer_name": name,
+        "message": job["content"],
+    }
+    assert phone not in claim.json()["prompt"]
+    with psycopg.connect(owner) as db:
+        assert db.execute("SELECT content FROM crm.whatsapp_agent_jobs WHERE id=%s", (job["id"],)).fetchone()[0] == job["content"]
 
 
 def test_real_issue_claim_owned_lifecycle_replay_and_no_browser_session(configured, monkeypatch):

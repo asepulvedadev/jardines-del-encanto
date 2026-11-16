@@ -1,5 +1,6 @@
 """Revocable, source-bound WhatsApp developer authority, never a browser session."""
 
+import json
 import secrets
 
 from fastapi import HTTPException
@@ -147,11 +148,23 @@ def issue(db, job_id, history=None):
         "SELECT 1 FROM crm.whatsapp_developer_authority WHERE job_id=%s", (job_id,)
     ).fetchone():
         raise HTTPException(409, "developer_source_already_used")
+    # Supply the configured label only after exact source-bound authorization.
+    # Keep the original inbound job unchanged; names never grant permissions.
+    prompt = json.dumps(
+        {
+            "channel": "whatsapp_developer",
+            "verified_developer_name": agent.developer(
+                channel["document"], job["participant_id"]
+            ),
+            "message": job["content"],
+        },
+        ensure_ascii=False,
+    )
     token = secrets.token_urlsafe(32)
     run = db.execute(
         """INSERT INTO crm.hermes_runs(actor_id,session_hash,token_hash,prompt,history,authentication)
         VALUES(%s,NULL,%s,%s,%s,'whatsapp_developer') RETURNING id""",
-        (owner["id"], security.digest(token), job["content"], Jsonb(validated_history(history))),
+        (owner["id"], security.digest(token), prompt, Jsonb(validated_history(history))),
     ).fetchone()
     db.execute(
         """INSERT INTO crm.whatsapp_developer_authority(run_id,job_id,owner_id,agent_version,
