@@ -275,8 +275,11 @@
   aspect-ratio: 2.1;
 }
 .landing .photo-tile picture {
+  position: absolute;
+  inset: 0;
   display: block;
   height: 100%;
+  width: 100%;
 }
 .landing .photo-tile img {
   height: 100%;
@@ -286,6 +289,32 @@
 }
 .landing .photo-tile:hover img {
   transform: scale(1.035);
+}
+.landing .gallery-video-badge {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 24px;
+  background: #062619e8;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.landing .photo-tile-0 img {
+  object-position: center;
+}
+.landing .gallery-dialog .dialog-toolbar h2 {
+  font-size: 18px;
+  line-height: 1.4;
+}
+.gallery-video {
+  display: block;
+  margin-inline: auto;
+  background: #03180d;
 }
 .landing .photo-caption {
   position: absolute;

@@ -4,9 +4,9 @@ import { whatsappLink } from "../lib/project";
 export const soachaEvent = {
   date: "2026-11-22",
   dateLabel: "Domingo 22 de noviembre de 2026",
-  venue: "Cámara de Comercio de Soacha",
+  venue: "Cámara de Comercio de Bogotá en Soacha",
   message:
-    "Hola, quiero información para asistir al evento de Jardines del Encanto el domingo 22 de noviembre de 2026 en la Cámara de Comercio de Soacha. ¿Me comparten el horario, la dirección exacta y cómo coordinar mi asistencia?",
+    "Hola, quiero información para asistir al evento de Jardines del Encanto el domingo 22 de noviembre de 2026 en la Cámara de Comercio de Bogotá en Soacha. ¿Me comparten el horario, la dirección exacta y cómo coordinar mi asistencia?",
 } as const;
 
 export function EventContactLink({

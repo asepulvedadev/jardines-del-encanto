@@ -1,50 +1,79 @@
 "use client";
 import { useRef, useState } from "react";
-import { photographs } from "../lib/project";
-import { ProjectPhoto } from "./project-photo";
+import { galleryMedia } from "../lib/project";
+
+type GalleryItem = (typeof galleryMedia)[number];
+
+function GalleryPreview({ item, expanded = false }: { item: GalleryItem; expanded?: boolean }) {
+  const isVideo = item.type === "video";
+  return (
+    <picture>
+      {!isVideo && (
+        <source
+          type="image/webp"
+          srcSet={`/media/${item.name}-640.webp 640w, /media/${item.name}-1280.webp 1280w`}
+          sizes={expanded ? "100vw" : "(max-width: 767px) 100vw, 50vw"}
+        />
+      )}
+      <img
+        src={`/media/${item.name}${isVideo ? "-poster" : "-1280"}.webp`}
+        alt={item.alt}
+        width={isVideo ? 720 : 1280}
+        height={isVideo ? 1280 : 720}
+        loading={expanded ? "eager" : "lazy"}
+        className={expanded ? "expanded-photo" : undefined}
+      />
+    </picture>
+  );
+}
 
 export function PhotoGallery() {
   const dialog = useRef<HTMLDialogElement>(null);
   const [index, setIndex] = useState(0);
-  const selected = photographs[index];
+  const [isOpen, setIsOpen] = useState(false);
+  const selected = galleryMedia[index];
   const move = (direction: number) =>
-    setIndex(
-      (current) =>
-        (current + direction + photographs.length) % photographs.length,
-    );
+    setIndex(current => (current + direction + galleryMedia.length) % galleryMedia.length);
   return (
     <>
       <div className="photo-grid">
-        {photographs.map((photo, i) => (
+        {galleryMedia.map((item, i) => (
           <button
+            type="button"
             className={`photo-tile photo-tile-${i}`}
-            key={photo.name}
-            aria-label={`Ampliar fotografía: ${photo.title}`}
+            key={item.name}
+            aria-label={`${item.type === "video" ? "Ver video" : "Ampliar fotografía"}: ${item.title}`}
+            aria-haspopup="dialog"
             onClick={() => {
               setIndex(i);
+              setIsOpen(true);
               dialog.current?.showModal();
             }}
           >
-            <ProjectPhoto
-              name={photo.name}
-              alt={photo.alt}
-              sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 640px"
-            />
+            <GalleryPreview item={item} />
+            {item.type === "video" && (
+              <span className="gallery-video-badge" aria-hidden="true">
+                <span>▶</span> Video · {item.duration}
+              </span>
+            )}
             <span className="photo-caption">
-              <span>{photo.title}</span>
-              <span aria-hidden="true">↗</span>
+              <span>{item.title}</span>
+              <span aria-hidden="true">{item.type === "video" ? "▷" : "↗"}</span>
             </span>
           </button>
         ))}
       </div>
       <dialog
-        className="media-dialog"
+        className="media-dialog gallery-dialog"
         ref={dialog}
         aria-labelledby="photo-title"
-        onClick={(event) => {
+        onClose={() => setIsOpen(false)}
+        onClick={event => {
           if (event.target === event.currentTarget) dialog.current?.close();
         }}
-        onKeyDown={(event) => {
+        onKeyDown={event => {
+          // Keep seeking and volume keys available to the native video player.
+          if (event.target instanceof HTMLVideoElement) return;
           if (event.key === "ArrowRight") move(1);
           if (event.key === "ArrowLeft") move(-1);
         }}
@@ -52,28 +81,38 @@ export function PhotoGallery() {
         <div className="dialog-toolbar">
           <h2 id="photo-title">{selected.title}</h2>
           <button
+            type="button"
             className="dialog-close"
             autoFocus
             onClick={() => dialog.current?.close()}
-            aria-label="Cerrar fotografía"
+            aria-label="Cerrar galería"
           >
             Cerrar <span aria-hidden="true">×</span>
           </button>
         </div>
-        <ProjectPhoto
-          name={selected.name}
-          alt={selected.alt}
-          className="expanded-photo"
-          eager
-        />
+        {isOpen && selected.type === "video" ? (
+          <video
+            key={selected.name}
+            className="expanded-photo gallery-video"
+            controls
+            playsInline
+            preload="metadata"
+            poster={`/media/${selected.name}-poster.webp`}
+            aria-label={selected.alt}
+          >
+            <source src={`/media/${selected.name}.mp4`} type="video/mp4" />
+            Tu navegador no puede reproducir este video.{" "}
+            <a href={`/media/${selected.name}.mp4`}>Abrir video</a>
+          </video>
+        ) : isOpen ? (
+          <GalleryPreview item={selected} expanded />
+        ) : null}
         <div className="gallery-controls">
-          <button onClick={() => move(-1)} aria-label="Fotografía anterior">
+          <button type="button" onClick={() => move(-1)} aria-label="Contenido anterior">
             ← <span>Anterior</span>
           </button>
-          <span aria-live="polite">
-            {index + 1} de {photographs.length}
-          </span>
-          <button onClick={() => move(1)} aria-label="Fotografía siguiente">
+          <span aria-live="polite">{index + 1} de {galleryMedia.length}</span>
+          <button type="button" onClick={() => move(1)} aria-label="Contenido siguiente">
             <span>Siguiente</span> →
           </button>
         </div>
