@@ -36,7 +36,9 @@ def client(monkeypatch, tmp_path):
     password = secrets.token_urlsafe(24)
     with psycopg.connect(owner) as db:
         db.execute("TRUNCATE crm.users, crm.login_limits, crm.contacts CASCADE")
-        db.execute("TRUNCATE crm.social_connections, crm.social_state, crm.social_webhook_events")
+        db.execute(
+            "TRUNCATE crm.tiktok_intake_config, crm.social_connections, crm.social_state, crm.social_webhook_events"
+        )
         db.execute(
             "INSERT INTO crm.users(username, password_hash) VALUES (%s,%s)",
             ("socialadmin", password_hash.hash(password)),

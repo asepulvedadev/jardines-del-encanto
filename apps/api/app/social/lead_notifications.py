@@ -159,6 +159,14 @@ def origin(db, contact_id, source):
         ).fetchone()
     ):
         return "Facebook"
+    if (
+        source == "social_campaign"
+        and db.execute(
+            "SELECT 1 FROM crm.social_onboarding WHERE contact_id=%s AND platform='tiktok' LIMIT 1",
+            (contact_id,),
+        ).fetchone()
+    ):
+        return "TikTok"
     return "Otros / sin confirmar"
 
 

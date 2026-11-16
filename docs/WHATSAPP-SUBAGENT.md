@@ -151,9 +151,10 @@ receipts remain historical and are never replayed. An additional conversation fo
 an existing participant may capture real identity but cannot repeat the welcome.
 Unknown send outcomes are never retried automatically.
 
-TikTok remains excluded: Zernio documents text/image replies, not audio; the
-existing eligibility guard is not bypassed. No fallback, account activation or
-TikTok send is implied. The fair-specific expiration remains November 23, 2026,
+TikTok remains excluded from the audio agent and generic workflows: Zernio documents
+text/image replies, not audio. A separately owner-activated private-message text
+registration lane is documented in SOCIAL-ONBOARDING.md; it does not bypass the
+generic workflow eligibility guard or activate an account automatically. The fair-specific expiration remains November 23, 2026,
 00:00 Colombia; this change does not extend the dated campaign.
 
 All ordinary tests use synthetic phone numbers, isolated `jardines_crm_test` data,

@@ -65,6 +65,10 @@ def _verified_source(db, row, cfg, credentials):
     messages = envelope.get("messages")
     if not isinstance(messages, list):
         raise TypeError("welcome_messages_invalid")
+    if row["platform"] == "tiktok":
+        from . import tiktok_intake
+
+        tiktok_intake.history(db, row, envelope)
     recovering = (
         bool(row.get("recovery_event_id")) and row["group_receipt"].get("status") != "accepted"
     )
@@ -155,7 +159,7 @@ def _verified_source(db, row, cfg, credentials):
     if (
         not matched
         or matched.get("message") != row["source"]["text"]
-        or not datetime.now(UTC) - timedelta(hours=24)
+        or not datetime.now(UTC) - timedelta(hours=48 if row["platform"] == "tiktok" else 24)
         < workflow._time(matched.get("createdAt"))
         <= datetime.now(UTC)
     ):
@@ -238,6 +242,8 @@ def execute(operation, identifier):
         "welcome_audio",
         "welcome_website",
         "welcome_group",
+        "welcome_introduction",
+        "welcome_confirmation",
     }:
         raise ValueError("invalid_welcome_operation")
     with connect() as db, config.locked():
@@ -253,14 +259,38 @@ def execute(operation, identifier):
         phase = operation.removeprefix("welcome_")
         if row["state"] != phase + "_reserved":
             raise ValueError("welcome_reservation_changed")
+        if row["platform"] == "tiktok":
+            from . import tiktok_intake
+
+            if phase not in {"introduction", "question", "confirmation", "website", "group"}:
+                raise ValueError("welcome_tiktok_text_only")
+            if not db.execute(
+                "SELECT 1 FROM crm.tiktok_reply_reservations WHERE onboarding_id=%s AND phase=%s AND source_message_id=%s AND message_id IS NULL",
+                (row["id"], phase, row["source"]["message_id"]),
+            ).fetchone():
+                raise ValueError("welcome_tiktok_reservation_required")
+            if phase != "introduction" and row["introduction_receipt"].get("status") != "accepted":
+                raise ValueError("welcome_tiktok_introduction_required")
+            if phase in {"confirmation", "website", "group"} and not row["contact_id"]:
+                raise ValueError("welcome_tiktok_registration_required")
+            if (
+                phase in {"website", "group"}
+                and row["confirmation_receipt"].get("status") != "accepted"
+            ):
+                raise ValueError("welcome_tiktok_confirmation_required")
         if not row["welcome_required"] and phase != "question":
             raise ValueError("welcome_already_claimed")
-        if phase == "website" and row["audio_receipt"].get("status") != "accepted":
+        if (
+            phase == "website"
+            and row["platform"] != "tiktok"
+            and row["audio_receipt"].get("status") != "accepted"
+        ):
             raise ValueError("welcome_audio_required")
         if phase == "group" and row["website_receipt"].get("status") != "accepted":
             raise ValueError("welcome_website_required")
         if (
             phase == "question"
+            and row["platform"] != "tiktok"
             and row["welcome_required"]
             and not any(
                 row[column].get("status") == "accepted"
@@ -271,14 +301,19 @@ def execute(operation, identifier):
         if phase == "audio":
             accepted = transmit_audio(row, credentials)
         else:
-            message = {
+            messages = {
                 "website": "Aquí puedes ver la página oficial de nuestro proyecto:\n"
                 + onboarding.WEBSITE,
                 "group": "Para estar al tanto de toda la información previa al evento, "
                 "ingresa a nuestro grupo de WhatsApp:\n" + cfg["group_url"],
                 "question": "Hola, soy Sara. Para registrarte, envíame tu nombre completo y número de celular. "
                 "Puedes escribir: Nombre completo: … Celular: …",
-            }[phase]
+            }
+            if row["platform"] == "tiktok":
+                messages.update(
+                    introduction=tiktok_intake.INTRODUCTION, confirmation=tiktok_intake.CONFIRMATION
+                )
+            message = messages[phase]
             command = Execute(
                 operation="sendInboxMessage",
                 account_id=row["account_id"],
@@ -286,8 +321,9 @@ def execute(operation, identifier):
                 body={"message": message},
             )
             spec, args = validate(command, credentials)
-            result = provider.request(
-                credentials, spec, args, key="sara-welcome-" + identifier + "-" + phase
-            )
+            key = "sara-welcome-" + identifier
+            if row["platform"] == "tiktok" and phase == "question":
+                key += "-" + workflow._digest(row["source"]["message_id"])[:16]
+            result = provider.request(credentials, spec, args, key=key + "-" + phase)
             accepted = receipt(result, row["conversation_id"])
         return {"state": "completed", "receipt": accepted}

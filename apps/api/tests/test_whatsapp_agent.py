@@ -96,7 +96,7 @@ def configured(authenticated, monkeypatch):
         db.execute(
             "TRUNCATE crm.whatsapp_agent,crm.whatsapp_agent_revisions,crm.whatsapp_agent_jobs,crm.whatsapp_agent_lessons CASCADE"
         )
-        db.execute("TRUNCATE crm.social_webhook_events")
+        db.execute("TRUNCATE crm.tiktok_intake_config,crm.social_webhook_events")
         db.execute("TRUNCATE crm.sara_profile,crm.sara_profile_versions")
         db.execute(
             "UPDATE crm.control_connections SET enabled=true WHERE key IN ('hermes','zernio','whatsapp')"
