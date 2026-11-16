@@ -98,3 +98,47 @@ A failed proof rolls back enrollment, and uncertain submissions remain held.
 
 Ambiguous identity fields do not halt a verified welcome. No ambiguous name or
 phone is saved; the existing identity question follows the group invitation.
+
+## TikTok private-message intake
+
+The separately activated TikTok lane is **text-only** and accepts authenticated
+`message.received` DMs for one explicitly configured Jardines account. Comments,
+comment-to-DM, outgoing events, other accounts and generic workflow sends remain
+excluded. It does not change WhatsApp/Facebook activation versions or audio order.
+
+The sequence is introduction/request for `Nombre completo:` and `Celular:` → wait
+for both valid, self-declared fields → canonical CRM contact/deal capture → text
+registration confirmation → website → configured WhatsApp-group invitation.
+Partial identity survives separate messages, but TikTok names must be explicitly
+labeled `Nombre completo:` or `Full name:`. Ordinary interest phrases, display
+names and opaque IDs are not registration identity. No links or registration claim precede persistence.
+The contact INSERT trigger queues the existing two internal team notices in that
+same transaction, with TikTok shown as origin. Existing phone records and stages
+are preserved without duplicate new-lead notices. Hourly report category contracts
+remain unchanged; TikTok contacts currently belong to their existing other category.
+
+Migration 030 adds independent private configuration, text phase receipts and a
+rolling reply-reservation ledger. Activation is not automatic: an enabled owner
+calls `tiktok_intake.configure` with the exact profile/account and a recent signed
+DM receipt. A live Inbox read must independently verify that source. The existing
+Zernio credential/profile, project group, connection switches, control ownership
+and administrator must match. This does not reconnect an account or infer DM
+eligibility from posting access. Provider eligibility remains required; no permission
+error is bypassed. Verify the internal-notice configuration separately before activation.
+
+Each external phase requires a durable reservation. At most ten local reservations
+per scoped participant are allowed in a conservative rolling 48-hour window,
+including uncertain outcomes. Complete live history adds other outgoing messages
+to that budget. Partial history, manual replies after intake starts, STOP, revoked
+configuration, stale sources or explicit human ownership halt sends. Original source
+messages must be within 48 hours; WhatsApp/Facebook retain their 24-hour guard.
+An ambiguous submission is never automatically retried. Identity can still be
+persisted when the outbound budget is exhausted. No TikTok TTS/audio call is made.
+The existing fair expiry still applies; activation does not extend the campaign.
+
+Verification uses signed synthetic DMs and fake Inbox/TTS in the isolated CRM test
+database, including cross-channel regressions, ordered receipts, opt-outs, 48-hour
+expiry, ten-reply boundaries and concurrent reservation attempts. Production
+activation and an actual platform-accepted send are separate operational checks.
+
+Provider contract: [TikTok Inbox](https://docs.zernio.com/platforms/tiktok/inbox).

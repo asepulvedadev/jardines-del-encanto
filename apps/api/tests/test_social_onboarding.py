@@ -1106,3 +1106,390 @@ def test_operator_recovers_proven_pre_send_blocked_row_without_replaying_a_recei
     with connect() as db, pytest.raises(ValueError, match="recovery_existing_history"):
         onboarding.recover_unanswered(db, event["id"], actor_id=actor)
     assert len(deliveries) == 3
+
+
+@pytest.fixture
+def tiktok_intake(intake, configured, monkeypatch):
+    from app.social import tiktok_intake as tiktok
+
+    _incoming, deliveries, synthesis, events, owner = intake
+    client = configured[0]
+    original_account = onboarding_transport.service.account
+    monkeypatch.setattr(
+        onboarding_transport.service,
+        "account",
+        lambda c, a: {"platform": "tiktok"} if a == "tiktok-one" else original_account(c, a),
+    )
+    with connect() as db:
+        db.execute("UPDATE crm.control_connections SET enabled=true WHERE key='tiktok'")
+        cfg = onboarding.settings(db)
+        credentials = onboarding.config.required()
+
+    def incoming(text="Hola", suffix="dm", event_type="message.received"):
+        event = payload("opaque-tiktok-user")
+        event["id"] = "tiktok-event-" + suffix
+        event["event"] = event_type
+        event["account"].update(id="tiktok-one", platform="tiktok")
+        event["conversation"].update(id="tiktok-thread", platform="tiktok")
+        event["message"].update(
+            platform="tiktok",
+            conversationId="tiktok-thread",
+            text=text,
+            platformMessageId="tiktok-message-" + suffix,
+        )
+        event["message"]["sender"].pop("phoneNumber", None)
+        event["message"]["sender"]["name"] = "Un Nombre Visible"
+        events["tiktok-thread"] = event
+        assert send(client, credentials, event).status_code == 200
+        return event
+
+    # Activate only after a signed DM has matching live Inbox evidence.
+    proof = incoming(suffix="proof")
+    with connect() as db:
+        tiktok.configure(
+            db,
+            owner_id=cfg["owner_id"],
+            profile_id=cfg["profile_id"],
+            account_id="tiktok-one",
+            proof_event_id=proof["id"],
+        )
+    return incoming, deliveries, synthesis, events, owner
+
+
+def test_tiktok_dm_collects_identity_before_confirmation_and_links(tiktok_intake):
+    from app.social import lead_notifications
+
+    incoming, deliveries, synthesis, _events, owner = tiktok_intake
+    incoming()
+    onboarding.tick()
+    row = state(owner)[0]
+    assert [d[0] for d in deliveries] == ["introduction"]
+    assert "Nombre completo:" in deliveries[0][1]["body"]["message"]
+    assert row["details"] == {} and row["contact_id"] is None
+    assert row["state"] == "waiting" and not synthesis
+    with connect() as db:
+        assert db.execute("SELECT count(*) AS n FROM crm.contacts").fetchone()["n"] == 0
+        # Exercise the already configured, two-recipient internal outbox.
+        db.execute(
+            "INSERT INTO crm.lead_notice_config(singleton,enabled,owner_id,profile_id,account_id,credential_revision,document_revision,activated_at,next_hour,next_daily,recipients) SELECT true,true,owner_id,profile_id,'notice-account',credential_revision,credential_revision,now(),now(),now(),%s FROM crm.tiktok_intake_config",
+            (
+                psycopg.types.json.Jsonb(
+                    [
+                        {"name": "Andrés", "phone": "+573001111001", "conversation_id": "dev-a"},
+                        {"name": "Johan", "phone": "+573001111002", "conversation_id": "dev-b"},
+                    ]
+                ),
+            ),
+        )
+    incoming("3001110099", suffix="phone")
+    onboarding.tick()
+    assert not synthesis and [d[0] for d in deliveries] == ["introduction", "question"]
+    incoming("Nombre completo: Mariana Torres", suffix="name")
+    for _ in range(3):
+        onboarding.tick()
+    row = state(owner)[0]
+    assert [d[0] for d in deliveries] == [
+        "introduction",
+        "question",
+        "confirmation",
+        "website",
+        "group",
+    ]
+    assert row["state"] == "completed" and row["contact_id"] and not synthesis
+    assert row["audio_receipt"] == {}
+    assert (
+        row["introduction_receipt"]["status"] == row["confirmation_receipt"]["status"] == "accepted"
+    )
+    with connect() as db:
+        contact = db.execute("SELECT * FROM crm.contacts").fetchone()
+        assert contact["name"] == "Mariana Torres" and contact["phone"] == "+573001110099"
+        assert lead_notifications.origin(db, contact["id"], contact["source"]) == "TikTok"
+        assert (
+            db.execute("SELECT count(*) AS n FROM crm.deals WHERE stage='new'").fetchone()["n"] == 1
+        )
+        assert (
+            db.execute("SELECT count(*) AS n FROM crm.lead_notice_deliveries").fetchone()["n"] == 2
+        )
+    incoming("Nombre completo: Mariana Torres\nCelular: 3001110099", suffix="repeat")
+    onboarding.tick()
+    assert len(deliveries) == 5
+
+
+@pytest.mark.parametrize("event_type", ["comment.received", "message.sent"])
+def test_tiktok_comments_and_outgoing_do_not_start_intake(tiktok_intake, event_type):
+    incoming, deliveries, synthesis, _events, owner = tiktok_intake
+    incoming(event_type=event_type)
+    onboarding.tick()
+    assert state(owner) == [] and not deliveries and not synthesis
+
+
+def test_tiktok_ambiguous_identity_does_not_confirm_or_link(tiktok_intake):
+    incoming, deliveries, synthesis, _events, owner = tiktok_intake
+    incoming("Nombre completo: Mariana Torres\nCelular: 3001110099\nCelular: 3001110088")
+    onboarding.tick()
+    assert state(owner)[0]["contact_id"] is None
+    assert [d[0] for d in deliveries] == ["introduction"] and not synthesis
+    incoming("Nombre completo: Mariana Torres\nCelular: 3001110099", suffix="corrected")
+    for _ in range(3):
+        onboarding.tick()
+    assert [d[0] for d in deliveries] == ["introduction", "confirmation", "website", "group"]
+
+
+def test_tiktok_uncertain_introduction_is_not_retried(tiktok_intake, monkeypatch):
+    incoming, deliveries, synthesis, _events, owner = tiktok_intake
+    incoming()
+    original = onboarding_transport.provider.request
+
+    def fail(c, op, args, key=None):
+        if op["method"] == "POST":
+            raise TimeoutError("fixture uncertainty")
+        return original(c, op, args, key=key)
+
+    monkeypatch.setattr(onboarding_transport.provider, "request", fail)
+    onboarding.tick()
+    assert state(owner)[0]["state"] == "unknown"
+    onboarding.tick()
+    assert state(owner)[0]["state"] == "unknown" and not deliveries and not synthesis
+
+
+@pytest.mark.parametrize("reserved", [9, 10])
+def test_tiktok_ten_reply_budget_is_durable(tiktok_intake, reserved):
+    incoming, deliveries, synthesis, _events, owner = tiktok_intake
+    incoming()
+    row = state(owner)[0]
+    with connect() as db:
+        for index in range(reserved):
+            db.execute(
+                "INSERT INTO crm.tiktok_reply_reservations(onboarding_id,profile_id,account_id,participant_id,phase) VALUES(%s,%s,%s,%s,%s)",
+                (
+                    row["id"],
+                    row["profile_id"],
+                    row["account_id"],
+                    row["participant_id"],
+                    "probe-" + str(index),
+                ),
+            )
+    onboarding.tick()
+    assert len(deliveries) == (1 if reserved == 9 else 0)
+    with connect() as db:
+        assert (
+            db.execute("SELECT count(*) AS n FROM crm.tiktok_reply_reservations").fetchone()["n"]
+            == 10
+        )
+    assert not synthesis
+
+
+@pytest.mark.parametrize("hours,allowed", [(47, True), (49, False)])
+def test_tiktok_reply_window_is_48_hours_only(tiktok_intake, hours, allowed):
+    from datetime import UTC, datetime, timedelta
+
+    from psycopg.types.json import Jsonb
+
+    incoming, deliveries, synthesis, events, _owner = tiktok_intake
+    event = incoming()
+    sent = (datetime.now(UTC) - timedelta(hours=hours)).isoformat()
+    event["message"]["sentAt"] = sent
+    events["tiktok-thread"] = event
+    with connect() as db:
+        row = db.execute("SELECT * FROM crm.social_onboarding").fetchone()
+        row["source"]["sent_at"] = sent
+        db.execute(
+            "UPDATE crm.social_onboarding SET source=%s WHERE id=%s",
+            (Jsonb(row["source"]), row["id"]),
+        )
+    with connect() as db:
+        if allowed:
+            onboarding_transport.source(db, row)
+        else:
+            with pytest.raises(ValueError, match="welcome_source_unverified"):
+                onboarding_transport.source(db, row)
+    assert not deliveries and not synthesis
+
+
+@pytest.mark.parametrize(
+    "kind", ["partial", "other_reply", "outgoing_budget", "human_control", "stop"]
+)
+def test_tiktok_live_guards_prevent_sends(tiktok_intake, monkeypatch, kind):
+    from datetime import UTC, datetime
+
+    incoming, deliveries, synthesis, _events, owner = tiktok_intake
+    incoming("STOP" if kind == "stop" else "Hola")
+    original = onboarding_transport.provider.request
+
+    def altered(c, op, args, key=None):
+        result = original(c, op, args, key=key)
+        if op["method"] == "GET" and op["path"].endswith("/messages"):
+            if kind == "partial":
+                result["pagination"] = {"hasMore": True}
+            if kind in {"other_reply", "outgoing_budget"}:
+                count = 10 if kind == "outgoing_budget" else 1
+                # A pre-intake history spends quota without implying current human takeover.
+                with connect() as db:
+                    created = db.execute("SELECT created_at FROM crm.social_onboarding").fetchone()[
+                        "created_at"
+                    ]
+                for n in range(count):
+                    from datetime import timedelta
+
+                    result["messages"].append(
+                        {
+                            "id": "external-" + str(n),
+                            "conversationId": "tiktok-thread",
+                            "accountId": "tiktok-one",
+                            "platform": "tiktok",
+                            "direction": "outgoing",
+                            "createdAt": (
+                                created - timedelta(seconds=1)
+                                if kind == "outgoing_budget"
+                                else datetime.now(UTC)
+                            ).isoformat(),
+                        }
+                    )
+        elif op["method"] == "GET" and kind == "human_control":
+            result["data"]["threadControl"] = "human"
+        return result
+
+    monkeypatch.setattr(onboarding_transport.provider, "request", altered)
+    onboarding.tick()
+    assert not deliveries and not synthesis
+    assert state(owner)[0]["state"] in {"blocked", "unknown", "pending"}
+
+
+def test_tiktok_registration_is_saved_even_when_reply_quota_is_spent(tiktok_intake):
+    incoming, deliveries, synthesis, _events, owner = tiktok_intake
+    incoming("Nombre completo: Mariana Torres\nCelular: 3001110099")
+    row = state(owner)[0]
+    with connect() as db:
+        for n in range(10):
+            db.execute(
+                "INSERT INTO crm.tiktok_reply_reservations(onboarding_id,profile_id,account_id,participant_id,phase) VALUES(%s,%s,%s,%s,%s)",
+                (
+                    row["id"],
+                    row["profile_id"],
+                    row["account_id"],
+                    row["participant_id"],
+                    "prior-" + str(n),
+                ),
+            )
+    onboarding.tick()
+    assert state(owner)[0]["contact_id"] and not deliveries and not synthesis
+
+
+def test_tiktok_confirmation_cannot_bypass_registration_or_intro(tiktok_intake):
+    incoming, deliveries, synthesis, _events, owner = tiktok_intake
+    incoming()
+    row = state(owner)[0]
+    with connect() as db:
+        db.execute(
+            "UPDATE crm.social_onboarding SET state='confirmation_reserved' WHERE id=%s",
+            (row["id"],),
+        )
+        db.execute(
+            "INSERT INTO crm.tiktok_reply_reservations(onboarding_id,profile_id,account_id,participant_id,phase,source_message_id) VALUES(%s,%s,%s,%s,'confirmation',%s)",
+            (
+                row["id"],
+                row["profile_id"],
+                row["account_id"],
+                row["participant_id"],
+                row["source"]["message_id"],
+            ),
+        )
+    with pytest.raises(ValueError, match="introduction_required"):
+        onboarding_transport.execute("welcome_confirmation", str(row["id"]))
+    with connect() as db:
+        db.execute(
+            "UPDATE crm.social_onboarding SET introduction_receipt=%s WHERE id=%s",
+            (psycopg.types.json.Jsonb({"status": "accepted", "message_id": "intro"}), row["id"]),
+        )
+    with pytest.raises(ValueError, match="registration_required"):
+        onboarding_transport.execute("welcome_confirmation", str(row["id"]))
+    assert not deliveries and not synthesis
+
+
+def test_tiktok_quota_reservation_is_serialized(tiktok_intake):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from app.social import tiktok_intake as tiktok
+
+    incoming, _deliveries, _synthesis, _events, owner = tiktok_intake
+    incoming()
+    row = state(owner)[0]
+    with connect() as db:
+        for n in range(9):
+            db.execute(
+                "INSERT INTO crm.tiktok_reply_reservations(onboarding_id,profile_id,account_id,participant_id,phase) VALUES(%s,%s,%s,%s,%s)",
+                (
+                    row["id"],
+                    row["profile_id"],
+                    row["account_id"],
+                    row["participant_id"],
+                    "prior-" + str(n),
+                ),
+            )
+
+    def attempt(step):
+        try:
+            with connect() as db:
+                tiktok.reserve(db, row, step)
+            return True
+        except ValueError as exc:
+            assert str(exc) == "welcome_tiktok_reply_budget"
+            return False
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(attempt, ["probe-one", "probe-two"]))
+    assert sorted(results) == [False, True]
+
+
+def test_tiktok_activation_and_normalization_do_not_enable_generic_workflows(tiktok_intake):
+    from app.social import workflow
+
+    incoming, _deliveries, _synthesis, _events, _owner = tiktok_intake
+    event = incoming()
+    assert workflow.normalize_event(event) is None
+    assert onboarding.normalize(event, "a" * 24)["platform"] == "tiktok"
+    with connect() as db:
+        assert set(onboarding.settings(db)["accounts"].values()) == {"whatsapp", "facebook"}
+        assert onboarding.settings(db, "tiktok")["accounts"] == {"tiktok-one": "tiktok"}
+
+
+def test_tiktok_disabled_config_and_fair_expiry_stop_sends(tiktok_intake, monkeypatch):
+    from datetime import UTC, datetime, timedelta
+
+    incoming, deliveries, synthesis, _events, _owner = tiktok_intake
+    incoming()
+    with connect() as db:
+        db.execute("UPDATE crm.tiktok_intake_config SET enabled=false")
+    onboarding.tick()
+    assert not deliveries and not synthesis
+    with connect() as db:
+        db.execute("UPDATE crm.tiktok_intake_config SET enabled=true")
+    monkeypatch.setattr(onboarding, "WELCOME_UNTIL", datetime.now(UTC) - timedelta(seconds=1))
+    onboarding.tick()
+    assert not deliveries and not synthesis
+
+
+def test_tiktok_interest_text_is_not_a_self_declared_name(tiktok_intake):
+    incoming, deliveries, synthesis, _events, owner = tiktok_intake
+    incoming()
+    onboarding.tick()
+    incoming("3001110099", suffix="phone")
+    onboarding.tick()
+    incoming("Me interesa el proyecto", suffix="interest")
+    onboarding.tick()
+    row = state(owner)[0]
+    assert row["details"] == {"phone": "+573001110099"}
+    assert row["contact_id"] is None
+    with connect() as db:
+        assert db.execute("SELECT count(*) AS n FROM crm.contacts").fetchone()["n"] == 0
+        assert (
+            db.execute("SELECT count(*) AS n FROM crm.lead_notice_deliveries").fetchone()["n"] == 0
+        )
+    assert [d[0] for d in deliveries] == ["introduction", "question", "question"]
+    assert len({d[2] for d in deliveries}) == 3
+    assert not synthesis
+    incoming("Nombre completo: Mariana Torres", suffix="self-identified")
+    for _ in range(3):
+        onboarding.tick()
+    assert state(owner)[0]["contact_id"]
+    assert [d[0] for d in deliveries][-3:] == ["confirmation", "website", "group"]

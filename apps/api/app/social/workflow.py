@@ -152,7 +152,9 @@ def _request(
                 # Zernio documents this header for replies. It never authorizes retries.
                 if operation == "reply":
                     headers["Idempotency-Key"] = _identifier(request_id, 200)
-            connection.request("POST" if sending else "GET", "/api" + path, body=body, headers=headers)
+            connection.request(
+                "POST" if sending else "GET", "/api" + path, body=body, headers=headers
+            )
             response = connection.getresponse()
             if not 200 <= response.status < 300:
                 raise ValueError
@@ -730,7 +732,7 @@ def options(db, account_id=None):
         return result
 
 
-def normalize_event(payload):
+def normalize_event(payload, *, allowed_platforms=PLATFORMS):
     """Parser ONLY. Caller must first authenticate HMAC, dedupe and verify ownership."""
     if (
         not isinstance(payload, dict)
@@ -750,7 +752,10 @@ def normalize_event(payload):
         )
         if any(not isinstance(v, dict) for v in (message, account, conversation)):
             return None
-        if message.get("platform") not in PLATFORMS or message.get("direction") != "incoming":
+        if (
+            message.get("platform") not in allowed_platforms
+            or message.get("direction") != "incoming"
+        ):
             return None
         if account.get("platform") != message["platform"]:
             return None

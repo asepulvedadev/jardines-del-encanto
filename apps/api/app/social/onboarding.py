@@ -110,7 +110,11 @@ def details(text, sender, previous):
     return result
 
 
-def settings(db):
+def settings(db, platform=None):
+    if platform == "tiktok":
+        from .tiktok_intake import settings as tiktok_settings
+
+        return tiktok_settings(db)
     return db.execute("SELECT * FROM crm.social_onboarding_config WHERE singleton").fetchone()
 
 
@@ -175,9 +179,10 @@ def normalize(payload, profile_id):
             "account": {**account, "profileId": profile_id},
             "conversation": {**conversation, "platformConversationId": conversation.get("id")},
             "message": {**message, "sender": sender},
-        }
+        },
+        allowed_platforms=workflow.PLATFORMS | {"tiktok"},
     )
-    if not event or event["platform"] not in {"whatsapp", "facebook"}:
+    if not event or event["platform"] not in {"whatsapp", "facebook", "tiktok"}:
         return None
     message = payload["message"]
     text = message.get("text")
@@ -306,7 +311,10 @@ def recover_unanswered(db, event_id, *, actor_id):
 
 
 def _enqueue(db, payload, profile_id, *, earliest):
-    cfg = settings(db)
+    event = normalize(payload, profile_id)
+    if not event:
+        return False
+    cfg = settings(db, event["platform"])
     if (
         not cfg
         or not cfg["enabled"]
@@ -314,8 +322,7 @@ def _enqueue(db, payload, profile_id, *, earliest):
         or datetime.now(UTC) >= WELCOME_UNTIL
     ):
         return False
-    event = normalize(payload, profile_id)
-    if not event or cfg["accounts"].get(event["account_id"]) != event["platform"]:
+    if cfg["accounts"].get(event["account_id"]) != event["platform"]:
         return False
     current = whatsapp_agent.current(db)
     if (
@@ -409,7 +416,7 @@ def participant_suppressed(db, participant):
 
 
 def guard_scope(db, row):
-    cfg = settings(db)
+    cfg = settings(db, row["platform"])
     if (
         not cfg
         or not cfg["enabled"]
@@ -511,11 +518,11 @@ def tick():
         try:
             # These durable reservations can only remain after an interrupted process.
             db.execute(
-                "UPDATE crm.social_onboarding SET state='unknown',error='interrupted' WHERE state IN ('audio_reserved','links_reserved','question_reserved','website_reserved','group_reserved')"
+                "UPDATE crm.social_onboarding SET state='unknown',error='interrupted' WHERE state IN ('audio_reserved','links_reserved','question_reserved','website_reserved','group_reserved','introduction_reserved','confirmation_reserved')"
             )
             row = db.execute(
                 """SELECT o.* FROM crm.social_onboarding o WHERE NOT suppressed AND (
-                state IN ('pending','captured','audio_accepted','website_accepted') OR
+                state IN ('pending','captured','audio_accepted','website_accepted','introduction_accepted','confirmation_accepted') OR
                 (state='waiting' AND NOT asked) OR EXISTS(
                 SELECT 1 FROM crm.social_onboarding_inputs i WHERE i.onboarding_id=o.id AND NOT i.processed))
                 ORDER BY created_at,id LIMIT 1"""
@@ -538,12 +545,21 @@ def tick():
             source = check(row)
             if not row["contact_id"]:
                 try:
-                    value = details(row["source"]["text"], source["sender"], row["details"])
+                    value = details(
+                        row["source"]["text"],
+                        {} if row["platform"] == "tiktok" else source["sender"],
+                        row["details"],
+                    )
                 except ValueError:
                     value = None  # Ask for corrected identity after the welcome; never guess.
                 if value is not None:
-                    # Plain name is accepted only in response to our explicit missing-name question.
-                    if row["asked"] and "name" not in value and valid_name(row["source"]["text"]):
+                    # Existing channels retain their prompted plain-name fallback; TikTok requires a labeled name.
+                    if (
+                        row["platform"] != "tiktok"
+                        and row["asked"]
+                        and "name" not in value
+                        and valid_name(row["source"]["text"])
+                    ):
                         value["name"] = valid_name(row["source"]["text"])
                     db.execute(
                         "UPDATE crm.social_onboarding SET details=%s WHERE id=%s",
@@ -572,7 +588,18 @@ def tick():
             db.commit()  # Real identity capture never waits for a media delivery.
             if row["state"] in {"unknown", "blocked"}:
                 return
-            if row["welcome_required"] and row["state"] in {"pending", "captured"}:
+            if row["platform"] == "tiktok":
+                from . import tiktok_intake
+
+                phase = tiktok_intake.phase(row, incoming)
+                if phase is None:
+                    db.execute(
+                        "UPDATE crm.social_onboarding SET state=%s WHERE id=%s",
+                        ("completed" if row["contact_id"] else "waiting", row["id"]),
+                    )
+                    db.commit()
+                    return
+            elif row["welcome_required"] and row["state"] in {"pending", "captured"}:
                 phase = "audio"
             elif row["welcome_required"] and row["state"] == "audio_accepted":
                 phase = "website"
@@ -593,6 +620,8 @@ def tick():
                     "UPDATE crm.social_onboarding SET audio=%s WHERE id=%s", (data, row["id"])
                 )
             guard(db, row)
+            if row["platform"] == "tiktok":
+                tiktok_intake.reserve(db, row, phase)
             db.execute(
                 "UPDATE crm.social_onboarding SET state=%s,updated_at=now() WHERE id=%s",
                 (phase + "_reserved", row["id"]),
@@ -607,7 +636,41 @@ def tick():
                 "website": "website_accepted",
                 "group": "completed" if row["contact_id"] else "waiting",
                 "question": "waiting",
+                "introduction": "introduction_accepted" if row["contact_id"] else "waiting",
+                "confirmation": "confirmation_accepted",
             }[phase]
+            if row["platform"] == "tiktok":
+                db.execute(
+                    """UPDATE crm.social_onboarding SET state=%s,asked=true,
+                    introduction_receipt=CASE WHEN %s THEN %s ELSE introduction_receipt END,
+                    confirmation_receipt=CASE WHEN %s THEN %s ELSE confirmation_receipt END,
+                    website_receipt=CASE WHEN %s THEN %s ELSE website_receipt END,
+                    group_receipt=CASE WHEN %s THEN %s ELSE group_receipt END,updated_at=now()
+                    WHERE id=%s""",
+                    (
+                        "completed" if phase == "group" else target,
+                        phase == "introduction",
+                        Jsonb(result.get("receipt", {})),
+                        phase == "confirmation",
+                        Jsonb(result.get("receipt", {})),
+                        phase == "website",
+                        Jsonb(result.get("receipt", {})),
+                        phase == "group",
+                        Jsonb(result.get("receipt", {})),
+                        row["id"],
+                    ),
+                )
+                db.execute(
+                    "UPDATE crm.tiktok_reply_reservations SET message_id=%s WHERE onboarding_id=%s AND phase=%s AND source_message_id=%s",
+                    (
+                        result["receipt"]["message_id"],
+                        row["id"],
+                        phase,
+                        row["source"]["message_id"],
+                    ),
+                )
+                db.commit()
+                return
             db.execute(
                 """UPDATE crm.social_onboarding SET state=%s,asked=asked OR %s,
                 audio_receipt=CASE WHEN %s THEN %s ELSE audio_receipt END,
