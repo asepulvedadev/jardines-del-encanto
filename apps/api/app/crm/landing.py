@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from .database import connect
 from .models import ContactInput, Input
 from .security import digest, require_origin
+from .services import capture_contact
 
 router = APIRouter(prefix="/public")
 
@@ -56,23 +57,10 @@ def throttle(phone):
 def register(data):
     throttle(data.phone)
     with connect() as db:
-        record = db.execute(
-            """INSERT INTO crm.contacts(name, phone, source) VALUES (%s,%s,'web')
-               ON CONFLICT (phone) DO NOTHING RETURNING id""",
-            (data.name, data.phone),
-        ).fetchone()
-        if not record:
-            record = db.execute(
-                "SELECT id FROM crm.contacts WHERE phone=%s FOR UPDATE", (data.phone,)
-            ).fetchone()
-        if not record:
-            # An administrator changed the phone concurrently; retry without partial writes.
-            raise HTTPException(409, "capture_retry")
-        contact_id = record["id"]
-        db.execute(
-            "INSERT INTO crm.deals(contact_id) VALUES (%s) ON CONFLICT (contact_id) DO NOTHING",
-            (contact_id,),
+        record, _ = capture_contact(
+            db, ContactInput(name=data.name, phone=data.phone, source="web")
         )
+        contact_id = record["id"]
         existing = db.execute(
             "SELECT code FROM crm.landing_registrations WHERE contact_id=%s", (contact_id,)
         ).fetchone()

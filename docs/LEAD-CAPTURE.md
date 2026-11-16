@@ -17,6 +17,8 @@ of Sara/Hermes, reply generation, workflow activation, calls and message deliver
   delivery-time or provider-retention guarantee is implied.
 - Only existing GET inbox operations can reach Zernio. It never marks messages read,
   sends replies, joins sequences, changes thread control or calls an AI model.
+  Existing separately configured Sara/onboarding replies retain their own authorization;
+  deploying this safety net does not activate or reconfigure them.
 
 ## Explicit scope
 

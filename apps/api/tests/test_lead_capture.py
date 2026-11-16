@@ -192,13 +192,14 @@ def test_status_is_private_and_contains_no_contact_data(intake):
     assert intake[0].get("/crm/inbox/lead-capture").status_code == 401
 
 
-def test_signed_webhook_saves_even_when_reply_agent_fails(intake, monkeypatch):
-    from app.social import whatsapp_agent
+@pytest.mark.parametrize("failure", ["agent", "onboarding"])
+def test_signed_webhook_saves_even_when_reply_agent_fails(intake, monkeypatch, failure):
+    from app.social import onboarding, whatsapp_agent
 
     def fail(db, *args):
         db.execute("SELECT 1/0")
 
-    monkeypatch.setattr(whatsapp_agent, "enqueue", fail)
+    monkeypatch.setattr(onboarding if failure == "onboarding" else whatsapp_agent, "enqueue", fail)
     payload = {
         "id": "capture-event-" + uuid4().hex,
         "event": "message.received",

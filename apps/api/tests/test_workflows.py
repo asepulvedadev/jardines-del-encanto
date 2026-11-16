@@ -325,7 +325,7 @@ def test_unknown_send_and_crashed_reservation_never_replay(fake_social):
     assert client.get(f"/crm/workflows/runs/{run2['id']}").json()["run"]["status"] == "unknown"
 
 
-def test_provider_change_and_verified_reply_hold(fake_social, monkeypatch):
+def test_provider_change_and_verified_reply_hold(fake_social):
     client, _owner, calls, changed = fake_social
     _person, _, review = prepare_run(client, social_doc())
     run = activate(client, review)
@@ -336,13 +336,14 @@ def test_provider_change_and_verified_reply_hold(fake_social, monkeypatch):
     changed["value"] = False
     _, _, review2 = prepare_run(client, social_doc(), phone="3001234568")
     run2 = activate(client, review2)
-    # Reply freshness must share the same clock; the fixture's fixed schedule
-    # instant otherwise rejects real timestamps after 15:05 UTC (or on later days).
-    reply_at = datetime.now(UTC)
-    monkeypatch.setattr(service, "now", lambda: reply_at)
     from app.crm.database import connect
 
     with connect() as db:
+        # PostgreSQL now() is real time; align the persisted start with the fixture clock.
+        db.execute(
+            "UPDATE crm.workflow_runs SET started_at=%s WHERE id=%s",
+            (service.now(), run2["id"]),
+        )
         worker.verified_reply(
             db,
             {
@@ -351,7 +352,7 @@ def test_provider_change_and_verified_reply_hold(fake_social, monkeypatch):
                 "participant_id": "participant",
                 "profile_id": "profile",
                 "platform": "whatsapp",
-                "sent_at": reply_at.isoformat(),
+                "sent_at": "2026-11-16T15:01:00Z",
             },
         )
     assert (
@@ -367,7 +368,7 @@ def test_provider_change_and_verified_reply_hold(fake_social, monkeypatch):
                 "participant_id": "participant",
                 "profile_id": "profile",
                 "platform": "whatsapp",
-                "sent_at": reply_at.isoformat(),
+                "sent_at": service.now().isoformat(),
             },
         )
     assert (

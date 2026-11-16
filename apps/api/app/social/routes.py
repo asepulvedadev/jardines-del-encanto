@@ -452,12 +452,14 @@ async def webhook(request: Request):
             from .workflow import normalize_event
 
             verified_reply(db, normalize_event(payload))
+            from .onboarding import enqueue as onboard
             from .whatsapp_agent import enqueue
 
             # A broken reply agent must not discard the verified intake receipt/lead.
             try:
                 with db.transaction():
-                    enqueue(db, payload, profile)
+                    if not onboard(db, payload, profile):
+                        enqueue(db, payload, profile)
             except Exception:  # noqa: BLE001, S110 - polling/intake remains independent
                 pass
         if not record:
