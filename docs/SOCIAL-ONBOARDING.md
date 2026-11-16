@@ -68,3 +68,28 @@ Official contracts: [inbox message send](https://docs.zernio.com/messages/send-i
 [Facebook inbox](https://docs.zernio.com/platforms/facebook/inbox),
 [conversation detail](https://docs.zernio.com/messages/get-inbox-conversation),
 [message detail](https://docs.zernio.com/messages/get-inbox-conversation-messages).
+
+## Owner-authorized unanswered recovery
+
+An operator may call `onboarding.recover_unanswered(db, event_id, actor_id=owner_id)`
+only after explicit owner approval for the missed inbound messages. This maintenance
+entry point is not exposed through HTTP, public models, tools or webhook fields.
+It requires the current enabled administrator owner and an already authenticated,
+persisted `message.received` receipt from the configured account/profile.
+
+Ordinary webhook enrollment retains its fifteen-minute freshness requirement.
+Explicit recovery may consider the original incoming event within the existing
+24-hour reply window, after activation and before the fair expiry. It never
+rewrites source timestamps, replays a webhook or resets an existing job. Any prior
+onboarding or agent-job history for the participant excludes recovery, including
+completed, blocked, uncertain and suppressed records.
+
+Recovery reuses canonical enrollment, its daily quota, participant claim and input
+queue. Migration 029 adds a private source-event audit marker. Live Inbox reads run before taking the shared enrollment lock, so recovery does
+not block fresh webhook enrollment. Account scope and history are rechecked under
+the short enrollment transaction. A live Inbox check must prove the same account, participant, message, content and app control before
+the new claim commits. Incomplete or explicitly partial/paginated history, a newer incoming message or
+any outgoing message excludes the candidate. Before every welcome phase, the worker rechecks
+that no other reply appeared; only its own accepted phase receipts are exempt.
+Once the group phase is accepted, ordinary identity capture continues unchanged.
+A failed proof rolls back enrollment, and uncertain submissions remain held.

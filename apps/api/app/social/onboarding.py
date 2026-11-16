@@ -189,6 +189,88 @@ def normalize(payload, profile_id):
 
 def enqueue(db, payload, profile_id):
     """Return True only when this public thread is owned by deterministic intake."""
+    return _enqueue(db, payload, profile_id, earliest=datetime.now(UTC) - timedelta(minutes=15))
+
+
+def recover_unanswered(db, event_id, *, actor_id):
+    """Operator-only recovery of a signed, still-unanswered event; never sends inline."""
+    from . import onboarding_transport
+
+    with db.transaction():
+        cfg = settings(db)
+        if (
+            not cfg
+            or not cfg["enabled"]
+            or cfg["owner_id"] != actor_id
+            or not db.execute(
+                "SELECT 1 FROM crm.users WHERE id=%s AND enabled AND role='admin'", (actor_id,)
+            ).fetchone()
+        ):
+            raise ValueError("recovery_not_authorized")
+        receipt = db.execute(
+            "SELECT body,profile_id FROM crm.social_webhook_events WHERE event_id=%s AND event='message.received' AND profile_id=%s",
+            (event_id, cfg["profile_id"]),
+        ).fetchone()
+        if not receipt:
+            raise ValueError("recovery_signed_receipt_required")
+        event = normalize(receipt["body"], receipt["profile_id"])
+        if not event or cfg["accounts"].get(event["account_id"]) != event["platform"]:
+            raise ValueError("recovery_scope_changed")
+        earliest = datetime.now(UTC) - timedelta(hours=24)
+        if (
+            not max(cfg["enabled_at"], earliest)
+            < workflow._time(event["sent_at"])
+            <= datetime.now(UTC)
+        ):
+            raise ValueError("recovery_source_expired")
+        if opted_out(event["text"]):
+            raise ValueError("recovery_opted_out")
+        scope = (receipt["profile_id"], event["account_id"], event["participant_id"])
+
+        def require_no_history():
+            if (
+                db.execute(
+                    "SELECT 1 FROM crm.social_onboarding WHERE profile_id=%s AND account_id=%s AND participant_id=%s LIMIT 1",
+                    scope,
+                ).fetchone()
+                or db.execute(
+                    "SELECT 1 FROM crm.whatsapp_agent_jobs WHERE profile_id=%s AND account_id=%s AND participant_id=%s LIMIT 1",
+                    scope,
+                ).fetchone()
+            ):
+                raise ValueError("recovery_existing_history")
+
+        require_no_history()
+        candidate = {
+            **event,
+            "id": None,
+            "profile_id": receipt["profile_id"],
+            "config_version": cfg["version"],
+            "source": event,
+            "recovery_event_id": event_id,
+            "audio_receipt": {},
+            "website_receipt": {},
+            "group_receipt": {},
+        }
+        # Upstream reads must never hold the shared enrollment lock: fresh public
+        # webhooks continue enrolling while the operator checks this candidate.
+        onboarding_transport.recovery_source(db, candidate)
+        db.execute("SELECT pg_advisory_xact_lock(9142041)")
+        require_no_history()  # A live webhook may have enrolled it during the read.
+        guard_scope(db, candidate)  # Configuration/owner may also have changed.
+        _enqueue(db, receipt["body"], receipt["profile_id"], earliest=earliest)
+        row = db.execute(
+            "UPDATE crm.social_onboarding SET recovery_event_id=%s WHERE profile_id=%s AND account_id=%s AND conversation_id=%s RETURNING *",
+            (event_id, receipt["profile_id"], event["account_id"], event["conversation_id"]),
+        ).fetchone()
+        if not row:
+            raise ValueError("recovery_not_admitted")
+        guard(db, row)
+        # The normal worker rechecks live unanswered proof before every send.
+        return {"state": "queued", "id": str(row["id"]), "platform": row["platform"]}
+
+
+def _enqueue(db, payload, profile_id, *, earliest):
     cfg = settings(db)
     if (
         not cfg
@@ -211,11 +293,7 @@ def enqueue(db, payload, profile_id):
     ):
         return False
     sent = workflow._time(event["sent_at"])
-    if (
-        not max(cfg["enabled_at"], datetime.now(UTC) - timedelta(minutes=15))
-        < sent
-        <= datetime.now(UTC)
-    ):
+    if not max(cfg["enabled_at"], earliest) < sent <= datetime.now(UTC):
         return True
     key = (profile_id, event["account_id"], event["conversation_id"])
     # Serialize participant claims across distinct conversations, including STOP.
@@ -295,19 +373,15 @@ def participant_suppressed(db, participant):
     )
 
 
-def guard(db, row):
+def guard_scope(db, row):
     cfg = settings(db)
-    actual = db.execute("SELECT * FROM crm.social_onboarding WHERE id=%s", (row["id"],)).fetchone()
     if (
         not cfg
         or not cfg["enabled"]
-        or not actual
-        or actual["suppressed"]
         or participant_suppressed(
             db, (row["profile_id"], row["account_id"], row["platform"], row["participant_id"])
         )
-        or actual["config_version"] != cfg["version"]
-        or actual["source"] != row["source"]
+        or row["config_version"] != cfg["version"]
         or datetime.now(UTC) >= WELCOME_UNTIL
         or cfg["profile_id"] != row["profile_id"]
         or cfg["accounts"].get(row["account_id"]) != row["platform"]
@@ -323,6 +397,19 @@ def guard(db, row):
         or workflow._digest(credentials) != cfg["credential_revision"]
     ):
         raise HTTPException(409, "onboarding_profile_changed")
+    return cfg, credentials
+
+
+def guard(db, row):
+    cfg, credentials = guard_scope(db, row)
+    actual = db.execute("SELECT * FROM crm.social_onboarding WHERE id=%s", (row["id"],)).fetchone()
+    if (
+        not actual
+        or actual["suppressed"]
+        or actual["config_version"] != cfg["version"]
+        or actual["source"] != row["source"]
+    ):
+        raise HTTPException(409, "onboarding_scope_changed")
     return cfg, credentials
 
 

@@ -864,3 +864,208 @@ def test_welcome_rolling_daily_limit_is_one_thousand(intake, existing, admitted)
             0
         ] == existing + int(admitted)
     assert deliveries == []
+
+
+def missed_signed_event(intake, configured, platform="whatsapp", age_hours=1):
+    from datetime import UTC, datetime, timedelta
+
+    incoming, _, _, _, owner = intake
+    client, _, credentials = configured
+    event = incoming(platform, text="Hola", suffix="missed")
+    with psycopg.connect(owner) as db:
+        db.execute("DELETE FROM crm.social_onboarding")
+        db.execute("DELETE FROM crm.social_webhook_events")
+        db.execute("UPDATE crm.social_onboarding_config SET enabled_at=now()-interval '3 hours'")
+    event["message"]["sentAt"] = (datetime.now(UTC) - timedelta(hours=age_hours)).isoformat()
+    assert send(client, credentials, event).status_code == 200
+    assert state(owner) == []  # Ordinary inbound enrollment still rejects old events.
+    return event
+
+
+@pytest.mark.parametrize("platform", ["whatsapp", "facebook"])
+def test_operator_recovers_only_signed_unanswered_welcome_once(intake, configured, platform):
+    event = missed_signed_event(intake, configured, platform)
+    _, deliveries, _, _, owner = intake
+    with connect() as db:
+        actor = onboarding.settings(db)["owner_id"]
+        assert onboarding.recover_unanswered(db, event["id"], actor_id=actor)["state"] == "queued"
+    with connect() as db, pytest.raises(ValueError, match="recovery_existing_history"):
+        onboarding.recover_unanswered(db, event["id"], actor_id=actor)
+    for _ in range(3):
+        onboarding.tick()
+    assert [d[0] for d in deliveries] == ["audio", "website", "group"]
+    assert state(owner)[0]["recovery_event_id"] == event["id"]
+
+
+@pytest.mark.parametrize(
+    "mutation", ["manual_reply", "uncertain_history", "expired", "wrong_actor"]
+)
+def test_operator_recovery_rejects_unsafe_history_without_enrollment(
+    intake, configured, monkeypatch, mutation
+):
+    from uuid import uuid4
+
+    event = missed_signed_event(intake, configured, age_hours=25 if mutation == "expired" else 1)
+    _, deliveries, _, _, owner = intake
+    if mutation == "manual_reply":
+        original = onboarding_transport.provider.request
+
+        def replied(credentials, spec, args, key=None):
+            result = original(credentials, spec, args, key)
+            if spec["path"].endswith("/messages"):
+                message = {
+                    **result["messages"][0],
+                    "id": "manual-response",
+                    "direction": "outgoing",
+                    "message": "Te respondió un asesor",
+                }
+                result["messages"].insert(0, message)
+            return result
+
+        monkeypatch.setattr(onboarding_transport.provider, "request", replied)
+    if mutation == "uncertain_history":
+        with connect() as db:
+            db.execute(
+                """INSERT INTO crm.social_onboarding(profile_id,account_id,conversation_id,participant_id,platform,config_version,source,state)
+                VALUES(%s,%s,%s,%s,%s,1,%s,'unknown')""",
+                (
+                    configured[2]["profile_id"],
+                    event["account"]["id"],
+                    event["conversation"]["id"],
+                    event["conversation"]["participantId"],
+                    event["account"]["platform"],
+                    psycopg.types.json.Jsonb(
+                        onboarding.normalize(event, configured[2]["profile_id"])
+                    ),
+                ),
+            )
+    with connect() as db:
+        actor = uuid4() if mutation == "wrong_actor" else onboarding.settings(db)["owner_id"]
+        with pytest.raises(
+            ValueError,
+            match={
+                "manual_reply": "welcome_recovery_already_answered",
+                "uncertain_history": "recovery_existing_history",
+                "expired": "recovery_source_expired",
+                "wrong_actor": "recovery_not_authorized",
+            }[mutation],
+        ):
+            onboarding.recover_unanswered(db, event["id"], actor_id=actor)
+    assert len(state(owner)) == int(mutation == "uncertain_history")
+    assert deliveries == []
+
+
+@pytest.mark.parametrize("phase_count", [0, 2])
+def test_recovery_rechecks_manual_reply_before_each_remaining_phase(
+    intake, configured, monkeypatch, phase_count
+):
+    event = missed_signed_event(intake, configured)
+    _, deliveries, _, _, owner = intake
+    with connect() as db:
+        onboarding.recover_unanswered(db, event["id"], actor_id=onboarding.settings(db)["owner_id"])
+    original = onboarding_transport.provider.request
+    manual = False
+
+    def messages_with_sent_receipts(credentials, spec, args, key=None):
+        result = original(credentials, spec, args, key)
+        if spec["method"] == "GET" and spec["path"].endswith("/messages"):
+            prototype = result["messages"][0]
+            for index, item in enumerate(deliveries, 1):
+                identifier = "audio-accepted" if item[0] == "audio" else "sent-" + str(index)
+                result["messages"].insert(
+                    0, {**prototype, "id": identifier, "direction": "outgoing"}
+                )
+            if manual:
+                result["messages"].insert(
+                    0, {**prototype, "id": "human-response", "direction": "outgoing"}
+                )
+        return result
+
+    monkeypatch.setattr(onboarding_transport.provider, "request", messages_with_sent_receipts)
+    for _ in range(phase_count):
+        onboarding.tick()
+    manual = True
+    onboarding.tick()
+    assert [d[0] for d in deliveries] == ["audio", "website"][:phase_count]
+    assert state(owner)[0]["state"] == "blocked"
+
+
+def test_recovery_requires_an_actual_signed_receipt(intake, configured):
+    _, deliveries, _, _, owner = intake
+    with connect() as db, pytest.raises(ValueError, match="recovery_signed_receipt_required"):
+        onboarding.recover_unanswered(
+            db, "not-a-real-event", actor_id=onboarding.settings(db)["owner_id"]
+        )
+    assert state(owner) == [] and deliveries == []
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {"pagination": {"hasMore": True}},
+        {"pagination": {"nextCursor": "omitted-page"}},
+        {"partialFailure": True},
+        {"warning": "partial_results"},
+        {"meta": {"accountsFailed": 1}},
+        {"meta": {"accountsSkipped": 1}},
+        {"meta": {"failedAccounts": ["unavailable"]}},
+    ],
+)
+def test_recovery_requires_a_complete_inbox_envelope(intake, configured, monkeypatch, metadata):
+    event = missed_signed_event(intake, configured)
+    original = onboarding_transport.provider.request
+
+    def partial(credentials, spec, args, key=None):
+        result = original(credentials, spec, args, key)
+        return {**result, **metadata} if spec["path"].endswith("/messages") else result
+
+    monkeypatch.setattr(onboarding_transport.provider, "request", partial)
+    with connect() as db, pytest.raises(ValueError, match="welcome_recovery_history_incomplete"):
+        onboarding.recover_unanswered(db, event["id"], actor_id=onboarding.settings(db)["owner_id"])
+    assert state(intake[4]) == [] and intake[1] == []
+
+
+def test_recovery_live_read_does_not_drop_fresh_public_enrollment(intake, configured, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    old = missed_signed_event(intake, configured)
+    client, _, credentials = configured
+    entered, release = Event(), Event()
+    original = onboarding_transport.provider.request
+
+    def delayed_live_read(credentials, spec, args, key=None):
+        if spec["method"] == "GET" and args["path"]["conversationId"] == old["conversation"]["id"]:
+            entered.set()
+            assert release.wait(10)
+        return original(credentials, spec, args, key)
+
+    monkeypatch.setattr(onboarding_transport.provider, "request", delayed_live_read)
+    with connect() as db:
+        actor = onboarding.settings(db)["owner_id"]
+
+    def recover():
+        with connect() as db:
+            return onboarding.recover_unanswered(db, old["id"], actor_id=actor)
+
+    fresh = payload("573001110088")
+    fresh["id"] = "fresh-concurrent"
+    fresh["message"]["platformMessageId"] = "fresh-concurrent-message"
+    fresh["message"]["text"] = "Hola"
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(recover)
+        assert entered.wait(3)
+        try:
+            response = send(client, credentials, fresh)
+        finally:
+            release.set()
+        assert future.result(5)["state"] == "queued"
+    assert response.status_code == 200
+    with connect() as db:
+        assert db.execute(
+            "SELECT 1 FROM crm.social_webhook_events WHERE event_id=%s", (fresh["id"],)
+        ).fetchone()
+        assert db.execute(
+            "SELECT 1 FROM crm.social_onboarding WHERE conversation_id=%s",
+            (fresh["conversation"]["id"],),
+        ).fetchone()

@@ -27,6 +27,15 @@ def read(credentials, row, operation, query=None):
 
 def source(db, row):
     cfg, credentials = onboarding.guard(db, row)
+    return _verified_source(db, row, cfg, credentials)
+
+
+def recovery_source(db, row):
+    cfg, credentials = onboarding.guard_scope(db, row)
+    return _verified_source(db, row, cfg, credentials)
+
+
+def _verified_source(db, row, cfg, credentials):
     account = service.account(credentials, row["account_id"])
     if account["platform"] != row["platform"]:
         raise ValueError("welcome_account_changed")
@@ -50,11 +59,70 @@ def source(db, row):
         raise ValueError("welcome_thread_control_changed")
     if row["platform"] == "facebook" and cfg["facebook_takeover"] is not True:
         raise ValueError("welcome_takeover_not_authorized")
-    messages = read(
+    envelope = read(
         credentials, row, "getInboxConversationMessages", {"sortOrder": "desc", "limit": 50}
-    ).get("messages")
+    )
+    messages = envelope.get("messages")
     if not isinstance(messages, list):
         raise TypeError("welcome_messages_invalid")
+    recovering = (
+        bool(row.get("recovery_event_id")) and row["group_receipt"].get("status") != "accepted"
+    )
+    if recovering:
+        pagination = envelope.get("pagination", {})
+        metadata = envelope.get("metadata", {})
+        meta = envelope.get("meta", {})
+        if (
+            len(messages) >= 50
+            or not isinstance(pagination, dict)
+            or not isinstance(metadata, dict)
+            or not isinstance(meta, dict)
+            or envelope.get("success") is False
+            or any(
+                part.get(key)
+                for part in (envelope, pagination, metadata, meta)
+                for key in (
+                    "accountsFailed",
+                    "accountsSkipped",
+                    "failedAccounts",
+                    "hasMore",
+                    "nextCursor",
+                    "next_cursor",
+                    "partialFailure",
+                    "partial_failure",
+                    "partial",
+                    "warning",
+                    "warnings",
+                )
+            )
+            or (isinstance(pagination.get("total"), int) and pagination["total"] > len(messages))
+        ):
+            raise ValueError("welcome_recovery_history_incomplete")
+        accepted = {
+            row[column].get("message_id")
+            for column in ("audio_receipt", "website_receipt", "group_receipt")
+            if row[column].get("status") == "accepted"
+        }
+        if any(
+            message.get("direction") not in {"incoming", "outgoing"}
+            or (message.get("direction") == "outgoing" and message.get("id") not in accepted)
+            for message in messages
+            if isinstance(message, dict)
+        ):
+            raise ValueError("welcome_recovery_already_answered")
+        newest = next(
+            (
+                message
+                for message in messages
+                if isinstance(message, dict)
+                and message.get("direction") == "incoming"
+                and message.get("senderId") == row["participant_id"]
+                and message.get("isDeleted") is not True
+            ),
+            None,
+        )
+        if not newest or newest.get("id") != row["source"]["message_id"]:
+            raise ValueError("welcome_recovery_newer_message")
     matched = None
     for message in messages:
         if not isinstance(message, dict):
@@ -76,8 +144,11 @@ def source(db, row):
         if not isinstance(metadata, dict) or metadata.get("standby"):
             raise ValueError("welcome_message_standby")
         if onboarding.opted_out(message.get("message") or ""):
-            db.execute("UPDATE crm.social_onboarding SET suppressed=true WHERE id=%s", (row["id"],))
-            db.commit()
+            if row["id"] is not None:
+                db.execute(
+                    "UPDATE crm.social_onboarding SET suppressed=true WHERE id=%s", (row["id"],)
+                )
+                db.commit()
             raise ValueError("welcome_suppressed")
         if message.get("id") == row["source"]["message_id"]:
             matched = message
