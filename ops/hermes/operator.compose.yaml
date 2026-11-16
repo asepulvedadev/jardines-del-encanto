@@ -35,11 +35,58 @@ services:
       - ./operator_provider.py:/policy/operator_provider.py:ro
       - ./operator_protocol.py:/policy/operator_protocol.py:ro
       - ./operator_audio.py:/policy/operator_audio.py:ro
+      - ./operator_public.py:/policy/operator_public.py:ro
     secrets: [openai_api_key]
     networks: [operator, egress]
     healthcheck:
       test: ["CMD", "/opt/hermes/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"]
       interval: 30s
+      timeout: 5s
+      retries: 3
+  image-provider:
+    <<: *runtime
+    entrypoint: ["/opt/hermes/.venv/bin/python", "/policy/image_server.py"]
+    command: []
+    environment:
+      <<: *environment
+      IMAGE_ROLE: provider
+    volumes:
+      - ./image_server.py:/policy/image_server.py:ro
+      - ./operator_images.py:/policy/operator_images.py:ro
+      - ./operator_audio.py:/policy/operator_audio.py:ro
+      - ./operator_protocol.py:/policy/operator_protocol.py:ro
+      - type: bind
+        source: ${HERMES_BRAND_ASSETS_DIR:-/srv/jardines-del-encanto/hermes-operator/brand}
+        target: /opt/jardines-images/brand
+        read_only: true
+        bind: { create_host_path: false }
+    secrets: [openai_api_key]
+    networks: [images, egress]
+    expose: ["8083"]
+    healthcheck:
+      test: ["CMD", "/opt/hermes/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8083/health', timeout=3)"]
+      interval: 120s
+      timeout: 5s
+      retries: 3
+  image-bridge:
+    <<: *runtime
+    entrypoint: ["/opt/hermes/.venv/bin/python", "/policy/image_server.py"]
+    command: []
+    environment:
+      <<: *environment
+      IMAGE_ROLE: bridge
+      IMAGE_PROVIDER_URL: http://image-provider:8083
+    volumes:
+      - ./image_server.py:/policy/image_server.py:ro
+      - ./operator_audio.py:/policy/operator_audio.py:ro
+      - ./operator_protocol.py:/policy/operator_protocol.py:ro
+    networks: [images, application]
+    expose: ["8082"]
+    depends_on:
+      image-provider: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "/opt/hermes/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8082/health', timeout=3)"]
+      interval: 120s
       timeout: 5s
       retries: 3
   hermes-bridge:
@@ -54,6 +101,7 @@ services:
       - ./operator.py:/policy/hermes_operator.py:ro
       - ./operator_protocol.py:/policy/operator_protocol.py:ro
       - ./operator_audio.py:/policy/operator_audio.py:ro
+      - ./operator_public.py:/policy/operator_public.py:ro
     networks: [operator, application]
     expose: ["8081"]
     depends_on:
@@ -63,7 +111,9 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
 networks:
+  images: { internal: true }
   operator: { internal: true }
   egress: {}
   application:

@@ -6,6 +6,9 @@ import ts from "typescript";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 const require = createRequire(import.meta.url);
+require.extensions[".css"] = (module) => {
+  module.exports = {};
+};
 for (const ext of [".tsx", ".ts"])
   require.extensions[ext] = (module, file) =>
     module._compile(

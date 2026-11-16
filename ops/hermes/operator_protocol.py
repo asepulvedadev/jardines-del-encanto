@@ -8,14 +8,15 @@ MAX_BODY = 131072
 MAX_RESULT = 65536
 MAX_TEXT = 20000
 MAX_CALLS = 12
-MAX_ITERATIONS = 4
+# Leave room for a final summary after a multi-step extension lifecycle.
+MAX_ITERATIONS = 8
 ACTIONS = frozenset({'crm.workspace', 'crm.activities', 'crm.contact.create', 'crm.contact.update',
     'crm.deal.update', 'crm.note.create', 'crm.task.create', 'crm.task.update', 'control.catalog',
     'control.item.create', 'control.item.update', 'control.connection.update', 'social.status',
     'social.sync', 'social.connect', 'control.extension.create', 'control.extension.update',
     'control.extension.install', 'control.extension.test', 'voice.catalog', 'voice.execute', 'retell.catalog', 'retell.schema', 'retell.execute',
     'workflows.catalog', 'workflows.definitions', 'workflows.run', 'workflows.draft.create',
-    'workflows.draft.update', 'workflows.pause', 'workflows.stop'})
+    'workflows.draft.update', 'workflows.pause', 'workflows.stop', 'sara.config.get', 'sara.config.update', 'sara.learn', 'sara.simulate', 'sara.simulation', 'images.catalog', 'images.generate', 'images.status'})
 
 
 def valid_token(token):
@@ -99,12 +100,21 @@ def validate_history(history):
 
 def validate_claim(claim):
     required = {'run_id', 'prompt', 'skills', 'tools'}
-    if not isinstance(claim, dict) or not required <= set(claim) or set(claim) - required - {'history'}:
+    if not isinstance(claim, dict) or not required <= set(claim) or set(claim) - required - {'history', 'configuration'}:
         raise ValueError('Invalid claim')
     text(claim['run_id'], 128, False)
     text(claim['prompt'], 8000, False)
     if 'history' in claim:
         validate_history(claim['history'])
+    if 'configuration' in claim:
+        config = claim['configuration']
+        expected = {'version', 'name', 'instructions', 'knowledge', 'greeting', 'response_style'}
+        if not isinstance(config, dict) or set(config) != expected or type(config['version']) is not int or config['version'] < 1:
+            raise ValueError('Invalid published configuration')
+        for key, maximum in (('name',80),('instructions',2000),('knowledge',4000),('greeting',300)):
+            text(config[key], maximum, key not in {'name','instructions'})
+        if config['response_style'] not in {'brief','balanced','detailed'}:
+            raise ValueError('Invalid response style')
     skills = claim['skills']
     if not isinstance(skills, list) or len(skills) > 64:
         raise ValueError('Invalid skills')

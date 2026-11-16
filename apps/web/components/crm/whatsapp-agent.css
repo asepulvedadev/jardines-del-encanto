@@ -1,0 +1,213 @@
+.whatsapp-agent {
+  color: #062619;
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.whatsapp-agent h3,
+.whatsapp-agent h4,
+.whatsapp-agent p {
+  margin: 0;
+}
+.whatsapp-agent h3 {
+  font-size: 20px;
+}
+.whatsapp-agent h4 {
+  font-size: 16px;
+}
+.whatsapp-agent p,
+.whatsapp-agent span,
+.whatsapp-agent summary {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.whatsapp-agent p,
+.whatsapp-agent span {
+  color: #526056;
+}
+.whatsapp-agent-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.whatsapp-agent-heading div {
+  display: grid;
+  gap: 4px;
+}
+.whatsapp-agent button {
+  min-height: 44px;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #062619;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.whatsapp-agent button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.whatsapp-agent button.whatsapp-agent-primary {
+  color: #fff;
+  background: #062619;
+  border-color: #062619;
+}
+.whatsapp-agent button:not(:disabled):hover {
+  background: #eef3e8;
+}
+.whatsapp-agent button.whatsapp-agent-primary:not(:disabled):hover {
+  background: #0c3b28;
+}
+.whatsapp-agent :is(button, input, textarea, summary):focus-visible {
+  outline: 2px solid #507010;
+  outline-offset: 2px;
+}
+.whatsapp-agent-status {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  background: #f1f3ef;
+  border-radius: 8px;
+}
+.whatsapp-agent-fields {
+  display: grid;
+  gap: 12px;
+  padding: 16px 0 0;
+  border: 0;
+  border-top: 1px solid #d9e1d5;
+  margin: 0;
+  min-width: 0;
+}
+.whatsapp-agent-fields legend {
+  font-weight: 700;
+  font-size: 14px;
+  padding: 0 8px 0 0;
+}
+.whatsapp-agent label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+}
+.whatsapp-agent :is(input:not([type="checkbox"]), textarea) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  color: #062619;
+  font: inherit;
+  font-size: 16px;
+}
+.whatsapp-agent textarea {
+  resize: vertical;
+}
+.whatsapp-agent-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.whatsapp-agent-developer {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: 12px;
+}
+.whatsapp-agent .whatsapp-agent-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-weight: 400;
+}
+.whatsapp-agent-consent input {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  accent-color: #062619;
+  margin: 2px 0;
+}
+.whatsapp-agent-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.whatsapp-agent .whatsapp-agent-notice,
+.whatsapp-agent-review {
+  padding: 12px;
+  background: #fff4db;
+  color: #855708;
+  border-radius: 8px;
+}
+.whatsapp-agent-review {
+  display: grid;
+  gap: 12px;
+}
+.whatsapp-agent-review p {
+  color: #855708;
+}
+.whatsapp-agent-review dd {
+  margin: 4px 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.whatsapp-agent-review dt {
+  font-weight: 700;
+}
+.whatsapp-agent-lessons {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #d9e1d5;
+}
+.whatsapp-agent-lesson {
+  display: grid;
+  gap: 8px;
+  border-left: 3px solid #507010;
+  padding: 4px 12px;
+}
+.whatsapp-agent-lesson p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #062619;
+}
+.whatsapp-agent summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: list-item;
+  align-content: center;
+}
+.whatsapp-agent-activity ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.whatsapp-agent-activity li {
+  display: grid;
+  gap: 4px;
+  padding: 12px 0;
+  border-top: 1px solid #d9e1d5;
+}
+@media (max-width: 640px) {
+  .whatsapp-agent-heading {
+    flex-direction: column;
+  }
+  .whatsapp-agent-grid,
+  .whatsapp-agent-developer {
+    grid-template-columns: 1fr;
+  }
+  .whatsapp-agent-developer {
+    padding-bottom: 12px;
+    border-bottom: 1px solid #d9e1d5;
+  }
+  .whatsapp-agent-developer button {
+    justify-self: start;
+  }
+}

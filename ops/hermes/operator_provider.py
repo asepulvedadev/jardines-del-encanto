@@ -1,4 +1,4 @@
-"""Separate credential boundary permitting only the bounded Jardines broker tool."""
+"""Separate credential boundary for the bounded operator and tool-free public Sara."""
 from collections import deque
 from http.client import HTTPSConnection
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -12,6 +12,9 @@ from operator_protocol import (MODEL, MAX_BODY, MAX_RESULT, MAX_ITERATIONS, boun
                                call_arguments, text, tool_schema)
 
 from operator_audio import AudioDeadline, MAX_AUDIO_BODY, multipart, read_json, read_reply, request_deadline, validate_audio
+
+from operator_public import public_deadline, validate_completion, public_model_reply
+
 
 SECRET = Path('/run/secrets/openai_api_key')
 MAX_REPLY = 65536
@@ -119,6 +122,8 @@ class Handler(BaseHTTPRequestHandler):
     runs = {}
     audio_requests = deque()
     audio_runs = {}
+    public_requests = deque()
+    public_runs = {}
 
     def setup(self):
         super().setup()
@@ -141,7 +146,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(404, {'error': 'Route denied'})
         available = ready()
         self.reply(200 if available else 503, {'available': available, 'configured': available,
-            'model': MODEL, 'history_available': True, 'transcription_available': available and os.environ.get('HERMES_TRANSCRIPTION_ENABLED') == '1'})
+            'model': MODEL, 'public_reply_available': available, 'history_available': True, 'transcription_available': available and os.environ.get('HERMES_TRANSCRIPTION_ENABLED') == '1'})
 
     def transcribe(self):
         try:
@@ -186,7 +191,56 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             connection.close()
 
+    def public_reply(self):
+        try:
+            with public_deadline(35):
+                return self.public_reply_bounded()
+        except AudioDeadline:
+            self.close_connection = True
+            self.connection.close()
+        except Exception:
+            self.reply(502, {'error': {'message': 'Public provider unavailable'}})
+
+    def public_reply_bounded(self):
+        try:
+            data = validate_completion(json.dumps(read_json(self, MAX_BODY), ensure_ascii=False).encode())
+        except (ValueError, TypeError, OSError, KeyError, RecursionError):
+            return self.reply(400, {'error': {'message': 'Public provider request denied'}})
+        run = self.headers.get('Authorization', '').removeprefix('Bearer ')
+        if not re.fullmatch(r'[0-9a-f]{32}', run):
+            return self.reply(401, {'error': {'message': 'Invocation denied'}})
+        now = time.monotonic()
+        type(self).public_runs = {key: stamp for key, stamp in self.public_runs.items() if now - stamp < 300}
+        while self.public_requests and now - self.public_requests[0] >= 60:
+            self.public_requests.popleft()
+        if run in self.public_runs or len(self.public_requests) >= 6:
+            return self.reply(429, {'error': {'message': 'Public reply budget reached'}})
+        if not ready():
+            return self.reply(503, {'error': {'message': 'Public provider unavailable'}})
+        self.public_runs[run] = now
+        self.public_requests.append(now)
+        connection = HTTPSConnection('api.openai.com', timeout=30)
+        try:
+            key = SECRET.read_text().strip()
+            connection.request('POST', '/v1/chat/completions', body=json.dumps(data, ensure_ascii=False).encode(),
+                headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key})
+            response = connection.getresponse()
+            raw = response.read(MAX_REPLY + 1)
+            if response.status != 200 or len(raw) > MAX_REPLY:
+                raise ValueError('Public provider rejected request')
+            content = public_model_reply(bounded_json(raw, MAX_REPLY))
+            if key and key in content:
+                raise ValueError('Public identity disclosure denied')
+            self.reply(200, {'id': 'public-response', 'object': 'chat.completion', 'model': MODEL,
+                'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': content}, 'finish_reason': 'stop'}]})
+        except Exception:
+            self.reply(502, {'error': {'message': 'Public provider unavailable'}})
+        finally:
+            connection.close()
+
     def do_POST(self):
+        if self.path == '/public/v1/chat/completions':
+            return self.public_reply()
         if self.path == '/audio/transcriptions':
             return self.transcribe()
         if self.path != '/v1/chat/completions':

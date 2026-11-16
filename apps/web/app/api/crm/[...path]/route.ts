@@ -37,6 +37,17 @@ const rules: [RegExp, string[]][] = [
     ["PATCH"],
   ],
   [/^sara\/(status|skills)$/, ["GET"]],
+  [/^sara\/config$/, ["GET", "PATCH"]],
+  [/^sara\/config\/versions$/, ["GET"]],
+  [/^sara\/simulations$/, ["GET", "POST"]],
+  [new RegExp(`^sara/simulations/${workflowId}$`), ["GET"]],
+  [/^images$/, ["POST"]],
+  [/^images\/catalog$/, ["GET"]],
+  [new RegExp(`^images/${workflowId}(?:/content)?$`), ["GET"]],
+  [
+    /^images\/assets\/(logo-white|logo-transparent|photo-aerial|photo-entrance|photo-gate)\/content$/,
+    ["GET"],
+  ],
   [/^sara\/conversations$/, ["GET", "POST"]],
   [/^sara\/conversations\/[0-9a-f-]{36}$/, ["PATCH", "DELETE"]],
   [/^sara\/conversations\/[0-9a-f-]{36}\/messages$/, ["GET", "POST"]],
@@ -67,6 +78,13 @@ const rules: [RegExp, string[]][] = [
   [/^hermes\/(chat|actions)$/, ["POST"]],
   [/^hermes\/proposals\/[0-9a-f-]{36}\/(approve|reject)$/, ["POST"]],
   [/^social\/settings$/, ["GET", "POST"]],
+  [/^social\/whatsapp-agent$/, ["GET", "PATCH"]],
+  [
+    new RegExp(
+      `^social/whatsapp-agent/lessons/${workflowId}/(approve|reject)$`,
+    ),
+    ["POST"],
+  ],
   [/^social\/(sync|complete)$/, ["POST"]],
   [/^social\/mcp\/status$/, ["GET"]],
   [/^social\/mcp\/(start|complete|check|disconnect)$/, ["POST"]],
@@ -126,6 +144,7 @@ async function proxy(
   }
   let query = "";
   const sara = endpoint.startsWith("sara/");
+  const images = endpoint === "images" || endpoint.startsWith("images/");
   const voice = endpoint.startsWith("voice/");
   const retell = endpoint.startsWith("retell/");
   const workflows = endpoint.startsWith("workflows/");
@@ -136,7 +155,13 @@ async function proxy(
     endpoint === "campaigns" || endpoint.startsWith("campaigns/");
   if (campaigns && new URL(request.url).searchParams.size)
     return fail(422, "invalid_input");
-  if ((voice || retell || workflows) && new URL(request.url).searchParams.size)
+  const whatsappAgent =
+    endpoint === "social/whatsapp-agent" ||
+    endpoint.startsWith("social/whatsapp-agent/");
+  if (
+    (voice || retell || workflows || whatsappAgent || images) &&
+    new URL(request.url).searchParams.size
+  )
     return fail(422, "invalid_input");
   if (endpoint === "retell/results" && request.body !== null)
     return fail(422, "invalid_input");
@@ -289,12 +314,15 @@ async function proxy(
         headers: resultHeaders,
       });
     }
-    if (sara || voice || retell || workflows || inbox) {
+    if (sara || voice || retell || workflows || inbox || images) {
       const voiceDownload =
         /^voice\/artifacts\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/content$/.test(
           endpoint,
         ) && upstream.ok;
+      const imageDownload =
+        images && endpoint.endsWith("/content") && upstream.ok;
       const download =
+        imageDownload ||
         voiceDownload ||
         (/^sara\/attachments\/[0-9a-f-]{36}\/content$/.test(endpoint) &&
           upstream.ok);
@@ -317,15 +345,21 @@ async function proxy(
       ];
       if (
         (download &&
-          !(voiceDownload
-            ? type === "audio/mpeg"
-            : media.includes(type ?? ""))) ||
+          !(imageDownload
+            ? ["image/png", "image/webp"].includes(type ?? "")
+            : voiceDownload
+              ? type === "audio/mpeg"
+              : media.includes(type ?? ""))) ||
         (!download && type !== "application/json")
       )
         return fail(502, "invalid_upstream_response");
       const raw = await boundedResult(
         upstream,
-        download && !voiceDownload ? 512 * 1024 : 2 * 1024 * 1024,
+        imageDownload
+          ? 8 * 1024 * 1024
+          : download && !voiceDownload
+            ? 512 * 1024
+            : 2 * 1024 * 1024,
       );
       if (!raw) return fail(502, "upstream_response_too_large");
       resultHeaders.set("X-Content-Type-Options", "nosniff");

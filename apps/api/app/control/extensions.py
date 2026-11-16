@@ -16,6 +16,14 @@ SAFE_ACTIONS = frozenset(
         "crm.task.create",
         "crm.task.update",
         "social.status",
+        "sara.config.get",
+        "sara.config.update",
+        "sara.learn",
+        "sara.simulate",
+        "sara.simulation",
+        "images.catalog",
+        "images.generate",
+        "images.status",
     }
 )
 

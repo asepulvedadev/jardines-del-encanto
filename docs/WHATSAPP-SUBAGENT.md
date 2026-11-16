@@ -1,0 +1,140 @@
+# Sara WhatsApp subagent
+
+Customer traffic uses a dedicated, text-only Hermes subagent, not a canned-reply
+rule or the administrator's Sara conversation. It receives only its published instructions,
+project knowledge, and up to three earlier exchanges from the same WhatsApp
+account, participant, conversation and configuration version. It has no CRM tool,
+credentials, filesystem actions, app skills, or self-programming authority.
+
+## Configuration and learning
+
+In **Configuraciones → Sara WhatsApp**, set the existing Zernio account ID,
+international business number, instructions, reference knowledge and up to two
+trusted developer numbers. Names are labels only; authorization uses the exact
+E.164 number proven in authenticated, freshly revalidated inbound messages.
+Developer authorization and channel routing numbers are not embedded as configuration
+in the public repository. The existing owner-approved public adviser contact remains
+in the immutable customer-assistance floor.
+
+The authenticated web settings save explicitly binds a real administrator owner.
+Previously saved channel configurations do not acquire developer authority until
+that owner saves them again. Revocable developer runs use their verified inbound
+job, phone/account/profile identity and owner grant; they never create or borrow a
+browser session. Customer messages always remain on the tool-free path.
+
+Verified developers can converse with the private scoped broker to create, inspect,
+update, test and install their owner's Sara skills/tools; edit the shared published
+configuration; explicitly teach knowledge; enqueue bounded brand-aware image jobs;
+and run isolated synthetic customer simulations. Only typed allowlisted actions
+are available. Developer tools cannot read CRM records, modify channel grants,
+change connection permissions, run arbitrary source, expose secrets or impersonate
+web sessions. Custom tools may target only the same safe capabilities; installed
+custom tools and skills become visible on the next turn. The catalog excludes
+other owners' definitions. Image and simulation jobs return inspectable receipts;
+unknown outcomes must not be automatically resubmitted.
+
+Trusted developers can also send `/estado` or `/aprender <text>` to the business number.
+`/aprender` creates a knowledge proposal, not an executable command or an immediate
+change to public answers. An authenticated administrator approves or rejects it in
+the web interface. Approval publishes a versioned knowledge update and pauses the
+agent for explicit review/reactivation. Customer messages cannot teach the agent,
+change developer identity, run tools, or become shared knowledge.
+
+Web and WhatsApp share one published profile with compare-and-swap versions.
+Changing it revokes queued or generating responses based on the previous profile.
+The initiating developer training job alone may advance to its own new version;
+all other obsolete jobs are blocked. Conversation history is isolated by participant,
+channel configuration and shared profile version. Channel settings cannot silently
+overwrite newer shared instructions or knowledge without the current shared version.
+
+Training means versioned instructions and retrieval context, not model fine-tuning.
+The immutable public-agent safety floor overrides references and conversation text.
+It prohibits invented commercial/legal promises, payments, bookings and admin actions.
+
+## Activation requirements
+
+1. Apply additive migrations through `017_sara_shared_profile_grant.sql` with
+   the migration owner. Preserve the checksums of previously applied migrations.
+2. Install the reviewed `operator_public.py` policy alongside the existing bridge
+   and provider policies; mount it read-only in both. Preserve the existing networks,
+   model, credential boundary, operator tool validation and other applications.
+3. Enable only the dedicated worker with `CRM_WHATSAPP_AGENT_WORKER_ENABLED=1`.
+   This does **not** enable the outbound sequence worker.
+4. Configure a real Zernio REST credential and matching profile through the existing
+   private connection settings. MCP account-read authorization alone is insufficient.
+5. Register and verify the HMAC webhook subscription for `message.received`, scoped
+   to the intended account/profile. A locally generated secret alone is not proof
+   of registration; `webhook_registered` must reflect an actual verified subscription.
+6. Review and explicitly activate inbound-only replies for the configured number.
+   Fresh vendor metadata must prove the account's WhatsApp number, app ownership,
+   conversation recipient and customer-service window. Unknown identity fails closed.
+
+The worker starts disabled. Configuration is saved paused when prerequisites are
+missing; an enabled flag is not reported as verified availability.
+
+## Delivery invariants
+
+- Webhooks authenticate raw HMAC, profile membership and stable event headers before
+  durable enqueue. Provider and model calls never delay webhook acknowledgment.
+- Only first-seen, non-test, non-standby incoming text after activation is enrolled.
+  Events older than fifteen minutes, other accounts, own numbers, and malformed
+  identities are ignored. No campaign, contact-list enrollment, or conversation opener.
+- Durable uniqueness covers both event ID and account/conversation/message identity.
+- Claims serialize across API processes; at most six per minute, one hundred per
+  rolling day and thirty per conversation per day. These are safety/spend ceilings,
+  not promised throughput. Public provider calls also have a separate six/minute cap.
+- Before sending, a fresh source read proves exact incoming text and sender. Existing
+  reviewed Zernio preparation/dispatch rechecks ownership, connection state and the
+  24-hour WhatsApp window. Literal model output is never template-interpolated.
+- Configuration changes revoke pending/generating jobs. A committed send reservation
+  precedes external I/O; pause/reconfiguration serializes with final dispatch.
+- Ambiguous or interrupted reservations are held, never automatically retried. Vendor
+  acceptance is not delivery or read confirmation. No production sends are simulated
+  as successful.
+
+## Verification
+
+All ordinary tests use synthetic phone numbers, isolated `jardines_crm_test` data,
+and mocked provider traffic. No real customer message, campaign, provider key or
+administrator conversation is required. Browser visual checks and a pinned-Hermes
+runtime test are distinct from mocks; report their actual results separately.
+
+The initial live preflight found no configured REST credential in the CRM, despite
+the number appearing in Zernio's dashboard. Production activation remains pending
+until that connection and webhook are actually verified. Zernio also displayed a
+business-verification restriction; this implementation does not bypass it.
+
+## Private concept-image delivery
+
+Developer-origin image generation now inserts a once-only attachment outbox in the
+same transaction that persists the generated PNG. Migration
+`019_sara_image_delivery.sql` retains immutable owner, source-run, recipient binding
+and PNG hash. Web-only jobs never acquire a WhatsApp recipient; public customer
+messages do not acquire developer capabilities.
+
+Enable the separate opt-in worker `CRM_WHATSAPP_IMAGES_WORKER_ENABLED=1` only after
+the image service, verified WhatsApp developer configuration and REST messaging
+connection are active. It revalidates the current grant, owner, channel, credentials,
+PNG, exact conversation ownership, human handover and customer-service window before
+one committed reservation and one multipart submission. Revocation validation uses
+the same connection holding the final agent/control locks to avoid self-deadlocks.
+
+The transport sends the original private PNG directly as multipart `attachment`
+with `accountId`, a fixed concept caption and a stable idempotency key. It uses no
+public upload URL or arbitrary destination. Vendor acceptance is not delivery/read
+confirmation; malformed or uncertain responses stay unknown and are not retried.
+Read-only preparation and final send each run in a supervised fixed-module subprocess.
+A timeout kills and waits for that process before releasing credential/authority
+guards, covering DNS, connection setup, TLS and a slow response after `Connection: close`.
+Credentials use stdin, never argv or logs; only the existing database/config/fixed-proxy
+environment is inherited. The child cannot choose a new endpoint or spawn agent tools.
+
+WhatsApp images are conservatively capped at 5,000,000 bytes. Larger valid PNGs
+remain private web artifacts with `image_exceeds_whatsapp_limit`; there is no hidden
+resize, regeneration, MIME relabeling or public-hosting fallback. The fixed Zernio
+CONNECT relay keeps the same host/DNS/connection/deadline restrictions with an 8 MiB
+aggregate encrypted-traffic allowance. Existing JSON workflow request caps stay 32 KiB.
+
+Contracts: [send attachments](https://docs.zernio.com/messages/send-inbox-message),
+[WhatsApp media limits](https://docs.zernio.com/platforms/whatsapp/reference).
+This local implementation is not evidence of a real image or WhatsApp delivery.

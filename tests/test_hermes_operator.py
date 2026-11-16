@@ -188,17 +188,39 @@ class OperatorHTTPTests(unittest.TestCase):
         connection = Mock()
         connection.getresponse.return_value = reply
         with patch.object(self.provider, 'ready', return_value=True), patch.object(self.provider, 'HTTPSConnection', return_value=connection) as factory, patch.object(self.provider.Path, 'read_text', return_value='fixture-private-key'):
-            for _ in range(4):
+            for _ in range(self.provider.MAX_ITERATIONS):
                 status, body = self.post(OperatorPolicyTests().payload())
                 self.assertEqual(status, 502)
                 self.assertNotIn(b'sensitive', body)
                 self.assertNotIn(b'fixture-private-key', body)
             status, _ = self.post(OperatorPolicyTests().payload())
             self.assertEqual(status, 429)
-        self.assertEqual(factory.call_count, 4)
+        self.assertEqual(factory.call_count, self.provider.MAX_ITERATIONS)
         factory.assert_called_with('api.openai.com', timeout=30)
         self.assertEqual(connection.request.call_args.args, ('POST', '/v1/chat/completions'))
         self.assertEqual(connection.request.call_args.kwargs['headers']['Authorization'], 'Bearer fixture-private-key')
+
+    def test_four_tool_steps_can_receive_a_final_summary_within_the_shared_budget(self):
+        reply = Mock(status=200)
+        reply.read.return_value = json.dumps({'choices': [{'message': {
+            'role': 'assistant', 'content': 'Resultado verificado'},
+            'finish_reason': 'stop'}]}).encode()
+        connection = Mock()
+        connection.getresponse.return_value = reply
+        with patch.object(self.provider, 'ready', return_value=True), patch.object(
+            self.provider, 'HTTPSConnection', return_value=connection
+        ), patch.object(self.provider, 'SECRET', Mock(read_text=lambda: 'fixture-private-key')):
+            # Four sequential action completions still need a fifth model completion.
+            for _ in range(5):
+                status, _body = self.post(OperatorPolicyTests().payload())
+                self.assertEqual(status, 200)
+            for _ in range(self.provider.MAX_ITERATIONS - 5):
+                self.assertEqual(self.post(OperatorPolicyTests().payload())[0], 200)
+            self.assertEqual(self.post(OperatorPolicyTests().payload())[0], 429)
+        self.assertEqual(connection.request.call_count, self.provider.MAX_ITERATIONS)
+        self.assertLessEqual(self.provider.MAX_ITERATIONS, 8)
+        self.assertEqual(load('operator').MAX_ITERATIONS, self.provider.MAX_ITERATIONS)
+        self.assertEqual(load('operator').MAX_CALLS, 12)
 
     def test_standard_openai_reply_metadata_is_normalized_before_validation(self):
         for tool_calls in ('absent', None):

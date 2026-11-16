@@ -14,9 +14,15 @@ from .crm.landing import router as landing_router
 from .crm.routes import router as crm_router
 from .hermes.routes import internal_router
 from .hermes.routes import router as hermes_router
+from .images import delivery as image_delivery
+from .images import worker as images_worker
+from .images.routes import router as images_router
 from .inbox.routes import router as inbox_router
 from .retell.routes import router as retell_router
+from .sara import simulations
+from .sara.profile_routes import router as sara_profile_router
 from .sara.routes import router as sara_router
+from .social import whatsapp_agent
 from .social.mcp_routes import router as social_mcp_router
 from .social.routes import router as social_router
 from .social.routes import webhook_router
@@ -28,10 +34,18 @@ from .workflows.routes import router as workflows_router
 @asynccontextmanager
 async def lifespan(app):
     workflows_worker.start()
+    whatsapp_agent.start()
+    simulations.start()
+    images_worker.start()
+    image_delivery.start()
     try:
         yield
     finally:
         workflows_worker.stop()
+        whatsapp_agent.stop()
+        simulations.stop()
+        images_worker.stop()
+        image_delivery.stop()
 
 
 app = FastAPI(
@@ -50,6 +64,8 @@ app.include_router(workflows_router)
 app.include_router(control_router)
 app.include_router(hermes_router)
 app.include_router(sara_router)
+app.include_router(sara_profile_router)
+app.include_router(images_router)
 app.include_router(voice_router)
 app.include_router(retell_router)
 app.include_router(internal_router)
@@ -57,6 +73,7 @@ app.include_router(landing_router)
 app.include_router(social_router)
 app.include_router(social_mcp_router)
 app.include_router(webhook_router)
+app.include_router(whatsapp_agent.router)
 
 
 @app.middleware("http")
@@ -74,6 +91,7 @@ async def private_response_headers(request: Request, call_next):
         )
     private_control = request.url.path.startswith(
         (
+            "/crm/social/whatsapp-agent",
             "/crm/campaigns",
             "/crm/inbox/",
             "/crm/workflows/",
@@ -81,6 +99,7 @@ async def private_response_headers(request: Request, call_next):
             "/crm/hermes/",
             "/internal/hermes/",
             "/crm/sara/",
+            "/crm/images",
             "/crm/voice/",
             "/crm/retell/",
         )

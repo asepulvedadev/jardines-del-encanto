@@ -1,0 +1,222 @@
+.sara-profile-panel {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  color: #062619;
+}
+.sara-profile-panel :is(h3, h4, p) {
+  margin: 0;
+}
+.sara-profile-panel h3 {
+  font-size: 20px;
+}
+.sara-profile-panel h4 {
+  font-size: 16px;
+}
+.sara-profile-panel p {
+  color: #526056;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.sara-profile-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sara-profile-heading > div,
+.sara-simulation > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+.sara-profile-panel button {
+  min-height: 44px;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: #062619;
+  background: #fff;
+  cursor: pointer;
+}
+.sara-profile-panel button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.sara-profile-panel button:not(:disabled):hover,
+.sara-profile-panel button[aria-pressed="true"] {
+  background: #eef3e8;
+}
+.sara-profile-panel button.sara-profile-primary {
+  background: #062619;
+  color: #fff;
+  border-color: #062619;
+}
+.sara-profile-panel button.sara-profile-primary:not(:disabled):hover {
+  background: #0c3b28;
+}
+.sara-profile-panel
+  :is(button, input, textarea, select, summary):focus-visible {
+  outline: 2px solid #507010;
+  outline-offset: 2px;
+}
+.sara-profile-fields {
+  display: grid;
+  gap: 12px;
+  padding: 16px 0 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid #d9e1d5;
+  min-width: 0;
+}
+.sara-profile-fields legend {
+  padding: 0 8px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+.sara-profile-panel label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.sara-profile-panel :is(input, textarea, select) {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  background: #fff;
+  color: #062619;
+  font: inherit;
+  font-size: 16px;
+}
+.sara-profile-panel textarea {
+  resize: vertical;
+}
+.sara-profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.sara-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sara-profile-panel .sara-profile-notice,
+.sara-profile-review {
+  padding: 12px;
+  color: #855708;
+  background: #fff4db;
+  border-radius: 8px;
+}
+.sara-profile-review {
+  display: grid;
+  gap: 12px;
+}
+.sara-profile-review p {
+  color: #855708;
+}
+.sara-profile-panel .sara-profile-error {
+  color: #a62b35;
+  background: #fdebed;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.sara-profile-panel summary {
+  min-height: 44px;
+  align-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.sara-profile-document {
+  margin: 8px 0;
+  font-size: 14px;
+}
+.sara-profile-document dt {
+  font-weight: 700;
+}
+.sara-profile-document dd {
+  margin: 4px 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #526056;
+}
+.sara-profile-history > details {
+  padding-left: 12px;
+  border-left: 2px solid #d9e1d5;
+}
+.sara-simulation {
+  display: grid;
+  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid #d9e1d5;
+  min-width: 0;
+}
+.sara-simulation-turn {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 8px;
+}
+.sara-simulation-list {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.sara-simulation-list button {
+  width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.sara-simulation-result {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #d9e1d5;
+  min-width: 0;
+}
+.sara-simulation-transcript {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.sara-simulation-transcript li {
+  display: grid;
+  gap: 8px;
+  padding-left: 12px;
+  border-left: 3px solid #7b897e;
+  font-size: 14px;
+}
+.sara-simulation-transcript li.sara-simulation-assistant {
+  border-color: #507010;
+}
+.sara-simulation-transcript p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #062619;
+}
+@media (max-width: 640px) {
+  .sara-profile-heading {
+    flex-direction: column;
+  }
+  .sara-profile-grid,
+  .sara-simulation-turn {
+    grid-template-columns: 1fr;
+  }
+  .sara-simulation-turn button {
+    justify-self: start;
+  }
+}

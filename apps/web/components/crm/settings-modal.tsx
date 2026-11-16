@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SocialPanel } from "./social-panel";
+import { WhatsAppAgentPanel } from "./whatsapp-agent-panel";
+import { SaraProfilePanel } from "./sara-profile-panel";
 import { ElevenLabsPanel } from "./elevenlabs-panel";
 import { RetellPanel } from "./retell-panel";
 import { HermesPanel } from "./hermes-panel";
@@ -18,6 +20,8 @@ import {
 import "../../app/crm/settings.css";
 const tabs = [
   ["social", "Redes sociales"],
+  ["whatsapp-agent", "Sara WhatsApp"],
+  ["sara-profile", "Sara IA"],
   ["connections", "Conexiones"],
   ["customizations", "Customizaciones"],
 ] as const;
@@ -363,7 +367,7 @@ export function SettingsModal({
               >
                 <Icon
                   name={
-                    key === "social"
+                    key === "social" || key === "whatsapp-agent"
                       ? "message"
                       : key === "connections"
                         ? "connections"
@@ -383,21 +387,24 @@ export function SettingsModal({
             {loading && (
               <p role="status">Consultando el catálogo compartido…</p>
             )}
-            {!loading && tab !== "social" && (
-              <button
-                type="button"
-                className="settings-refresh"
-                onClick={() => {
-                  setLoading(true);
-                  setError("");
-                  void load()
-                    .catch((cause) => setError(settingsError(cause)))
-                    .finally(() => setLoading(false));
-                }}
-              >
-                Actualizar catálogo
-              </button>
-            )}
+            {!loading &&
+              tab !== "social" &&
+              tab !== "whatsapp-agent" &&
+              tab !== "sara-profile" && (
+                <button
+                  type="button"
+                  className="settings-refresh"
+                  onClick={() => {
+                    setLoading(true);
+                    setError("");
+                    void load()
+                      .catch((cause) => setError(settingsError(cause)))
+                      .finally(() => setLoading(false));
+                  }}
+                >
+                  Actualizar catálogo
+                </button>
+              )}
             <section
               id="settings-panel-social"
               role="tabpanel"
@@ -417,6 +424,34 @@ export function SettingsModal({
                     setEditingConnection("zernio");
                     setTab("connections");
                   }}
+                />
+              )}
+            </section>
+            <section
+              id="settings-panel-whatsapp-agent"
+              role="tabpanel"
+              aria-labelledby="settings-tab-whatsapp-agent"
+              tabIndex={0}
+              hidden={tab !== "whatsapp-agent"}
+            >
+              {visited && (
+                <WhatsAppAgentPanel
+                  request={request}
+                  active={open && tab === "whatsapp-agent"}
+                />
+              )}
+            </section>
+            <section
+              id="settings-panel-sara-profile"
+              role="tabpanel"
+              aria-labelledby="settings-tab-sara-profile"
+              tabIndex={0}
+              hidden={tab !== "sara-profile"}
+            >
+              {visited && (
+                <SaraProfilePanel
+                  request={request}
+                  active={open && tab === "sara-profile"}
                 />
               )}
             </section>

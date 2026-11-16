@@ -8,6 +8,7 @@ import {
 } from "./settings-types";
 import { ElevenLabsVoiceResult } from "./elevenlabs-result";
 import { RetellVoiceResult } from "./retell-result";
+import { SaraImageResult } from "./sara-image-result";
 import {
   VoiceProposalSummary,
   VoiceResultSummary,
@@ -187,6 +188,8 @@ export function ActionResultDetails({
   request?: SettingsRequest;
   presentation?: ActionPresentation;
 }) {
+  if (result.kind === "image" && request)
+    return <SaraImageResult result={result} request={request} />;
   const uncertain = [
     "external_outcome_unconfirmed",
     "dispatch_reserved",

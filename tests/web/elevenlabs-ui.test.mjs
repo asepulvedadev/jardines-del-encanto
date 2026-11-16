@@ -25,6 +25,7 @@ function load(name) {
     },
   }).outputText;
   const req = (s) => {
+    if (s.endsWith(".css")) return {};
     if (s === "next/navigation") return { useRouter: () => ({ replace() {} }) };
     if (s.startsWith(".")) {
       for (const e of [".tsx", ".ts"]) {

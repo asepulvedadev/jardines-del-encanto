@@ -516,6 +516,34 @@ def prepare(db, node, contact, binding=None, cache=None):
     return plan
 
 
+def prepare_literal_reply(db, source, text):
+    """Public subagent literal content, preserving all existing ownership/window checks."""
+    text = _text(text, 1500)
+    contact = {
+        "id": str(source["id"]),
+        "name": "Visitante",
+        "phone": "+" + source["participant_id"],
+    }
+    plan = prepare(
+        db,
+        {
+            "kind": "social_message",
+            "settings": {
+                "account_id": source["account_id"],
+                "platform": "whatsapp",
+                "text": "Respuesta pendiente",
+            },
+        },
+        contact,
+        {"account_id": source["account_id"], "conversation_id": source["conversation_id"]},
+    )
+    plan["payload"]["message"] = text
+    plan["summary"]["text"] = text
+    plan.pop("seal")
+    plan["seal"] = _seal(plan, config.required())
+    return plan
+
+
 def _check(plan, credentials):
     if (
         not isinstance(plan, dict)

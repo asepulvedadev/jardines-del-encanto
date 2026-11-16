@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "id": "logo-white",
+      "name": "Logo blanco",
+      "filename": "jardines-del-encanto-blanco-4k.png",
+      "kind": "logo",
+      "mime_type": "image/png",
+      "size": 333958,
+      "sha256": "ef0dafe1087117a2e7b8b4e2a3ed00708075c7d25c900b9007b15b3d6bae22de",
+      "source": "owner-provided:jardines-del-encanto-blanco-4k.png"
+    },
+    {
+      "id": "logo-transparent",
+      "name": "Logo transparente",
+      "filename": "jardines-del-encanto-transparente-4k.png",
+      "kind": "logo",
+      "mime_type": "image/png",
+      "size": 495831,
+      "sha256": "af1f44216d316632c87c3905c1436455af6d1ef97414db9cba02cc4f5f7fe01c",
+      "source": "owner-provided:jardines-del-encanto-transparente-4k.png"
+    },
+    {
+      "id": "photo-aerial",
+      "name": "Vista aérea",
+      "filename": "aerial-960.webp",
+      "kind": "photo",
+      "mime_type": "image/webp",
+      "size": 168392,
+      "sha256": "747563a4d3f18eeab8280fdc21fea4b809af8d01a88011865b8f0a0333329c3b",
+      "source": "owner-provided:aerial-960.webp"
+    },
+    {
+      "id": "photo-entrance",
+      "name": "Entrada",
+      "filename": "entrance-960.webp",
+      "kind": "photo",
+      "mime_type": "image/webp",
+      "size": 118350,
+      "sha256": "615dbd35a135d15769b2620f630de03724070e278aea2cd7819074d4fdc7c7dd",
+      "source": "owner-provided:entrance-960.webp"
+    },
+    {
+      "id": "photo-gate",
+      "name": "Portería",
+      "filename": "gate-960.webp",
+      "kind": "photo",
+      "mime_type": "image/webp",
+      "size": 127906,
+      "sha256": "ecdbe95c82fa8aa96c30c5c0d0442bd0d18e81eabf9a70a9f3078663955220e4",
+      "source": "owner-provided:gate-960.webp"
+    }
+  ]
+}

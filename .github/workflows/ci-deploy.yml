@@ -32,6 +32,7 @@ jobs:
         run: |
           uv run --project apps/api --frozen python ops/dev/crm.py init
           uv run --project apps/api --frozen python ops/dev/crm.py test
+      - run: uv run --project apps/api --frozen python -m pytest tests/test_hermes_images.py tests/test_sara_transport.py tests/test_image_isolation.py -q
       - run: uv run --project apps/api --frozen python -m unittest discover -s tests -v
       - name: Build production images
         env:

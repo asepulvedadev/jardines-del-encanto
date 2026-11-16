@@ -10,11 +10,21 @@ from pydantic import ValidationError
 from ..crm import models as crm_models
 from ..crm import services
 from ..crm.database import connect
+from ..images import models as image_models
 from ..retell import models as retell_models
+from ..sara import profile_models
 from ..voice import models as voice_models
 from . import models
 
 ACTION_MODELS = {
+    "sara.config.get": models.Empty,
+    "sara.config.update": profile_models.ProfileUpdate,
+    "sara.learn": profile_models.Learning,
+    "sara.simulate": profile_models.SimulationCreate,
+    "sara.simulation": profile_models.SimulationID,
+    "images.catalog": models.Empty,
+    "images.generate": image_models.Generate,
+    "images.status": profile_models.SimulationID,
     "workflows.catalog": models.Empty,
     "workflows.definitions": models.Empty,
     "workflows.run": models.WorkflowRecord,
@@ -47,7 +57,14 @@ ACTION_MODELS = {
     "social.sync": models.Empty,
     "social.connect": models.SocialConnect,
 }
+LOCAL_AGENT_ACTIONS = frozenset(
+    {"sara.config.update", "sara.learn", "sara.simulate", "images.generate"}
+)
 READ_ACTIONS = {
+    "sara.config.get",
+    "sara.simulation",
+    "images.catalog",
+    "images.status",
     "workflows.catalog",
     "workflows.definitions",
     "workflows.run",
@@ -345,6 +362,28 @@ def update_connection(db, key, data, admin):
 
 def execute(db, action, args, admin):
     """Invoked only for reads, direct human configuration, or consumed proposals."""
+    if action.startswith("sara."):
+        from ..sara import profile, simulations
+
+        if action == "sara.config.get":
+            return profile.get(db)
+        if action == "sara.config.update":
+            return profile.update(db, args, admin)
+        if action == "sara.learn":
+            return profile.learn(db, args, admin)
+        if action == "sara.simulate":
+            return simulations.create(db, args, admin)
+        if action == "sara.simulation":
+            return simulations.status(db, args.id, admin)
+    if action.startswith("images."):
+        from ..images import service as images
+
+        if action == "images.catalog":
+            return images.catalog(db, admin)
+        if action == "images.generate":
+            return images.enqueue(db, args, admin)
+        if action == "images.status":
+            return images.status(db, args.id, admin)
     if action.startswith("workflows."):
         from ..workflows import models as workflow_models
         from ..workflows import service as workflows

@@ -29,6 +29,10 @@ def proposal_view(row):
 
 def dispatch(db, action, arguments, admin, run_id=None, parent=None):
     service.lock(db)
+    if admin.get("channel") == "whatsapp_developer":
+        from . import developer
+
+        return developer.dispatch(db, action, arguments, admin, run_id)
     if action.startswith("custom."):
         try:
             item_id = UUID(action.removeprefix("custom."))
@@ -57,7 +61,7 @@ def dispatch(db, action, arguments, admin, run_id=None, parent=None):
         from ..control import extensions
 
         return {"result": jsonable_encoder(extensions.execute(db, action, args, admin))}
-    if action in service.READ_ACTIONS:
+    if action in service.READ_ACTIONS or action in service.LOCAL_AGENT_ACTIONS:
         return {"result": jsonable_encoder(service.execute(db, action, args, admin))}
     row = db.execute(
         """INSERT INTO crm.hermes_proposals
@@ -242,6 +246,18 @@ def identity(db, bearer):
     if not bearer or not bearer.startswith("Bearer ") or len(bearer) > 100:
         raise HTTPException(401, "service_authentication_required")
     token = bearer.removeprefix("Bearer ")
+    # Developer identities share the registry/config revocation lock, not browser sessions.
+    service.lock(db)
+    channel_run = db.execute(
+        "SELECT r.*,u.username,u.role FROM crm.hermes_runs r JOIN crm.users u ON u.id=r.actor_id "
+        "WHERE r.token_hash=%s AND r.expires_at>now() AND r.authentication='whatsapp_developer' FOR UPDATE OF r",
+        (security.digest(token),),
+    ).fetchone()
+    if channel_run:
+        from . import developer
+
+        developer.authority(db, channel_run)
+        return channel_run
     row = db.execute(
         """SELECT r.*,u.username,u.role FROM crm.hermes_runs r
         JOIN crm.users u ON u.id=r.actor_id JOIN crm.sessions s ON s.token_hash=r.session_hash
@@ -257,6 +273,14 @@ def identity(db, bearer):
 
 
 def actor(run):
+    if run.get("authentication") == "whatsapp_developer":
+        return {
+            "id": run["actor_id"],
+            "username": run["username"],
+            "role": run["role"],
+            "channel": "whatsapp_developer",
+            "developer_run_id": run["id"],
+        }
     return {
         "id": run["actor_id"],
         "token_hash": run["session_hash"],
@@ -265,12 +289,24 @@ def actor(run):
     }
 
 
-def tools(db):
-    actions = [action for action in service.ACTION_MODELS if service.capability_enabled(db, action)]
+def tools(db, run=None):
+    developer_run = run is not None and run.get("authentication") == "whatsapp_developer"
+    from . import developer
+
+    actions = [
+        action
+        for action in service.ACTION_MODELS
+        if service.capability_enabled(db, action)
+        and (not developer_run or action in developer.ACTIONS)
+    ]
     items = [
         item
-        for item in service.rows(db)
-        if item["kind"] != "skill" and service.item_view(db, item)["effective"]
+        for item in (
+            developer.owned_items(db, run["actor_id"]) if developer_run else service.rows(db)
+        )
+        if item["kind"] != "skill"
+        and service.item_view(db, item)["effective"]
+        and (not developer_run or developer.safe_definition(item))
     ]
     custom = {
         "custom." + str(item["id"]): {
@@ -306,7 +342,11 @@ def tools(db):
     description = (
         "Consultar la aplicación o proponer cambios para aprobación exacta del administrador. "
         "Los cambios de negocio/configuración requieren aprobación humana. Solo control.extension.* "
-        "gestiona directamente definiciones declarativas propias: create crea borrador, update lo "
+        "sara.config.get/update y sara.learn consultan y editan directamente la configuración publicada, nunca secretos o permisos. "
+        "sara.simulate crea una simulación sintética sin enviar mensajes reales; sara.simulation consulta su resultado. "
+        "images.catalog muestra logos/fotos originales e IDs; images.generate encola una imagen de concepto con UUID request_id, "
+        "prompt, reference_ids y size; images.status consulta el resultado. No reintentar un resultado unknown. "
+        "Solo control.extension.* gestiona directamente definiciones declarativas propias: create crea borrador, update lo "
         "desactiva, install habilita, test valida sin ejecutar. Nuevas extensiones solo en el próximo "
         "turno. Sin código, paquetes nativos, conexiones ni cambios de permisos. "
         "voice.catalog muestra opciones; voice.execute siempre propone una operación de pago. "
@@ -324,6 +364,17 @@ def tools(db):
         "Contratos JSON de argumentos y definiciones: "
         + json.dumps(manifest, ensure_ascii=False, separators=(",", ":"))
     )
+    if developer_run:
+        description = (
+            "Herramientas de desarrollador verificado de WhatsApp. Solo acciones enumeradas y extensiones propias. "
+            "control.catalog lista tus definiciones; control.extension.create/update/test/install gestiona borradores declarativos, "
+            "no código. Usa sara.config.get antes de editar por versión, sara.learn para conocimiento explícito. "
+            "images.generate y sara.simulate encolan trabajos acotados con request_id; consulta status sin reenviar resultados unknown. "
+            "Las imágenes de este canal encolan el archivo en la conversación de origen; whatsapp_delivery informa su estado. "
+            "Aceptado no significa entregado o leído. Si excede el límite, queda privado en la web, sin regenerarse. "
+            "Las extensiones instaladas aparecen en el siguiente turno. No tienes CRM, sesiones web, conexiones, shell ni secretos. "
+            "Contratos JSON: " + json.dumps(manifest, ensure_ascii=False, separators=(",", ":"))
+        )
     if len(description.encode()) > 16384:
         raise HTTPException(503, "hermes_catalog_too_large")
     return [
@@ -351,8 +402,15 @@ def claim(db, run):
     if run["state"] != "issued":
         raise HTTPException(409, "run_already_claimed")
     db.execute("UPDATE crm.hermes_runs SET state='claimed' WHERE id=%s", (run["id"],))
+    developer_run = run.get("authentication") == "whatsapp_developer"
+    from . import developer
+
+    if developer_run:
+        developer.authority(db, run)
     skills = []
-    for item in service.rows(db):
+    for item in developer.owned_items(db, run["actor_id"]) if developer_run else service.rows(db):
+        if developer_run and not developer.safe_definition(item):
+            continue
         if not service.item_view(db, item)["effective"]:
             continue
         content = (
@@ -362,7 +420,7 @@ def claim(db, run):
         )
         if content:
             skills.append({"name": item["name"], "content": content})
-    schemas = tools(db)
+    schemas = tools(db, run)
     keys = schemas[0]["function"]["parameters"]["properties"]["action"]["enum"]
     scope = {}
     for key in keys:
@@ -380,7 +438,17 @@ def claim(db, run):
             ).fetchone()
             scope[key] = str(override["id"]) + ":" + str(override["version"]) if override else None
     service.audit(db, actor(run), "run.claim", {"run_id": str(run["id"]), "scope": scope})
-    result = {"run_id": run["id"], "prompt": run["prompt"], "skills": skills, "tools": schemas}
+    from ..sara import profile
+
+    published = profile.get(db)
+    configuration = {key: published[key] for key in ("version", *profile.Profile.model_fields)}
+    result = {
+        "run_id": run["id"],
+        "prompt": run["prompt"],
+        "skills": skills,
+        "tools": schemas,
+        "configuration": configuration,
+    }
     history = validated_history(run.get("history"))
     if history:
         result["history"] = history

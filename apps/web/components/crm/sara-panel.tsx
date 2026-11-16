@@ -286,19 +286,36 @@ export function SaraMessageView({
       {message.attachments.map((attachment) => (
         <SaraFile key={attachment.id} attachment={attachment} csrf={csrf} />
       ))}
-      {message.results.length > 0 && (
+      {message.results
+        .filter((result) => result.kind === "image")
+        .map((result, index) => (
+          <ActionResultDetails
+            key={`image-${index}`}
+            result={result}
+            request={request}
+          />
+        ))}
+      {message.results.some((result) => result.kind !== "image") && (
         <details className="sara-activity">
           <summary>
-            Actividad de Sara <span>{message.results.length}</span>
+            Actividad de Sara{" "}
+            <span>
+              {
+                message.results.filter((result) => result.kind !== "image")
+                  .length
+              }
+            </span>
           </summary>
           <div>
-            {message.results.map((result, index) => (
-              <ActionResultDetails
-                key={index}
-                result={result}
-                request={request}
-              />
-            ))}
+            {message.results
+              .filter((result) => result.kind !== "image")
+              .map((result, index) => (
+                <ActionResultDetails
+                  key={index}
+                  result={result}
+                  request={request}
+                />
+              ))}
           </div>
         </details>
       )}

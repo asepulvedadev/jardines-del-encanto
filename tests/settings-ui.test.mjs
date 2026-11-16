@@ -103,7 +103,7 @@ test("rendered switch exposes checked, disabled and labeled state", () => {
   assert.match(html, /aria-label="Activar Hermes"/);
   assert.match(html, /disabled=""/);
 });
-test("rendered modal exposes three associated keyboard tabs and no fake connected status", () => {
+test("rendered modal exposes five associated keyboard tabs and no fake connected status", () => {
   const { SettingsModal } = loadComponent("settings-modal.tsx");
   const html = renderToStaticMarkup(
     React.createElement(SettingsModal, {
@@ -114,9 +114,15 @@ test("rendered modal exposes three associated keyboard tabs and no fake connecte
     }),
   );
   assert.match(html, /<dialog[^>]+aria-labelledby="settings-title"/);
-  assert.equal((html.match(/role="tab"/g) || []).length, 3);
-  assert.equal((html.match(/role="tabpanel"/g) || []).length, 3);
-  for (const label of ["Redes sociales", "Conexiones", "Customizaciones"])
+  assert.equal((html.match(/role="tab"/g) || []).length, 5);
+  assert.equal((html.match(/role="tabpanel"/g) || []).length, 5);
+  for (const label of [
+    "Redes sociales",
+    "Sara WhatsApp",
+    "Sara IA",
+    "Conexiones",
+    "Customizaciones",
+  ])
     assert.ok(html.includes(label));
   assert.doesNotMatch(html, /Conectado|Disponible para Hermes/);
 });
@@ -199,4 +205,32 @@ test("Hermes edit opens a persistent editor and focuses its prompt", () => {
   assert.match(modal, /hidden=\{editingConnection !== "hermes"\}/);
   assert.match(modal, /prompt\?\.focus\(\)/);
   assert.equal((modal.match(/<HermesPanel/g) || []).length, 1);
+});
+
+test("image receipts render a visible non-retrying concept state and reject injected paths", () => {
+  const { SaraImageResult } = loadComponent("sara-image-result.tsx");
+  const request = async () => ({});
+  const base = {
+    kind: "image",
+    mime_type: "image/png",
+    id: "00000000-0000-4000-8000-000000000001",
+    status: "queued",
+    concept: true,
+    reference_ids: ["logo-white"],
+    model: "gpt-image-2.5-flare",
+  };
+  const html = renderToStaticMarkup(
+    React.createElement(SaraImageResult, { result: base, request }),
+  );
+  assert.match(html, /en espera|Preparando|Generando/i);
+  assert.doesNotMatch(html, /<img|autoplay/);
+  assert.equal(
+    renderToStaticMarkup(
+      React.createElement(SaraImageResult, {
+        result: { ...base, id: "https://evil.invalid" },
+        request,
+      }),
+    ),
+    "",
+  );
 });

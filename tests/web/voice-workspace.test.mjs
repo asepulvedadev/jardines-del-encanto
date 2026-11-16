@@ -95,6 +95,8 @@ function harness(file, component, props = {}, transport) {
         };
       if (path === "./elevenlabs-result")
         return { ElevenLabsVoiceResult: "ElevenLabsVoiceResult" };
+      if (path === "./sara-image-result")
+        return { SaraImageResult: "SaraImageResult" };
       if (path === "./retell-result")
         return { RetellVoiceResult: "RetellVoiceResult" };
       return require(path);
