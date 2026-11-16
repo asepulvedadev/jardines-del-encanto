@@ -307,7 +307,9 @@ def webhook(db, payload, profile):
     if not enabled() or not event or event["profile_id"] != profile:
         return
     row = {
-        "id": event["conversation_id"],
+        # REST history is addressed by Zernio's internal conversation ID, not
+        # the platform alias used by the sequence stop-on-reply normalizer.
+        "id": payload["conversation"]["id"],
         "accountId": event["account_id"],
         "platform": event["platform"],
         "participantId": event["participant_id"],

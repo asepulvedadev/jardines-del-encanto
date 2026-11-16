@@ -236,6 +236,12 @@ def test_signed_webhook_saves_even_when_reply_agent_fails(intake, monkeypatch, f
         assert db.execute(
             "SELECT 1 FROM crm.social_webhook_events WHERE event_id=%s", (payload["id"],)
         ).fetchone()
+        assert (
+            db.execute("SELECT conversation_id FROM crm.lead_capture_threads").fetchone()[
+                "conversation_id"
+            ]
+            == payload["conversation"]["id"]
+        )
     raw = raw.replace(payload["id"].encode(), b"capture-event-unsigned")
     assert (
         intake[0].post("/integrations/zernio/webhook", content=raw, headers=headers).status_code
