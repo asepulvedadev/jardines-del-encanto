@@ -1,8 +1,10 @@
 # Private landing analytics
 
-Status: implementation prepared locally. **The VPS analytics service is not installed or
-activated by this change. No production visits have been collected.** Publishing the
-application alone does not activate the separate analytics stack or installed policy.
+Deployment contract: publishing the application alone does not install or activate
+the separate analytics stack or root-owned runtime policy. The owner authorized the
+production rollout on 2026-11-16. Verify live state through the installed deployment
+marker, service health and authenticated aggregate endpoint; do not infer activation
+from the presence of these source files.
 
 ## Data contract and boundaries
 
@@ -272,4 +274,5 @@ collector into real Umami, then returned through the shared dashboard/Sara repor
 service for 1, 7 and 30 days. The registration SQL boundary used an isolated empty fixture;
 no real customer database, external ad account or production statistics were used.
 This proves the collector/provider adapter contract, not production collection or
-historical traffic. Live production activation remains pending.
+historical traffic. Local smoke does not itself prove production activation; verify the installed service
+and application release independently using the rollout checks above.
