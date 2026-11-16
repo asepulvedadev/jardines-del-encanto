@@ -75,6 +75,30 @@ def create_contact(db, data, admin, record_activity=activity):
     return record
 
 
+def capture_contact(db, data):
+    """Conflict-safe intake shared by public forms and authenticated social events.
+
+    Existing identity, source and pipeline stage remain administrator-owned.
+    """
+    record = db.execute(
+        "INSERT INTO crm.contacts(name,phone,source) VALUES(%s,%s,%s) "
+        "ON CONFLICT(phone) DO NOTHING RETURNING id",
+        (data.name, data.phone, data.source),
+    ).fetchone()
+    if not record:
+        record = db.execute(
+            "SELECT id FROM crm.contacts WHERE phone=%s FOR UPDATE", (data.phone,)
+        ).fetchone()
+    if not record:
+        raise HTTPException(409, "capture_retry")
+    db.execute(
+        "INSERT INTO crm.deals(contact_id) VALUES(%s) ON CONFLICT(contact_id) DO NOTHING",
+        (record["id"],),
+    )
+    deal = db.execute("SELECT id FROM crm.deals WHERE contact_id=%s", (record["id"],)).fetchone()
+    return record, deal
+
+
 def edit_contact(db, contact_id, data, admin):
     record = db.execute(
         """UPDATE crm.contacts SET name=%s, phone=%s, source=%s, version=version+1,

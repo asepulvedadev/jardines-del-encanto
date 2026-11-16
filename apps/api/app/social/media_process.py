@@ -11,6 +11,10 @@ from . import media, workflow
 def execute(frame):
     from . import audio_media
 
+    if frame.get("operation", "").startswith("welcome_") and set(frame) == {"operation", "id"}:
+        from . import onboarding_transport
+
+        return onboarding_transport.execute(frame["operation"], frame["id"])
     if frame.get("operation") == "prepare_audio" and set(frame) == {"operation", "source"}:
         source = frame["source"]
         if set(source) != {"id", "account_id", "conversation_id", "participant_id"}:

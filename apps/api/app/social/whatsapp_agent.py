@@ -551,6 +551,9 @@ def _loop():
     global _heartbeat
     while not _stop.is_set():
         try:
+            from . import onboarding
+
+            onboarding.tick()
             tick()
             _heartbeat = monotonic()
         except Exception:  # noqa: BLE001 - recover without logging private data

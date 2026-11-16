@@ -442,9 +442,11 @@ async def webhook(request: Request):
             from .workflow import normalize_event
 
             verified_reply(db, normalize_event(payload))
+            from .onboarding import enqueue as onboard
             from .whatsapp_agent import enqueue
 
-            enqueue(db, payload, profile)
+            if not onboard(db, payload, profile):
+                enqueue(db, payload, profile)
         if not record:
             previous = db.execute(
                 "SELECT body_hash FROM crm.social_webhook_events WHERE event_id=%s", (event_id,)
