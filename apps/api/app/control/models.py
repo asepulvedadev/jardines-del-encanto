@@ -225,6 +225,13 @@ class WorkflowDraftUpdate(Input):
         return Document.model_validate(value).model_dump()
 
 
+class WorkflowLookup(Input):
+    id: UUID | None = None
+    query: str = Field(default="", max_length=120)
+    limit: int = Field(default=10, ge=1, le=20, strict=True)
+    offset: int = Field(default=0, ge=0, le=200, strict=True)
+
+
 class WorkflowRecord(Input):
     id: UUID
 

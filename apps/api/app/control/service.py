@@ -26,8 +26,8 @@ ACTION_MODELS = {
     "images.generate": image_models.Generate,
     "images.status": profile_models.SimulationID,
     "workflows.catalog": models.Empty,
-    "workflows.definitions": models.Empty,
-    "workflows.run": models.WorkflowRecord,
+    "workflows.definitions": models.WorkflowLookup,
+    "workflows.run": models.WorkflowLookup,
     "workflows.draft.create": models.WorkflowDraftCreate,
     "workflows.draft.update": models.WorkflowDraftUpdate,
     "workflows.pause": models.WorkflowControl,
@@ -391,9 +391,11 @@ def execute(db, action, args, admin):
         if action == "workflows.catalog":
             return workflows.catalog(db)
         if action == "workflows.definitions":
+            if args.model_fields_set or admin.get("channel") == "whatsapp_developer":
+                return workflows.search_definitions(db, args)
             return workflows.definitions(db)
         if action == "workflows.run":
-            return workflows.detail(db, args.id)
+            return workflows.detail(db, args.id) if args.id is not None else workflows.search_runs(db, args)
         if action == "workflows.draft.create":
             return workflows.create(
                 db, workflow_models.DefinitionCreate.model_validate(args.model_dump()), admin

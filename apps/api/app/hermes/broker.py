@@ -372,7 +372,19 @@ def tools(db, run=None):
             "images.generate y sara.simulate encolan trabajos acotados con request_id; consulta status sin reenviar resultados unknown. "
             "Las imágenes de este canal encolan el archivo en la conversación de origen; whatsapp_delivery informa su estado. "
             "Aceptado no significa entregado o leído. Si excede el límite, queda privado en la web, sin regenerarse. "
-            "Las extensiones instaladas aparecen en el siguiente turno. No tienes CRM, sesiones web, conexiones, shell ni secretos. "
+            "crm.workspace consulta clientes, pipeline y seguimientos; usa sus IDs/versiones reales antes de editar. "
+            "crm.contact.create crea cliente y lead en Nuevo con nombre, celular y source; "
+            "crm.contact.update edita; crm.deal.update mueve a new/contacted/won; "
+            "crm.note.create y crm.task.create/update gestionan notas y seguimientos; crm.activities consulta historial. "
+            "Estas acciones CRM se ejecutan directamente para este desarrollador verificado, sin propuesta web. "
+            "workflows.catalog consulta opciones. workflows.run sin id lista ejecuciones con query/limit/offset; "
+            "con id consulta detalle. No confundas ID de definición con ID de ejecución. "
+            "workflows.definitions lista IDs/nombres con query/limit/offset, "
+            "usa {id} para leer un documento completo antes de editar. workflows.draft.create/update guardan borradores "
+            "directamente; workflows.pause/stop pausan o detienen ejecuciones existentes por ID/version. "
+            "No activas, preparas ni reanudas secuencias: requieren revisión humana en Secuencias. "
+            "No confirmes un cambio si la herramienta devuelve error; no inventes IDs ni versiones. "
+            "Las extensiones instaladas aparecen en el siguiente turno. Sin sesiones web, cambios de permisos, shell ni secretos. "
             "Contratos JSON: " + json.dumps(manifest, ensure_ascii=False, separators=(",", ":"))
         )
     if len(description.encode()) > 16384:

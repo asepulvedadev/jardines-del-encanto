@@ -12,6 +12,23 @@ from ..crm import security
 
 ACTIONS = frozenset(
     {
+        # Business access is restricted to the source-verified developer channel.
+        # Reuse canonical services; never mint browser sessions or activation grants.
+        "crm.workspace",
+        "crm.activities",
+        "crm.contact.create",
+        "crm.contact.update",
+        "crm.deal.update",
+        "crm.note.create",
+        "crm.task.create",
+        "crm.task.update",
+        "workflows.catalog",
+        "workflows.definitions",
+        "workflows.run",
+        "workflows.draft.create",
+        "workflows.draft.update",
+        "workflows.pause",
+        "workflows.stop",
         "control.catalog",
         "control.extension.create",
         "control.extension.update",

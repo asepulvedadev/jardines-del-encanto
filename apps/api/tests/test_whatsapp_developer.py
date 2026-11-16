@@ -14,14 +14,14 @@ from app.crm.database import connect
 from app.social import whatsapp_agent as agent
 
 
-def test_developer_scope_is_explicit_and_definitions_cannot_smuggle_crm():
+def test_developer_scope_includes_crm_but_cannot_change_permissions():
     from app.hermes import developer
 
     assert "sara.config.update" in developer.ACTIONS
-    assert "crm.workspace" not in developer.ACTIONS
+    assert "crm.workspace" in developer.ACTIONS
     assert "control.connection.update" not in developer.ACTIONS
     assert developer.safe_definition({"kind": "tool", "definition": {"action": "sara.config.get", "defaults": {}}})
-    assert not developer.safe_definition({"kind": "tool", "definition": {"action": "crm.contact.create", "defaults": {}}})
+    assert developer.safe_definition({"kind": "tool", "definition": {"action": "crm.contact.create", "defaults": {}}})
     assert not developer.safe_definition({"kind": "plugin", "definition": {"actions": ["control.extension.install"]}})
 
 
@@ -67,7 +67,7 @@ def test_real_issue_claim_owned_lifecycle_replay_and_no_browser_session(configur
     claim = client.post("/internal/hermes/claim", json={}, headers=headers)
     assert claim.status_code == 200, claim.text
     actions = claim.json()["tools"][0]["function"]["parameters"]["properties"]["action"]["enum"]
-    assert "sara.config.get" in actions and "crm.workspace" not in actions
+    assert "sara.config.get" in actions and "crm.workspace" in actions
     assert claim.json()["configuration"]["version"] >= 1
     data = {"kind": "tool", "name": "Published preferences", "definition": {"action": "sara.config.get", "defaults": {}}}
     created = call(client, headers, "control.extension.create", data, "create-once")
@@ -79,8 +79,8 @@ def test_real_issue_claim_owned_lifecycle_replay_and_no_browser_session(configur
     assert call(client, headers, "control.extension.test", args).json()["result"]["side_effects"] is False
     installed = call(client, headers, "control.extension.install", args).json()["result"]
     assert installed["enabled"]
-    assert call(client, headers, "crm.workspace", {}).json()["result"]["error"] == "capability_not_in_run"
-    assert call(client, headers, "control.extension.create", {"kind": "tool", "name": "Unsafe", "definition": {"action": "crm.workspace", "defaults": {}}}).json()["result"]["error"] == "developer_action_denied"
+    assert call(client, headers, "crm.workspace", {}).json()["result"]["contacts"] == []
+    assert call(client, headers, "control.extension.create", {"kind": "tool", "name": "Unsafe", "definition": {"action": "control.connection.update", "defaults": {}}}).json()["result"]["error"] == "developer_action_denied"
     catalog = call(client, headers, "control.catalog", {}).json()["result"]
     assert {item["id"] for item in catalog["items"]} == {installed["id"]}
     assert client.post("/internal/hermes/finish", json={"reply": "Installed."}, headers=headers).status_code == 200

@@ -30,9 +30,28 @@ Verified developers can converse with the private scoped broker to create, inspe
 update, test and install their owner's Sara skills/tools; edit the shared published
 configuration; explicitly teach knowledge; enqueue bounded brand-aware image jobs;
 and run isolated synthetic customer simulations. Only typed allowlisted actions
-are available. Developer tools cannot read CRM records, modify channel grants,
-change connection permissions, run arbitrary source, expose secrets or impersonate
-web sessions. Custom tools may target only the same safe capabilities; installed
+are available. The two verified developer numbers can also directly read CRM
+records; create and edit clients (creation adds a New pipeline lead); move deals
+between New, Contacted and Won; add notes; create and complete follow-ups; inspect
+sequence definitions/runs; create and edit validated sequence drafts; and pause or
+stop existing runs. These business actions reuse the same canonical CRM/workflow
+services, version checks, activity history, capability switches and once-only
+broker call receipts. They do not create browser sessions or pending web proposals.
+
+WhatsApp sequence listings are compact and paginated (`query`, `limit`, `offset`);
+`workflows.definitions` with `id` retrieves one exact document before editing it.
+`workflows.run` without `id` similarly lists execution IDs, status and versions;
+with `id` it returns the existing exact run details. Definition IDs are never used
+as execution IDs. The legacy web definition lookup with empty arguments keeps its
+existing full-list response.
+
+Sequence preparation, activation and resumption still require exact human review
+in Secuencias; WhatsApp cannot authorize bulk messaging or calls. Public customers
+remain tool-free: mentioning a developer name or asking for CRM access does not
+create a developer grant. Removing a developer, disabling the owner/channel or
+revoking a connection immediately blocks subsequent CRM calls. Developer tools
+cannot modify channel grants, change connection permissions, run arbitrary source,
+expose secrets or impersonate web sessions. Custom tools may target only the same safe capabilities; installed
 custom tools and skills become visible on the next turn. The catalog excludes
 other owners' definitions. Image and simulation jobs return inspectable receipts;
 unknown outcomes must not be automatically resubmitted.

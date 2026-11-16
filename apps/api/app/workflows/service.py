@@ -64,6 +64,23 @@ def definitions(db):
     }
 
 
+def search_definitions(db, args):
+    """Compact listings for chat; fetch one exact document only when requested."""
+    if args.id is not None:
+        return {"workflows": [definition(db, args.id)]}
+    count = db.execute(
+        "SELECT count(*) AS n FROM crm.workflow_definitions "
+        "WHERE position(lower(%s) in lower(name))>0", (args.query,)
+    ).fetchone()["n"]
+    rows = db.execute(
+        "SELECT id,name,version,updated_at FROM crm.workflow_definitions "
+        "WHERE position(lower(%s) in lower(name))>0 ORDER BY updated_at DESC,id "
+        "LIMIT %s OFFSET %s", (args.query, args.limit, args.offset)
+    ).fetchall()
+    return {"workflows": rows, "paging": {"offset": args.offset, "limit": args.limit,
+            "total": count, "has_more": count > args.offset + len(rows)}}
+
+
 def create(db, data, admin):
     return db.execute(
         "INSERT INTO crm.workflow_definitions(name,description,document) VALUES (%s,%s,%s) RETURNING *",
@@ -512,6 +529,21 @@ def runs(db):
             ).fetchall()
         ]
     }
+
+
+def search_runs(db, args):
+    """Discover real execution IDs without returning audience or event payloads."""
+    count = db.execute(
+        "SELECT count(*) AS n FROM crm.workflow_runs "
+        "WHERE position(lower(%s) in lower(workflow_name))>0", (args.query,)
+    ).fetchone()["n"]
+    rows = db.execute(
+        "SELECT id,workflow_id,workflow_name,workflow_version,status,version,created_at,started_at "
+        "FROM crm.workflow_runs WHERE position(lower(%s) in lower(workflow_name))>0 "
+        "ORDER BY created_at DESC,id LIMIT %s OFFSET %s", (args.query, args.limit, args.offset)
+    ).fetchall()
+    return {"runs": rows, "paging": {"offset": args.offset, "limit": args.limit,
+            "total": count, "has_more": count > args.offset + len(rows)}}
 
 
 def detail(db, record_id):
