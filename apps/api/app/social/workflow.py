@@ -139,35 +139,46 @@ def _request(
     body = _json(payload).encode() if sending else None
     if body and len(body) > MAX_REQUEST:
         _fail("zernio_invalid_content")
-    connection = None
-    try:
-        connection = https_connection("zernio.com", timeout=4)
-        headers = {
-            "Authorization": "Bearer " + credentials["api_key"],
-            "Accept": "application/json",
-        }
-        if sending:
-            headers["Content-Type"] = "application/json"
-            # Zernio documents this header for replies. It never authorizes retries.
-            if operation == "reply":
-                headers["Idempotency-Key"] = _identifier(request_id, 200)
-        connection.request("POST" if sending else "GET", "/api" + path, body=body, headers=headers)
-        response = connection.getresponse()
-        raw = response.read(MAX_RESPONSE + 1)
-        if not 200 <= response.status < 300 or len(raw) > MAX_RESPONSE:
-            raise ValueError
-        result = json.loads(raw)
-        if not isinstance(result, dict):
-            raise TypeError
-        return result
-    except (OSError, ValueError, TypeError, KeyError, http.client.HTTPException, UnicodeError):
-        # No status, redirect target, body, exception string or vendor error escapes.
-        raise HTTPException(
-            502, "zernio_submission_unknown" if sending else "zernio_workflow_unavailable"
-        ) from None
-    finally:
-        if connection:
-            connection.close()
+    for attempt in range(1 if sending else 2):
+        connection = None
+        try:
+            connection = https_connection("zernio.com", timeout=4)
+            headers = {
+                "Authorization": "Bearer " + credentials["api_key"],
+                "Accept": "application/json",
+            }
+            if sending:
+                headers["Content-Type"] = "application/json"
+                # Zernio documents this header for replies. It never authorizes retries.
+                if operation == "reply":
+                    headers["Idempotency-Key"] = _identifier(request_id, 200)
+            connection.request("POST" if sending else "GET", "/api" + path, body=body, headers=headers)
+            response = connection.getresponse()
+            if not 200 <= response.status < 300:
+                raise ValueError
+            raw = response.read(MAX_RESPONSE + 1)
+            if len(raw) > MAX_RESPONSE:
+                raise ValueError
+            result = json.loads(raw)
+            if not isinstance(result, dict):
+                raise TypeError
+            return result
+        except (OSError, http.client.HTTPException):
+            # A failed GET can be repeated once on a fresh connection. Never
+            # replay a POST, or bypass the identity/window/ownership checks.
+            if not sending and attempt == 0:
+                continue
+            raise HTTPException(
+                502, "zernio_submission_unknown" if sending else "zernio_workflow_unavailable"
+            ) from None
+        except (ValueError, TypeError, KeyError, UnicodeError):
+            # Rejections, oversized or malformed responses are not transient.
+            raise HTTPException(
+                502, "zernio_submission_unknown" if sending else "zernio_workflow_unavailable"
+            ) from None
+        finally:
+            if connection:
+                connection.close()
 
 
 def _list(data, key, limit=100):

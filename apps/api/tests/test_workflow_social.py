@@ -1,6 +1,7 @@
 """Read-only preparation and one-shot fixed-host messaging; never real vendor traffic."""
 
 import copy
+import http.client
 import json
 from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
@@ -182,6 +183,104 @@ def test_exact_existing_conversation_reply_and_encoded_opaque_path(vendor):
     assert post[1] == "/api/v1/inbox/conversations/thread%3A1/messages"
     assert post[2] == {"accountId": ACCOUNT, "message": "Hola Ana"}
     assert result["state"] == "completed"
+
+
+@pytest.mark.parametrize("failures", [1, 2])
+def test_final_reply_read_timeout_is_retried_once_without_replaying_send(
+    vendor, monkeypatch, failures
+):
+    node, binding = conversation(vendor)
+    plan = workflow.prepare(None, node, CONTACT, binding)
+    original = workflow.https_connection
+    closed = []
+    attempts = []
+
+    def connection(host, timeout):
+        client = original(host, timeout)
+        response = client.getresponse
+        number = len(attempts)
+        attempts.append(number)
+
+        def getresponse():
+            if number < failures:
+                raise TimeoutError("private upstream details")
+            return response()
+
+        client.getresponse = getresponse
+        client.close = lambda: closed.append(number)
+        return client
+
+    monkeypatch.setattr(workflow, "https_connection", connection)
+    if failures == 1:
+        assert workflow.dispatch(plan, "reserved-read-retry")["state"] == "completed"
+        assert sum(call[0] == "POST" for call in vendor["calls"]) == 1
+    else:
+        with pytest.raises(HTTPException) as error:
+            workflow.dispatch(plan, "reserved-read-retry")
+        assert error.value.detail == "zernio_workflow_unavailable"
+        assert len(attempts) == 2
+        assert not any(call[0] == "POST" for call in vendor["calls"])
+    assert closed == attempts
+
+
+def test_write_timeout_is_never_retried(vendor):
+    node, binding = conversation(vendor)
+    plan = workflow.prepare(None, node, CONTACT, binding)
+    vendor["timeout"] = True
+    assert workflow.dispatch(plan, "reserved-write-timeout")["state"] == "unknown"
+    assert sum(call[0] == "POST" for call in vendor["calls"]) == 1
+
+
+def test_read_retry_does_not_bypass_human_ownership(vendor, monkeypatch):
+    node, binding = conversation(vendor)
+    plan = workflow.prepare(None, node, CONTACT, binding)
+    original = workflow.https_connection
+    attempts = []
+
+    def connection(host, timeout):
+        client = original(host, timeout)
+        attempts.append(client)
+        if len(attempts) == 1:
+            def interrupted():
+                vendor["conversations"][0]["threadControl"] = "human"
+                raise TimeoutError
+
+            client.getresponse = interrupted
+        return client
+
+    monkeypatch.setattr(workflow, "https_connection", connection)
+    with pytest.raises(HTTPException):
+        workflow.dispatch(plan, "reserved-human-takeover")
+    assert len(attempts) > 1
+    assert not any(call[0] == "POST" for call in vendor["calls"])
+
+
+@pytest.mark.parametrize("status", [401, 403, 429, 500])
+@pytest.mark.parametrize("broken_body", [False, True])
+def test_rejected_reads_are_not_retried(vendor, monkeypatch, status, broken_body):
+    original = workflow.https_connection
+
+    def connection(host, timeout):
+        client = original(host, timeout)
+        response = client.getresponse
+
+        def rejected():
+            result = response()
+            result.status = status
+            if broken_body:
+                def interrupted(maximum):
+                    raise http.client.IncompleteRead(b"")
+
+                result.read = interrupted
+            return result
+
+        client.getresponse = rejected
+        return client
+
+    monkeypatch.setattr(workflow, "https_connection", connection)
+    with pytest.raises(HTTPException):
+        workflow._request(vendor["credentials"], "accounts")
+    assert len(vendor["calls"]) == 1
 
 
 @pytest.mark.parametrize("control", [None, "ai_agent", "other"])

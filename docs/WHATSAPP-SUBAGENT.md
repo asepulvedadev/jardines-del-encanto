@@ -114,6 +114,10 @@ missing; an enabled flag is not reported as verified availability.
 - Ambiguous or interrupted reservations are held, never automatically retried. Vendor
   acceptance is not delivery or read confirmation. No production sends are simulated
   as successful.
+- A socket/HTTP transport failure during a read-only Zernio verification GET gets
+  one fresh-connection retry (four-second socket timeout per attempt). HTTP rejection,
+  malformed/oversized responses, failed ownership checks and POST submissions are
+  never retried. The complete final identity/control/window validation still runs.
 
 ## Verification
 
