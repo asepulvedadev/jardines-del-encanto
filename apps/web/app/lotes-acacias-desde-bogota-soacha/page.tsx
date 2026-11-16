@@ -1,3 +1,4 @@
+import { LandingAnalytics } from "../../components/landing-analytics";
 import { landingFont } from "../../lib/landing-font";
 import { project } from "../../lib/project";
 import {
@@ -20,6 +21,7 @@ export const metadata = publicMetadata(
 export default function BuyerGuide() {
   return (
     <div className={`landing buyer-guide ${landingFont.variable}`}>
+      <LandingAnalytics />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -60,9 +62,9 @@ export default function BuyerGuide() {
           <p className="guide-lead">
             Jardines del Encanto es un proyecto ubicado en{" "}
             <strong>Acacías, Meta</strong>. Si vives en Bogotá o Soacha, aquí
-            puedes conocer su oferta informada, revisar el plano y preparar las
-            preguntas para una visita. Los lotes no están ubicados en Bogotá ni
-            en Soacha.
+            puedes conocer lotes de 7 × 14 m (98 m²) desde $13.000.000 COP,
+            con financiación informada de hasta 24 meses. Revisa el plano y
+            prepara tu visita: los lotes no están ubicados en Bogotá ni en Soacha.
           </p>
           <p className="content-note">
             Información comercial suministrada por el proyecto. Confirma

@@ -108,3 +108,64 @@ location; no fictitious Bogotá/Soacha branches or purchased backlink campaign.
   [sitemap](https://nextjs.org/docs/app/api-reference/file-conventions/metadata/sitemap),
   [JSON-LD](https://nextjs.org/docs/app/guides/json-ld): verified against16.4.5 docs,
   compatible with this project's16.4.6 build.
+
+
+## Brand, sharing and entity upgrade — 2026-11-16
+
+The owner requested stronger SEO/GEO, correct brand icons and a professional
+information card when sharing a link. The current update remains local until
+publication is separately authorized. It does not change indexable route scope,
+private robots defaults, authentication, DNS or the root-owned Nginx policy.
+
+- The home and buyer guide explicitly publish a 1200×630 PNG social card,
+  with absolute branded URLs, dimensions, MIME type, descriptive alt and large
+  Twitter card metadata. The versioned image URL replaces the old raw aerial
+  WebP reference. It is not an event poster and has no expiring event date.
+- The card uses the original white SVG lockup, an owner-supplied real gate
+  photograph, Plus Jakarta Sans and the existing forest palette. Starting price,
+  dimensions and financing are owner-supplied facts visible on the landing.
+  No render, generated building, testimonial or unsupported claim was added.
+- Browser icons use the original SVG's exact existing emblem, not a new mark.
+  A multi-resolution ICO and square PNGs support browser/search/Apple clients.
+  Organization markup uses a separate full-lockup 512×512 PNG on white.
+- All assets live under `/media/`, which is already public in the deployed
+  allowlist. Putting a favicon at another root route without updating the host
+  policy would retain its default noindex header. No broader indexing exception
+  or private route change is needed for the chosen paths.
+- Metadata inheritance preserves the root noindex default and explicitly opts in
+  only the two existing public pages. Organization logo/contact, an accurate
+  ImageObject and a guide-only BreadcrumbList enrich the linked entity graph.
+  The guide breadcrumb matches the visible `Inicio → Guía para compradores` path.
+- Visible introductory copy answers what the project is, where the lots are and
+  what the informed lot/financing option is. Bogotá and Soacha remain buyer
+  audiences, not invented project locations or business offices.
+- The two-page sitemap now includes only photographs visible on their respective
+  pages. No fabricated last-modified dates, new doorway pages, coordinates,
+  ratings, SearchAction or FAQ rich-result claims were introduced.
+
+Rebuild assets with `node ops/media/build-social-assets.mjs` after `npm ci`.
+It uses Sharp already provided by the locked Next dependency tree, the committed
+original SVG/photo and local font. No AI image service, stock download, additional
+runtime dependency or analytics script is involved. If the commercial facts
+change, update the card source text, regenerate it and version its metadata URL.
+
+Checks include server-rendered social tags for Googlebot, Facebook's share crawler
+and Twitterbot; PNG/ICO types and dimensions; entity graph links; exact public
+sitemap scope and unchanged private noindex behavior. Actual platform preview
+caches and Google indexing/rankings are not controlled or guaranteed by these tests.
+Search Console ownership/submission and any external share-debugger refresh still
+require the owner's authorized account/session; none was accessed here.
+
+Primary guidance checked on 2026-11-16:
+- [Google AI features](https://developers.google.com/search/docs/appearance/ai-features)
+  and [AI optimization](https://developers.google.com/search/docs/fundamentals/ai-optimization-guide)
+- [Organization](https://developers.google.com/search/docs/appearance/structured-data/organization),
+  [breadcrumbs](https://developers.google.com/search/docs/appearance/structured-data/breadcrumb)
+  and [image SEO](https://developers.google.com/search/docs/appearance/google-images)
+- [Next metadata](https://nextjs.org/docs/app/api-reference/functions/generate-metadata),
+  [icons](https://nextjs.org/docs/app/api-reference/file-conventions/metadata/app-icons)
+  and [social images](https://nextjs.org/docs/app/api-reference/file-conventions/metadata/opengraph-image)
+
+Context7 lookup was unavailable due to its monthly quota; official framework
+pages supplied the documentation fallback. No special AI file/schema is required
+for Google AI features, and eligibility is not an inclusion/ranking guarantee.

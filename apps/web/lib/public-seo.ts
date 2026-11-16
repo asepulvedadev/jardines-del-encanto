@@ -4,13 +4,31 @@ import { project } from "./project";
 export const publicOrigin = "https://jardinesdelencanto.site";
 export const buyerGuidePath = "/lotes-acacias-desde-bogota-soacha";
 export const homeTitle =
-  "Lotes en Acacías desde $13 millones | Jardines del Encanto";
+  "Lotes en Acacías, Meta desde $13 millones | Jardines del Encanto";
 export const homeDescription =
-  "Conoce lotes de 7 × 14 m en Acacías, Meta, desde $13 millones COP. Información para compradores de Bogotá y Soacha, plano y visitas al proyecto.";
+  "Lotes de 7 × 14 m (98 m²) en Acacías, Meta, desde $13 millones COP. Financiación hasta 24 meses. Fotos reales, plano y visitas desde Bogotá y Soacha.";
 export const guideTitle =
   "Lotes en Acacías desde Bogotá y Soacha | Jardines del Encanto";
 export const guideDescription =
   "¿Vives en Bogotá o Soacha? Revisa precios informados, plano, financiación y preguntas para preparar una visita a Jardines del Encanto en Acacías, Meta.";
+
+export const socialImage = {
+  url: `${publicOrigin}/media/jardines-del-encanto-social-20261116.png`,
+  width: 1200,
+  height: 630,
+  type: "image/png",
+  alt: "Jardines del Encanto en Acacías, Meta: foto real de la portería, lotes desde $13 millones COP, 7 × 14 m y financiación hasta 24 meses.",
+};
+
+// Keep icons under the already-public media path; private routes stay noindex.
+export const brandIcons: Metadata["icons"] = {
+  icon: [
+    { url: "/media/brand/favicon.ico", type: "image/x-icon", sizes: "32x32 48x48 96x96" },
+    { url: "/media/brand/icon-96.png", type: "image/png", sizes: "96x96" },
+    { url: "/media/brand/icon-192.png", type: "image/png", sizes: "192x192" },
+  ],
+  apple: [{ url: "/media/brand/apple-touch-icon.png", type: "image/png", sizes: "180x180" }],
+};
 
 export function publicMetadata(
   title: string,
@@ -18,12 +36,6 @@ export function publicMetadata(
   path: string,
 ): Metadata {
   const url = `${publicOrigin}${path}`;
-  const image = {
-    url: `${publicOrigin}/media/aerial-1920.webp`,
-    width: 1920,
-    height: 1080,
-    alt: "Fotografía aérea real de Jardines del Encanto en Acacías, Meta",
-  };
   return {
     title,
     description,
@@ -46,19 +58,20 @@ export function publicMetadata(
       title,
       description,
       url,
-      images: [image],
+      images: [{ ...socialImage, secureUrl: socialImage.url }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [image.url],
+      images: [{ url: socialImage.url, alt: socialImage.alt }],
     },
   };
 }
 
 // The physical project is in Acacías; buyer locations are not office addresses.
 export function publicGraph(title: string, description: string, path: string) {
+  const url = `${publicOrigin}${path}`;
   return {
     "@context": "https://schema.org",
     "@graph": [
@@ -68,6 +81,21 @@ export function publicGraph(title: string, description: string, path: string) {
         name: project.name,
         url: `${publicOrigin}/`,
         telephone: project.phone,
+        logo: {
+          "@type": "ImageObject",
+          url: `${publicOrigin}/media/brand/logo-512.png`,
+          contentUrl: `${publicOrigin}/media/brand/logo-512.png`,
+          width: 512,
+          height: 512,
+          caption: project.name,
+        },
+        contactPoint: {
+          "@type": "ContactPoint",
+          contactType: "sales",
+          telephone: project.phone,
+          availableLanguage: "es-CO",
+          url: `https://wa.me/${project.whatsapp}`,
+        },
       },
       {
         "@type": "WebSite",
@@ -81,23 +109,51 @@ export function publicGraph(title: string, description: string, path: string) {
         "@type": "Place",
         "@id": `${publicOrigin}/#project`,
         name: project.name,
+        description: "Proyecto de venta de lotes en Acacías, Meta, Colombia.",
         address: {
           "@type": "PostalAddress",
           addressLocality: "Acacías",
           addressRegion: "Meta",
           addressCountry: "CO",
         },
+        photo: {
+          "@type": "ImageObject",
+          contentUrl: `${publicOrigin}/media/porteria-actual-1280.webp`,
+          width: 1280,
+          height: 720,
+          caption: "Fotografía real de la portería y su entorno en Jardines del Encanto.",
+        },
       },
       {
+        "@type": "ImageObject",
+        "@id": `${publicOrigin}/#social-image`,
+        url: socialImage.url,
+        contentUrl: socialImage.url,
+        width: socialImage.width,
+        height: socialImage.height,
+        caption: "Tarjeta informativa de Jardines del Encanto con fotografía real de la portería.",
+        inLanguage: "es-CO",
+      },
+      ...(path === buyerGuidePath ? [{
+        "@type": "BreadcrumbList",
+        "@id": `${url}#breadcrumb`,
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Inicio", item: `${publicOrigin}/` },
+          { "@type": "ListItem", position: 2, name: "Guía para compradores", item: url },
+        ],
+      }] : []),
+      {
         "@type": "WebPage",
-        "@id": `${publicOrigin}${path}#webpage`,
-        url: `${publicOrigin}${path}`,
+        "@id": `${url}#webpage`,
+        url,
         name: title,
         description,
         inLanguage: "es-CO",
         isPartOf: { "@id": `${publicOrigin}/#website` },
         about: { "@id": `${publicOrigin}/#project` },
         publisher: { "@id": `${publicOrigin}/#organization` },
+        primaryImageOfPage: { "@id": `${publicOrigin}/#social-image` },
+        ...(path === buyerGuidePath ? { breadcrumb: { "@id": `${url}#breadcrumb` } } : {}),
       },
     ],
   };

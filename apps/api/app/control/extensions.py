@@ -7,6 +7,7 @@ from . import models, service
 # Flat canonical targets only: no indirection to another item, policy or connection action.
 SAFE_ACTIONS = frozenset(
     {
+        "analytics.summary",
         "crm.workspace",
         "crm.activities",
         "crm.contact.create",

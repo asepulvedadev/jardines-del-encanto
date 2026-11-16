@@ -14,6 +14,7 @@ ACTIONS = frozenset(
     {
         # Business access is restricted to the source-verified developer channel.
         # Reuse canonical services; never mint browser sessions or activation grants.
+        "analytics.summary",
         "crm.workspace",
         "crm.activities",
         "crm.contact.create",

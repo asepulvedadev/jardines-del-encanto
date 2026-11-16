@@ -1,0 +1,11 @@
+# Disposable local verification: no access to the production application network.
+name: jardines-analytics-local
+services:
+  umami:
+    ports: ["127.0.0.1:14320:3000"]
+networks:
+  app:
+    external: false
+    name: jardines-analytics-local_app
+    # Docker needs a non-internal bridge to publish this loopback-only test port.
+    internal: false

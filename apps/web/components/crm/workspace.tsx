@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "./icon";
+import { AnalyticsPanel } from "./analytics-panel";
 import { VoiceWorkspace } from "./voice-workspace";
 import { WorkflowPanel } from "./workflow-panel";
 import { InboxPanel } from "./inbox-panel";
@@ -562,46 +563,7 @@ export function Workspace({
                 </div>
               </div>
               <div className="crm-overview-grid">
-                <section className="crm-panel">
-                  <div className="crm-panel-heading">
-                    <h2>Lo que sigue</h2>
-                    <button
-                      className="crm-inline-link"
-                      onClick={() => changeView("tasks")}
-                    >
-                      Ver seguimientos <Icon name="chevron" size={14} />
-                    </button>
-                  </div>
-                  {pendingTasks.length ? (
-                    <div>
-                      {pendingTasks.slice(0, 6).map((task) => (
-                        <TaskRow
-                          contact={contactsById.get(task.contact_id)}
-                          day={day}
-                          pending={pending}
-                          onToggle={toggleTask}
-                          onOpen={openContact}
-                          key={task.id}
-                          task={task}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <Empty
-                      onCreate={() => editContact("new")}
-                      title={
-                        data.contacts.length
-                          ? "Todo al día."
-                          : "Empecemos con una conversación."
-                      }
-                      action={!data.contacts.length}
-                    >
-                      {data.contacts.length
-                        ? "No tienes seguimientos pendientes. Programa el próximo desde la ficha de un cliente."
-                        : "Registra tu primer cliente. Su negociación aparecerá automáticamente en el pipeline."}
-                    </Empty>
-                  )}
-                </section>
+                <AnalyticsPanel />
                 <section className="crm-panel crm-pipeline-summary">
                   <div className="crm-panel-heading">
                     <h2>Tu pipeline</h2>

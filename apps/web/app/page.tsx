@@ -1,3 +1,4 @@
+import { LandingAnalytics } from "../components/landing-analytics";
 import { landingFont } from "../lib/landing-font";
 import {
   buyerGuidePath,
@@ -61,6 +62,7 @@ function ContactLink({
 export default function Home() {
   return (
     <div id="jardines-landing" className={`landing ${landingFont.variable}`}>
+      <LandingAnalytics />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
@@ -109,9 +111,9 @@ export default function Home() {
                 <span>Tu comienzo.</span>
               </h1>
               <p className="hero-description">
-                Lotes en Acacías, Meta, para tu próximo comienzo. Conoce
-                Jardines del Encanto: naturaleza, espacios para compartir y una
-                opción en el Llano si vives en Bogotá o Soacha.
+                Jardines del Encanto es un proyecto de venta de lotes en
+                Acacías, Meta, Colombia. Conoce sus espacios, explora el plano y
+                agenda una visita desde Bogotá, Soacha o donde te encuentres.
               </p>
               <div className="hero-offer">
                 <span>PRECIO DE LANZAMIENTO · LOTES DESDE</span>
@@ -434,8 +436,10 @@ export default function Home() {
                   Puedes explorar esta página sin registrar tus datos. Si envías
                   el formulario de cupo, guardamos tu nombre, celular y
                   autorización de contacto en el CRM del proyecto. El código
-                  identifica tu registro de interés, no una reserva. No usamos
-                  herramientas de analítica. Si eliges escribirnos, abrirás
+                  identifica tu registro de interés, no una reserva. Cuando la medición interna está activa, contamos visitas, clics y
+                  origen del tráfico en infraestructura del proyecto, sin enviar tu
+                  nombre, celular ni el contenido del formulario a la analítica.
+                  Respetamos las señales de no seguimiento del navegador. Si eliges escribirnos, abrirás
                   WhatsApp, un servicio externo con sus propias políticas de
                   privacidad.
                 </p>

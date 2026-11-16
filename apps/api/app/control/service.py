@@ -7,6 +7,7 @@ from fastapi.encoders import jsonable_encoder
 from psycopg.types.json import Jsonb
 from pydantic import ValidationError
 
+from ..analytics import models as analytics_models
 from ..crm import models as crm_models
 from ..crm import services
 from ..crm.database import connect
@@ -17,6 +18,7 @@ from ..voice import models as voice_models
 from . import models
 
 ACTION_MODELS = {
+    "analytics.summary": analytics_models.SummaryInput,
     "sara.config.get": models.Empty,
     "sara.config.update": profile_models.ProfileUpdate,
     "sara.learn": profile_models.Learning,
@@ -61,6 +63,7 @@ LOCAL_AGENT_ACTIONS = frozenset(
     {"sara.config.update", "sara.learn", "sara.simulate", "images.generate"}
 )
 READ_ACTIONS = {
+    "analytics.summary",
     "sara.config.get",
     "sara.simulation",
     "images.catalog",
@@ -428,6 +431,10 @@ def execute(db, action, args, admin):
         from ..voice.service import catalog as voice_catalog
 
         return voice_catalog(db)
+    if action == "analytics.summary":
+        from ..analytics import service as analytics_service
+
+        return analytics_service.summary(args, db=db)
     if action == "crm.workspace":
         state = services.workspace(db, admin)
         query = args.query.casefold()

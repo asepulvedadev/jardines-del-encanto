@@ -8,6 +8,7 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from .analytics.routes import router as analytics_router
 from .campaigns.routes import router as campaigns_router
 from .control.routes import router as control_router
 from .crm.landing import router as landing_router
@@ -64,6 +65,7 @@ app = FastAPI(
 
 
 app.include_router(crm_router)
+app.include_router(analytics_router)
 app.include_router(campaigns_router)
 app.include_router(inbox_router)
 app.include_router(workflows_router)

@@ -45,6 +45,9 @@ not certified original brand values. Recheck them when source artwork is supplie
   in the main landing header and footer, replacing the typeset project name.
   The main landing has no desktop navigation or mobile menu; use a non-sticky
   brand header and keep in-content CTAs. Buyer-guide and CRM branding are unchanged.
+- Browser and Apple icons use the exact existing `emblem` paths from the approved
+  original SVG, unchanged, centered on a square white canvas. The organization
+  logo and social card retain the complete original lockup; do not redraw it.
 - Preserve the wordmark, palms, leaf, proportions and approved color variants.
 - Request the original SVG or transparent high-resolution artwork before public launch.
   The poster is a reference, not a production-ready logo or verified standalone photograph.
@@ -212,8 +215,10 @@ density. No full-bleed photographs, oversized promotional typography or decorati
   “Seguimientos”, “Voz”, “Secuencias”, “Plantillas” and “Inbox”;
   “Configuraciones” stays at the bottom.
   Show only authorized, implemented modules.
-- The home view prioritizes next actions and overdue follow-ups. Metrics must answer
-  real questions, not occupy a decorative four-card dashboard row.
+- The dashboard retains commercial totals, pipeline and recent activity. The owner
+  replaced the former next-actions panel with landing analytics: meaningful numerical
+  KPIs, a daily chart, source/action breakdowns and date filters. Follow-ups remain
+  available through their navigation item. Missing measurements are not zero traffic.
 - Contact detail: identity, assignment, next action and a readable activity timeline.
   Put editing in a focused panel; keep the user's position after saving.
 - Pipeline stages are Nuevo, Contactado and Ganado only. The page heading has no

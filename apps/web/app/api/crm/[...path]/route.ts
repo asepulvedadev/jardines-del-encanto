@@ -28,6 +28,7 @@ const rules: [RegExp, string[]][] = [
   [/^auth\/logout$/, ["POST"]],
   [/^auth\/session$/, ["GET"]],
   [/^workspace$/, ["GET"]],
+  [/^analytics\/summary$/, ["GET"]],
   [/^control\/catalog$/, ["GET"]],
   [/^control\/items$/, ["POST"]],
   [/^control\/items\/[0-9a-f-]{36}$/, ["PATCH"]],
@@ -143,6 +144,12 @@ async function proxy(
     return fail(404, "not_found");
   }
   let query = "";
+  const analytics = endpoint === "analytics/summary";
+  if (analytics) {
+    const params = new URL(request.url).searchParams;
+    if ([...params.keys()].some(key => key !== "days") || params.getAll("days").length > 1 || (params.has("days") && !["1", "7", "30"].includes(params.get("days")!))) return fail(422, "invalid_input");
+    query = `?days=${params.get("days") || "7"}`;
+  }
   const sara = endpoint.startsWith("sara/");
   const images = endpoint === "images" || endpoint.startsWith("images/");
   const voice = endpoint.startsWith("voice/");
@@ -246,7 +253,7 @@ async function proxy(
     request.cookies.get("__Host-jardines_session") ??
     request.cookies.get("jardines_session");
   if (session) headers.set("cookie", `${session.name}=${session.value}`);
-  const timeout =
+  const timeout = analytics ? 20000 :
     /^campaigns\/.*\/(?:reviews(?:\/.*\/refresh)?|review-preview)$/.test(
       endpoint,
     ) ||
@@ -286,6 +293,13 @@ async function proxy(
       resultHeaders.append("Set-Cookie", cookie);
     const retry = upstream.headers.get("retry-after");
     if (retry) resultHeaders.set("Retry-After", retry);
+    if (analytics) {
+      const bytes = await boundedResult(upstream, 65536);
+      if (!bytes || !upstream.headers.get("content-type")?.startsWith("application/json")) return fail(502, "invalid_analytics_response");
+      if (!upstream.ok) return fail([401, 403, 422].includes(upstream.status) ? upstream.status : 503, upstream.status === 401 ? "authentication_required" : "analytics_unavailable");
+      try { JSON.parse(new TextDecoder().decode(bytes)); } catch { return fail(502, "invalid_analytics_response"); }
+      return new Response(bytes, {status: 200, headers: { ...privateHeaders, "Content-Type": "application/json" }});
+    }
     if (campaigns) {
       const media =
         (endpoint.startsWith("campaigns/media/") ||

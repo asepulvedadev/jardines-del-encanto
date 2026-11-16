@@ -24,7 +24,7 @@ test("public homepage is indexable with a single branded canonical and social me
   assert.match(html, /<title>[^<]*Lotes en Acacías/);
   assert.match(
     html,
-    /property="og:image" content="https:\/\/jardinesdelencanto.site\/media\/aerial-1920.webp"/,
+    /property="og:image" content="https:\/\/jardinesdelencanto.site\/media\/jardines-del-encanto-social-20261116.png"/,
   );
   assert.match(html, /name="twitter:card" content="summary_large_image"/);
   assert.match(html, new RegExp(`href="${guide}"`));
@@ -67,6 +67,13 @@ test("robots and sitemap expose only canonical public pages, not the CRM", async
     [`${site}/`, `${site}${guide}`].sort(),
   );
   assert.doesNotMatch(xml, /sslip|\/crm|\/login|\/api/);
+  assert.match(xml, /xmlns:image="http:\/\/www.google.com\/schemas\/sitemap-image\/1.1"/);
+  const imageUrls = [...xml.matchAll(/<image:loc>(.*?)<\/image:loc>/g)].map(match => match[1]);
+  assert.deepEqual(imageUrls.sort(), [
+    `${site}/media/porteria-actual-1280.webp`,
+    `${site}/media/vias-actuales-1280.webp`,
+    `${site}/media/aerial-1920.webp`,
+  ].sort());
 });
 
 test("JSON-LD describes visible facts and keeps the property in Acacías", async () => {
@@ -86,6 +93,20 @@ test("JSON-LD describes visible facts and keeps the property in Acacías", async
     assert.equal(webpage.about["@id"], place["@id"]);
     const organization = graph.find((node) => node["@type"] === "Organization");
     assert.equal(organization.telephone, "+57 300 834 8478");
+    assert.equal(organization.logo.width, 512);
+    assert.equal(organization.logo.height, 512);
+    assert.equal(organization.contactPoint.availableLanguage, "es-CO");
+    const image = graph.find(node => node["@type"] === "ImageObject");
+    assert.equal(image.width, 1200);
+    assert.equal(image.height, 630);
+    assert.equal(webpage.primaryImageOfPage["@id"], image["@id"]);
+    const breadcrumbs = graph.find(node => node["@type"] === "BreadcrumbList");
+    if (path === guide) {
+      assert.equal(breadcrumbs.itemListElement.length, 2);
+      assert.equal(breadcrumbs.itemListElement[0].item, `${site}/`);
+      assert.equal(breadcrumbs.itemListElement[1].item, `${site}${guide}`);
+      assert.equal(webpage.breadcrumb["@id"], breadcrumbs["@id"]);
+    } else assert.equal(breadcrumbs, undefined);
     assert.doesNotMatch(
       JSON.stringify(documents),
       /aggregateRating|reviewRating|streetAddress|RealEstateAgent|FAQPage|SearchAction/,
@@ -134,4 +155,52 @@ test("the buyer guide reflows and leads back to the working interest modal", { s
       await page.close();
     }
   } finally { await browser.close(); }
+});
+
+
+test("public share card is a lightweight PNG with complete metadata", async () => {
+  for (const path of ["/", guide]) {
+    const html = await (await fetch(`${base}${path}`)).text();
+    assert.match(html, /property="og:image:type" content="image\/png"/);
+    assert.match(html, /property="og:image:width" content="1200"/);
+    assert.match(html, /property="og:image:height" content="630"/);
+    assert.match(html, /property="og:image:alt" content="[^"]*Acacías/);
+    assert.match(html, /name="twitter:image:alt" content="[^"]*Acacías/);
+  }
+  const response = await fetch(`${base}/media/jardines-del-encanto-social-20261116.png`);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /image\/png/);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  assert.equal(bytes.readUInt32BE(16), 1200);
+  assert.equal(bytes.readUInt32BE(20), 630);
+  assert.ok(bytes.length < 1_000_000);
+});
+
+test("brand icons are declared and served as real square assets", async () => {
+  const html = await (await fetch(base)).text();
+  for (const [file, size] of [["icon-96.png", 96], ["apple-touch-icon.png", 180], ["logo-512.png", 512]]) {
+    if (size !== 512) assert.ok(html.includes(`/media/brand/${file}`), file);
+    const response = await fetch(`${base}/media/brand/${file}`);
+    assert.equal(response.status, 200, file);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    assert.equal(bytes.readUInt32BE(16), size);
+    assert.equal(bytes.readUInt32BE(20), size);
+  }
+  const ico = await fetch(`${base}/media/brand/favicon.ico`);
+  assert.equal(ico.status, 200);
+  const bytes = Buffer.from(await ico.arrayBuffer());
+  assert.equal(bytes.readUInt16LE(2), 1);
+  assert.equal(bytes.readUInt16LE(4), 3);
+});
+
+test("search and sharing crawlers receive social metadata without JavaScript", async () => {
+  for (const userAgent of ["Googlebot", "facebookexternalhit/1.1", "Twitterbot/1.0"]) {
+    const response = await fetch(base, { headers: { "User-Agent": userAgent } });
+    assert.equal(response.status, 200, userAgent);
+    const html = await response.text();
+    const head = html.match(/<head>([\s\S]*?)<\/head>/)?.[1] ?? "";
+    assert.match(head, /property="og:image" content="https:\/\/jardinesdelencanto.site\/media\/jardines-del-encanto-social-20261116.png"/);
+    assert.match(head, /name="twitter:card" content="summary_large_image"/);
+    assert.match(head, /rel="icon"/);
+  }
 });

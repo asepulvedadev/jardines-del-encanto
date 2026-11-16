@@ -349,6 +349,8 @@ def tools(db, run=None):
         "Solo control.extension.* gestiona directamente definiciones declarativas propias: create crea borrador, update lo "
         "desactiva, install habilita, test valida sin ejecutar. Nuevas extensiones solo en el próximo "
         "turno. Sin código, paquetes nativos, conexiones ni cambios de permisos. "
+        "analytics.summary consulta visitas, clics y registros reales de la landing por 1, 7 o 30 días, "
+        "en America/Bogota; no inventes métricas si status no es ready. "
         "voice.catalog muestra opciones; voice.execute siempre propone una operación de pago. "
         "retell.catalog lista operaciones revisadas; retell.schema consulta campos paginados. "
         "retell.execute SIEMPRE crea una propuesta exacta, incluso para lecturas. "

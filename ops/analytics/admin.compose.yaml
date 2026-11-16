@@ -1,0 +1,9 @@
+# Explicit maintenance-only override. Never expose Umami through public ingress.
+services:
+  umami:
+    ports: ["127.0.0.1:14320:3000"]
+    networks: [app, analytics_data, maintenance]
+networks:
+  # Dedicated temporary bridge; never attach PostgreSQL or sibling applications.
+  maintenance:
+    internal: false

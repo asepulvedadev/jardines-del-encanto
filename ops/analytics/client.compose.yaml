@@ -1,0 +1,10 @@
+# Source-only extension of the installed CRM policy, not an independent stack.
+# Install explicitly and add to the root-owned deployment command before enabling.
+name: jardines
+services:
+  web:
+    env_file: ${ANALYTICS_SECRETS_DIR:?Set ANALYTICS_SECRETS_DIR}/collector.env
+  api:
+    env_file:
+      - /srv/jardines-del-encanto/secrets/crm-runtime.env
+      - ${ANALYTICS_SECRETS_DIR}/client.env
