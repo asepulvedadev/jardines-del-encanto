@@ -12,6 +12,13 @@ from .models import REGISTRY, AccountQuery, Confirmation, Execute
 router = APIRouter(prefix="/crm/inbox")
 
 
+@router.get("/lead-capture")
+def lead_capture_status(admin: Admin):
+    from ..social.lead_capture_worker import status
+
+    return status()
+
+
 @router.get("/catalog")
 def catalog(admin: Admin):
     return REGISTRY

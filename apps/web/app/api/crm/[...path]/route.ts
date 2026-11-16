@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 const workflowId =
   "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const rules: [RegExp, string[]][] = [
-  [/^inbox\/(catalog|accounts|actions)$/, ["GET"]],
+  [/^inbox\/(catalog|accounts|actions|lead-capture)$/, ["GET"]],
   [/^inbox\/(read|prepare|templates)$/, ["POST"]],
   [/^inbox\/actions\/[0-9a-f-]{36}$/, ["GET"]],
   [/^inbox\/actions\/[0-9a-f-]{36}\/confirm$/, ["POST"]],

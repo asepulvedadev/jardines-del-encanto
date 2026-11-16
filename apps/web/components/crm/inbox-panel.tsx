@@ -10,6 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { Icon } from "./icon";
 import { InboxFields, inboxFieldValues } from "./inbox-fields";
+import { LeadCaptureStatus } from "./lead-capture-status";
 import {
   inboxSections,
   inboxPlatforms,
@@ -582,6 +583,7 @@ export function InboxPanel({
           </button>
         </div>
       </div>
+      <LeadCaptureStatus request={request} active={active} />
       {error && (
         <p className="inbox-error" role="alert">
           {error}{" "}
@@ -995,13 +997,11 @@ export function InboxPanel({
                               selected.url,
                           ) && (
                             <a
-                              href={
-                                inboxSafeLink(
-                                  selected.permalink ??
-                                    selected.reviewUrl ??
-                                    selected.url,
-                                )!
-                              }
+                              href={inboxSafeLink(
+                                selected.permalink ??
+                                  selected.reviewUrl ??
+                                  selected.url,
+                              )!}
                               target="_blank"
                               rel="noopener noreferrer"
                             >

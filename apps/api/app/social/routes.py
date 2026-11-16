@@ -437,6 +437,16 @@ async def webhook(request: Request):
             (event_id, event, profile, platform, Jsonb(payload), body_hash),
         ).fetchone()
         if record:
+            from . import lead_capture, lead_capture_worker
+
+            # Intake does not depend on an LLM or the outgoing agent queue.
+            # A failed attempt leaves the signed receipt durable for the repair sweep.
+            try:
+                with db.transaction():
+                    lead_capture.webhook(db, payload, profile)
+            except Exception:  # noqa: BLE001, S110 - no payload/PII in logs
+                pass
+            lead_capture_worker.wake()
             # Only the authenticated, first-seen event reaches sequence stop-on-reply.
             from ..workflows.worker import verified_reply
             from .workflow import normalize_event
@@ -444,7 +454,12 @@ async def webhook(request: Request):
             verified_reply(db, normalize_event(payload))
             from .whatsapp_agent import enqueue
 
-            enqueue(db, payload, profile)
+            # A broken reply agent must not discard the verified intake receipt/lead.
+            try:
+                with db.transaction():
+                    enqueue(db, payload, profile)
+            except Exception:  # noqa: BLE001, S110 - polling/intake remains independent
+                pass
         if not record:
             previous = db.execute(
                 "SELECT body_hash FROM crm.social_webhook_events WHERE event_id=%s", (event_id,)
