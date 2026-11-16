@@ -37,10 +37,10 @@ def document():
     }
 
 
-def test_campaign_seeds_are_fifteen_valid_drafts_with_seven_suggested_dates():
+def test_campaign_seeds_include_location_draft_and_seven_suggested_dates():
     items = seeds()
-    assert len(items) == 15
-    assert len({item["id"] for item in items}) == 15
+    assert len(items) == 16
+    assert len({item["id"] for item in items}) == 16
     dates = []
     for item in items:
         doc = Document.model_validate(item["document"])
@@ -81,7 +81,7 @@ def test_campaigns_save_reload_custom_creation_and_conflict_preserve_changes(aut
     client, _, _ = authenticated
     listed = client.get("/crm/campaigns")
     assert listed.status_code == 200
-    assert len(listed.json()["items"]) == 15
+    assert len(listed.json()["items"]) == 16
     seed = listed.json()["items"][0]
     changed = deepcopy(seed["document"])
     changed["name"] = "Nombre editado"
@@ -98,7 +98,7 @@ def test_campaigns_save_reload_custom_creation_and_conflict_preserve_changes(aut
     new = client.post("/crm/campaigns", json={"document": document()})
     assert new.status_code == 201, new.text
     assert new.json()["status"] == "local_draft"
-    assert len(client.get("/crm/campaigns").json()["items"]) == 16
+    assert len(client.get("/crm/campaigns").json()["items"]) == 17
     assert (
         client.patch("/crm/campaigns/missing", json={"version": 0, "document": changed}).status_code
         == 404
@@ -158,5 +158,39 @@ def test_campaign_list_stays_bounded_without_hiding_old_seed_overrides(authentic
                 (f"draft-fixture-{number}", seed["id"]),
             )
     listed = client.get("/crm/campaigns").json()
-    assert listed["limited"] and len(listed["items"]) == 115
+    assert listed["limited"] and len(listed["items"]) == 116
     assert listed["items"][0]["document"]["name"] == "Referencia editada"
+
+
+def test_soacha_location_draft_keeps_original_campaigns_and_editable_map_link(authenticated):
+    from urllib.parse import parse_qs, urlsplit
+
+    from app.campaigns import service
+
+    client, _, _ = authenticated
+    items = client.get("/crm/campaigns").json()["items"]
+    assert [item["id"] for item in items[:15]] == [f"campaign-{n:02}" for n in range(1, 16)]
+    location = next(item for item in items if item["id"] == "campaign-16")
+    assert location["status"] == "local_draft" and location["version"] == 0
+    doc = location["document"]
+    assert doc["image_id"] == "campaign-16"
+    assert "Carrera 7 # 11 - 83 (Soacha)" in doc["body"]
+    assert "ubicación" in doc["body"] and "SALIR" in doc["body"]
+    link = next(v for v in doc["variables"] if v["key"] == "enlace_ubicacion")
+    assert link["kind"] == "link"
+    query = parse_qs(urlsplit(link["example"]).query)
+    assert query["api"] == ["1"]
+    assert "Carrera 7 # 11 - 83" in query["query"][0] and "Soacha" in query["query"][0]
+    assert {"kind": "url", "label": "Cómo llegar", "value": "{{enlace_ubicacion}}"} in doc[
+        "buttons"
+    ]
+    assert any(
+        b["kind"] == "reply" and b["value"] == "confirmar_asistencia" for b in doc["buttons"]
+    )
+    assert client.get("/crm/campaigns/media/campaign-16").status_code == 200
+    assert client.get("/crm/campaigns/media/campaign-17").status_code == 404
+    assert (service.ROOT / "assets/campaign-16.png").stat().st_size <= 5 * 1024 * 1024
+    changed = {**doc, "name": "Ubicación revisada"}
+    saved = client.patch("/crm/campaigns/campaign-16", json={"version": 0, "document": changed})
+    assert saved.status_code == 200 and saved.json()["status"] == "local_draft"
+    assert client.get("/crm/campaigns/campaign-16/reviews").json()["items"] == []

@@ -543,7 +543,7 @@ export function CampaignPanel({ csrf, onDirtyChange }: Props) {
                           }
                         >
                           <option value="">Sin imagen</option>
-                          {Array.from({ length: 15 }, (_, index) => {
+                          {Array.from({ length: 16 }, (_, index) => {
                             const id = `campaign-${String(index + 1).padStart(2, "0")}`;
                             const name =
                               collection.items.find((item) => item.id === id)

@@ -14,7 +14,7 @@ const rules: [RegExp, string[]][] = [
   [/^campaigns\/[a-z0-9-]{1,80}\/reviews\/[0-9a-f-]{36}\/refresh$/, ["POST"]],
   [/^campaigns\/review-media\/[0-9a-f-]{36}\/[A-Za-z0-9_-]{43}$/, ["GET"]],
   [/^campaigns\/[a-z0-9-]{1,80}$/, ["PATCH"]],
-  [/^campaigns\/media\/campaign-(0[1-9]|1[0-5])$/, ["GET"]],
+  [/^campaigns\/media\/campaign-(0[1-9]|1[0-6])$/, ["GET"]],
   [/^workflows\/(catalog|definitions|runs)$/, ["GET"]],
   [/^workflows\/(definitions|options)$/, ["POST"]],
   [new RegExp(`^workflows/definitions/${workflowId}$`), ["PATCH"]],

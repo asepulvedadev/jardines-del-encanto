@@ -658,5 +658,44 @@
         }
       ]
     }
+  },
+  {
+    "id": "campaign-16",
+    "document": {
+      "name": "Ubicación del encuentro · Soacha",
+      "audience": "information",
+      "suggested_date": null,
+      "image_id": "campaign-16",
+      "body": "Hola {{nombre}} 👋\n\nPresta mucha atención a la ubicación de nuestro encuentro:\n\n📍 Cámara de Comercio — Soacha\nCarrera 7 # 11 - 83 (Soacha)\n\nLa foto te ayudará a reconocer la fachada. Toca «Cómo llegar» para buscar la dirección en Google Maps.\n\n¿Nos acompañas? Confirma tu asistencia o cuéntanos si necesitas ayuda para llegar.\n\nSi prefieres no recibir información, responde SALIR.",
+      "variables": [
+        {
+          "key": "nombre",
+          "kind": "text",
+          "example": "María"
+        },
+        {
+          "key": "enlace_ubicacion",
+          "kind": "link",
+          "example": "https://www.google.com/maps/search/?api=1&query=C%C3%A1mara+de+Comercio%2C+Carrera+7+%23+11+-+83%2C+Soacha%2C+Cundinamarca%2C+Colombia"
+        }
+      ],
+      "buttons": [
+        {
+          "kind": "url",
+          "label": "Cómo llegar",
+          "value": "{{enlace_ubicacion}}"
+        },
+        {
+          "kind": "reply",
+          "label": "Confirmar asistencia",
+          "value": "confirmar_asistencia"
+        },
+        {
+          "kind": "reply",
+          "label": "Necesito ayuda",
+          "value": "ayuda_ubicacion"
+        }
+      ]
+    }
   }
 ]

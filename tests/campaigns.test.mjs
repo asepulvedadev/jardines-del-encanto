@@ -225,3 +225,11 @@ test("review gateway exposes only explicit review operations and short-lived ima
   assert.equal(media.status, 200);
   assert.match(media.headers.get("cache-control"), /no-store/);
 });
+
+test("Soacha location media is allowed without opening arbitrary campaign files", async () => {
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0]);
+  globalThis.fetch = async () =>
+    new Response(png, { headers: { "content-type": "image/png" } });
+  assert.equal((await GET(request(), context("campaigns/media/campaign-16"))).status, 200);
+  assert.equal((await GET(request(), context("campaigns/media/campaign-17"))).status, 404);
+});

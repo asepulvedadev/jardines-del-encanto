@@ -1,0 +1,23 @@
+{
+  "status": "local_draft",
+  "notSubmittedToMeta": true,
+  "notSentToCustomers": true,
+  "address": "Carrera 7 # 11 - 83 (Soacha)",
+  "addressSource": "Owner supplied; map link is an address search, not verified coordinates.",
+  "method": "Built-in image_gen restoration and reference-guided portrait composition; logo guided by supplied project artwork, not pixel-identical vector compositing.",
+  "originalCampaigns": "campaign-01 through campaign-15 unchanged",
+  "files": [
+    {
+      "file": "assets/campaign-drafts/2026-11/soacha-location/venue-owner-original.png",
+      "sha256": "d172b76fb7ab9288284380b129963174dddd84efb5ada38a996fd42ca0ab54c4"
+    },
+    {
+      "file": "assets/campaign-drafts/2026-11/soacha-location/venue-enhanced.png",
+      "sha256": "ef9894ddcc3052b2d4f085a1aefb44fe0719d1345ab4a8324644b343b650539c"
+    },
+    {
+      "file": "apps/api/app/campaigns/assets/campaign-16.png",
+      "sha256": "d0d9b26cde1f8181b9baa10f60b9cd609b97dbfa1ce3880f8640990b22b7f3bb"
+    }
+  ]
+}

@@ -11,7 +11,7 @@ from pydantic import Field, field_validator, model_validator
 from ..crm.models import Input
 
 TOKEN = re.compile(r"\{\{([a-z][a-z0-9_]{0,39})\}\}")
-ASSETS = {f"campaign-{number:02}" for number in range(1, 16)}
+ASSETS = {f"campaign-{number:02}" for number in range(1, 17)}
 
 
 def https_link(value: str) -> bool:
