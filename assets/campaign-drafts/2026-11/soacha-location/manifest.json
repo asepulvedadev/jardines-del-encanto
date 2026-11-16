@@ -17,7 +17,9 @@
     },
     {
       "file": "apps/api/app/campaigns/assets/campaign-16.png",
-      "sha256": "d0d9b26cde1f8181b9baa10f60b9cd609b97dbfa1ce3880f8640990b22b7f3bb"
+      "sha256": "6c88bbad1cd3794acc1c2b77643e5fba59b634931c69f491766cf199a63f9b45",
+      "previousSha256": "d0d9b26cde1f8181b9baa10f60b9cd609b97dbfa1ce3880f8640990b22b7f3bb"
     }
-  ]
+  ],
+  "venueLabel": "Cámara de Comercio de Bogotá — Sede Soacha"
 }

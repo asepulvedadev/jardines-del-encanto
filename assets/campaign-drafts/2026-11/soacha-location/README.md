@@ -7,6 +7,7 @@ The template remains a draft, not submitted to Meta, scheduled or sent to custom
 
 ## Content and provenance
 
+- Venue label corrected at the owner's request: `Cámara de Comercio de Bogotá — Sede Soacha`.
 - Address supplied by the owner: `Carrera 7 # 11 - 83 (Soacha)`.
 - The owner's 23-second voice note requests the venue photo, clear address and
   emphasis on paying attention to the location. No date or time was added.
@@ -16,7 +17,8 @@ The template remains a draft, not submitted to Meta, scheduled or sent to custom
 - `apps/api/app/campaigns/assets/campaign-16.png` is the vertical 941 × 1672
   artwork. Its project logo is reference-guided from the approved supplied
   artwork, not a claim of pixel-identical SVG composition.
-- `poster-prompt.txt` records the built-in generation prompt. `manifest.json`
+- `poster-prompt.txt` records the built-in generation prompt;
+  `venue-label-edit-prompt.txt` records the later focused institution-name edit. `manifest.json`
   records source and output hashes. No institution endorsement is implied.
 
 ## Editable CRM draft

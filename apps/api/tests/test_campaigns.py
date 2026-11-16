@@ -176,6 +176,7 @@ def test_soacha_location_draft_keeps_original_campaigns_and_editable_map_link(au
     assert doc["image_id"] == "campaign-16"
     assert "Carrera 7 # 11 - 83 (Soacha)" in doc["body"]
     assert "ubicación" in doc["body"] and "SALIR" in doc["body"]
+    assert "Cámara de Comercio de Bogotá — Sede Soacha" in doc["body"]
     link = next(v for v in doc["variables"] if v["key"] == "enlace_ubicacion")
     assert link["kind"] == "link"
     query = parse_qs(urlsplit(link["example"]).query)
