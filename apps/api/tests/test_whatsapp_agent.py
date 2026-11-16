@@ -460,3 +460,105 @@ def test_history_is_scoped_to_participant_and_shared_published_version(configure
     assert captured[1][0]["content"] == "Message 0"
     assert captured[2] == [{"role": "user", "content": "Message 2"}]
     assert captured[3] == [{"role": "user", "content": "Message 3"}]
+
+
+@pytest.mark.parametrize("content_field", ["message", "text"])
+def test_real_source_matcher_accepts_rest_content_and_legacy_text(monkeypatch, content_field):
+    job = {
+        "account_id": DOC["account_id"],
+        "conversation_id": "wa-thread",
+        "message_id": "wamid.source",
+        "participant_id": "573001110002",
+        "content": "Hola Sara",
+    }
+    record = {
+        "id": job["message_id"],
+        "conversationId": job["conversation_id"],
+        "accountId": job["account_id"],
+        "platform": "whatsapp",
+        "direction": "incoming",
+        "senderId": job["participant_id"],
+        content_field: job["content"],
+        "isDeleted": False,
+    }
+    calls = []
+
+    def read(credentials, operation, **scope):
+        calls.append((operation, scope))
+        return {"messages": [record]}
+
+    monkeypatch.setattr(workflow, "_request", read)
+    assert agent.source_verified(job, {}) is True
+    assert calls == [
+        ("messages", {"account_id": job["account_id"], "conversation_id": job["conversation_id"]})
+    ]
+
+
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"message": "changed"},
+        {"text": "changed"},
+        {"message": None},
+        {"accountId": "other"},
+        {"conversationId": "other"},
+        {"id": "other"},
+        {"senderId": "573001110001"},
+        {"platform": "instagram"},
+        {"direction": "outgoing"},
+        {"isDeleted": True},
+        {"metadata": {"standby": True}},
+    ],
+)
+def test_real_source_matcher_keeps_exact_identity_and_content_guards(monkeypatch, patch):
+    job = {
+        "account_id": DOC["account_id"],
+        "conversation_id": "wa-thread",
+        "message_id": "wamid.source",
+        "participant_id": "573001110002",
+        "content": "Hola Sara",
+    }
+    record = {
+        "id": job["message_id"],
+        "conversationId": job["conversation_id"],
+        "accountId": job["account_id"],
+        "platform": "whatsapp",
+        "direction": "incoming",
+        "senderId": job["participant_id"],
+        "message": job["content"],
+        "text": job["content"],
+        "isDeleted": False,
+        **patch,
+    }
+    monkeypatch.setattr(workflow, "_request", lambda *args, **kwargs: {"messages": [record]})
+    assert agent.source_verified(job, {}) is False
+
+
+def test_agent_uses_signed_canonical_rest_conversation_not_platform_alias():
+    event = agent.normalize(payload(), "a" * 24)
+    assert event["conversation_id"] == "internal-thread"
+    assert event["message_id"] == "wamid.source"
+
+
+def test_real_webhook_rest_and_reply_contract_without_matcher_mocks(vendor):
+    phone = CONTACT["phone"].lstrip("+")
+    event = payload(phone)
+    job = {**agent.normalize(event, "a" * 24), "id": "00000000-0000-4000-8000-000000000001"}
+    job["content"] = job["text"]
+    conversation(vendor)
+    thread = vendor["conversations"][0]
+    thread["id"] = event["conversation"]["id"]
+    thread.pop("threadControl")
+    vendor["messages"][0].update(
+        id=event["message"]["platformMessageId"],
+        conversationId=thread["id"],
+        message=job["content"],
+    )
+    assert agent.source_verified(job, vendor["credentials"]) is True
+    plan = workflow.prepare_literal_reply(None, job, "Hola, soy Sara.")
+    result = workflow.dispatch(plan, "verified-real-contract")
+    assert result["state"] == "completed"
+    posts = [call for call in vendor["calls"] if call[0] == "POST"]
+    assert len(posts) == 1
+    assert posts[0][1] == "/api/v1/inbox/conversations/internal-thread/messages"
+    assert posts[0][2] == {"accountId": DOC["account_id"], "message": "Hola, soy Sara."}

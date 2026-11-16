@@ -138,3 +138,23 @@ aggregate encrypted-traffic allowance. Existing JSON workflow request caps stay 
 Contracts: [send attachments](https://docs.zernio.com/messages/send-inbox-message),
 [WhatsApp media limits](https://docs.zernio.com/platforms/whatsapp/reference).
 This local implementation is not evidence of a real image or WhatsApp delivery.
+
+## REST source-content compatibility
+
+Signed inbound webhooks carry `message.text`, but the Inbox REST history returns
+the same content in each record's `message` string. Source verification compares
+that canonical REST field with the signed inbound content, retaining legacy `text`
+records only when they are unambiguous. Conflicting dual fields fail closed.
+Account, conversation, message, sender, direction, deletion and standby checks stay
+unchanged. Regression tests exercise the real matcher rather than mocking it.
+
+The specialized agent stores the signed webhook's opaque `conversation.id` for
+REST lookup/reply; `platformConversationId` is not substituted for it. Message
+verification still uses the exact platform message ID returned by Inbox history.
+
+For untouched WhatsApp threads, Zernio omits `threadControl` until a handover has
+occurred ([vendor contract](https://docs.zernio.com/messages/list-inbox-conversations)).
+Only that absent-key WhatsApp case is supported alongside explicit `app` control.
+Explicit null/external/AI-agent control and standby messages still block replies,
+and every dispatch rechecks current ownership. Facebook/Instagram rules are
+unchanged. No thread-control takeover request is issued.

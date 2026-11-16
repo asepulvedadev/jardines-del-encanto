@@ -436,3 +436,34 @@ def test_normalize_only_authenticatable_inbound_identity_without_content():
         assert workflow.normalize_event({**payload, **patch}) is None
     payload["message"]["direction"] = "outgoing"
     assert workflow.normalize_event(payload) is None
+
+
+@pytest.mark.parametrize("platform", ["whatsapp", "facebook", "instagram"])
+def test_untouched_whatsapp_thread_omits_control_without_takeover(vendor, platform):
+    node, binding = conversation(vendor, platform=platform)
+    vendor["conversations"][0].pop("threadControl")
+    if platform == "whatsapp":
+        plan = workflow.prepare(None, node, CONTACT, binding)
+        result = workflow.dispatch(plan, "untouched-whatsapp")
+        assert result["state"] == "completed"
+        assert len([call for call in vendor["calls"] if call[0] == "POST"]) == 1
+        assert all("thread-control" not in call[1] for call in vendor["calls"])
+    else:
+        node["settings"]["allow_provider_takeover"] = True
+        with pytest.raises(HTTPException):
+            workflow.prepare(None, node, CONTACT, binding)
+        assert not any(call[0] == "POST" for call in vendor["calls"])
+
+
+@pytest.mark.parametrize("change", [
+    {"threadControl": None}, {"threadControl": "other"},
+    {"threadControl": "ai_agent"}, {"metadata": {"standby": True}},
+])
+def test_untouched_whatsapp_rechecks_handover_before_send(vendor, change):
+    node, binding = conversation(vendor)
+    vendor["conversations"][0].pop("threadControl")
+    plan = workflow.prepare(None, node, CONTACT, binding)
+    vendor["conversations"][0].update(change)
+    with pytest.raises(HTTPException):
+        workflow.check(plan)
+    assert not any(call[0] == "POST" for call in vendor["calls"])

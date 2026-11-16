@@ -266,7 +266,17 @@ def _control(conversation):
     metadata = {} if metadata is None else metadata
     if not isinstance(metadata, dict) or metadata.get("standby"):
         _fail("zernio_thread_control_unconfirmed")
-    if conversation.get("platform") in META and conversation.get("threadControl") != "app":
+    # Zernio only includes threadControl after WhatsApp handover has occurred.
+    # Missing is the documented untouched state; explicit null/other/ai_agent
+    # remains unconfirmed. Never extend this exception to Facebook/Instagram.
+    untouched_whatsapp = (
+        conversation.get("platform") == "whatsapp" and "threadControl" not in conversation
+    )
+    if (
+        conversation.get("platform") in META
+        and conversation.get("threadControl") != "app"
+        and not untouched_whatsapp
+    ):
         _fail("zernio_thread_control_unconfirmed")
 
 

@@ -287,7 +287,13 @@ def normalize(payload, profile):
         return None
     if not re.fullmatch(r"[1-9][0-9]{7,14}", event["participant_id"]):
         return None
-    return {**event, "text": text}
+    try:
+        # REST list/reply routes use Zernio's signed opaque conversation ID,
+        # not the platform alias (the platform message ID remains canonical).
+        conversation_id = workflow._identifier(payload["conversation"].get("id"))
+    except HTTPException:
+        return None
+    return {**event, "conversation_id": conversation_id, "text": text}
 
 
 def enqueue(db, payload, profile):
@@ -392,6 +398,11 @@ def source_verified(job, credentials):
         conversation_id=job["conversation_id"],
     )
     for message in workflow._list(data, "messages"):
+        # Inbox REST uses `message`; webhook deliveries use `text`. Retain the
+        # legacy REST spelling only when it cannot contradict canonical content.
+        content = message.get("message", message.get("text"))
+        if not isinstance(content, str) or ("text" in message and message["text"] != content):
+            continue
         if (
             message.get("id") == job["message_id"]
             and message.get("conversationId") == job["conversation_id"]
@@ -399,7 +410,7 @@ def source_verified(job, credentials):
             and message.get("platform") == "whatsapp"
             and message.get("direction") == "incoming"
             and message.get("senderId") == job["participant_id"]
-            and message.get("text") == job["content"]
+            and content == job["content"]
             and message.get("isDeleted") is not True
             and isinstance(message.get("metadata", {}), dict)
             and not message.get("metadata", {}).get("standby")
