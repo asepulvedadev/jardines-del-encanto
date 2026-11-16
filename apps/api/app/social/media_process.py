@@ -9,6 +9,19 @@ from . import media, workflow
 
 
 def execute(frame):
+    from . import audio_media
+
+    if frame.get("operation") == "prepare_audio" and set(frame) == {"operation", "source"}:
+        source = frame["source"]
+        if set(source) != {"id", "account_id", "conversation_id", "participant_id"}:
+            raise ValueError
+        with connect() as db:
+            return workflow.prepare_literal_reply(db, source, audio_media.CAPTION)
+    if frame.get("operation") == "submit_audio" and set(frame) == {
+        "operation", "plan", "credentials", "data_base64", "request_id"
+    }:
+        data = base64.b64decode(frame["data_base64"], validate=True)
+        return audio_media.transmit(frame["plan"], data, frame["credentials"], frame["request_id"])
     if frame.get("operation") == "prepare" and set(frame) == {"operation", "source"}:
         source = frame["source"]
         if set(source) != {"id", "account_id", "conversation_id", "participant_id"}:

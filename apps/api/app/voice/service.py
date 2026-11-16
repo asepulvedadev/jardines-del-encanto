@@ -219,21 +219,27 @@ def prepare(db, row, args, admin, consent_confirmed):
     }
 
 
+def tts_audio(value):
+    """Decode the existing finite MP3 result without assigning a proposal or owner."""
+    if (
+        set(value) != {"status", "mime_type", "data_base64"}
+        or value["status"] != "completed"
+        or value["mime_type"] != "audio/mpeg"
+    ):
+        raise ValueError("invalid_voice_result")
+    raw = base64.b64decode(value["data_base64"], validate=True)
+    if not 12 <= len(raw) <= 2 * 1024 * 1024 or not (
+        raw.startswith(b"ID3") or raw[0] == 255 and raw[1] & 224 == 224
+    ):
+        raise ValueError("invalid_voice_result")
+    return raw
+
+
 def execute_reserved(payload, admin):
     value = bridge.request("/execute", payload, timeout=65)
     operation = payload["operation"]
     if operation == "tts":
-        if (
-            set(value) != {"status", "mime_type", "data_base64"}
-            or value["status"] != "completed"
-            or value["mime_type"] != "audio/mpeg"
-        ):
-            raise ValueError("invalid_voice_result")
-        raw = base64.b64decode(value["data_base64"], validate=True)
-        if not 12 <= len(raw) <= 2 * 1024 * 1024 or not (
-            raw.startswith(b"ID3") or raw[0] == 255 and raw[1] & 224 == 224
-        ):
-            raise ValueError("invalid_voice_result")
+        raw = tts_audio(value)
         with connect() as db:
             quota(db, admin["id"], len(raw))
             row = db.execute(

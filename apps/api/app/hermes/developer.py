@@ -160,6 +160,16 @@ def issue(db, job_id, history=None):
         },
         ensure_ascii=False,
     )
+    from ..social.whatsapp_audio import requested
+
+    if requested(job["content"]):
+        document = json.loads(prompt)
+        document["response_format"] = "spoken_answer"
+        document["instruction"] = (
+            "Return the answer as natural spoken text. The application synthesizes it "
+            "separately; do not claim audio was sent or propose another TTS action."
+        )
+        prompt = json.dumps(document, ensure_ascii=False)
     token = secrets.token_urlsafe(32)
     run = db.execute(
         """INSERT INTO crm.hermes_runs(actor_id,session_hash,token_hash,prompt,history,authentication)

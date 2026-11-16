@@ -103,6 +103,42 @@ and mocked provider traffic. No real customer message, campaign, provider key or
 administrator conversation is required. Browser visual checks and a pinned-Hermes
 runtime test are distinct from mocks; report their actual results separately.
 
+## Requested spoken answers
+
+An explicit current-message request such as `Respóndeme en audio`, `Envíame una
+nota de voz`, or `/audio <question>` selects a private MP3 attachment. A negated
+request or a question about audio remains text. This is not a persistent preference.
+The existing inbound-only channel and its enabled ElevenLabs connection authorize
+this narrow rendering path; customer models acquire no voice tools or developer
+permissions. It starts no Retell call or ElevenLabs conversational session.
+
+Hermes generates the answer using the same published knowledge, training and
+participant-scoped history. ElevenLabs speaks that exact answer using the verified
+server-selected default voice/model from **Configuraciones → Conexiones → ElevenLabs**.
+Never select a provider voice by display-name similarity alone: a Retell custom
+voice ID is not necessarily its underlying ElevenLabs ID. Confirm the mapping or
+the intended existing ElevenLabs voice with the owner first.
+
+Migration `020_whatsapp_audio.sql` adds private source-job-bound artifacts, not fake
+human proposals. The inbound job and the gateway each reserve before paid synthesis.
+The exact original MP3 and its hash are persisted before one sealed multipart send
+to the original conversation. The same worker handles both phases; no extra worker
+or policy-overlay installation is needed. Rendering is limited to 1,500 characters,
+2 MiB, twenty reservations per owner per rolling day, and at most 100 retained
+artifacts within a 25 MiB owner quota. Unknown paid/send outcomes consume the
+reservation and are never regenerated or replayed automatically.
+
+Source, enabled owner/channel/connections, provider revision, configured voice and
+shared profile are rechecked. Recipient ownership, handover and the service window
+are prepared before paid synthesis and checked again before the supervised send.
+Pause/configuration changes share the existing final-send locks. Preparation/dispatch
+failure is recorded with a sanitized error; no silent retry or public hosting occurs.
+
+The result is an **MP3 audio attachment**, not a native recorded voice-note bubble.
+Zernio requires mono OGG/Opus and `voiceNote: true` for that representation. Provider
+acceptance is not delivery/read proof. Incoming WhatsApp audio transcription and
+voice cloning are not introduced by this change.
+
 The initial live preflight found no configured REST credential in the CRM, despite
 the number appearing in Zernio's dashboard. Production activation remains pending
 until that connection and webhook are actually verified. Zernio also displayed a

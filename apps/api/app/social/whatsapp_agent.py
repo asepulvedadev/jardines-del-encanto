@@ -455,12 +455,15 @@ def generate(job, row):
     if author:
         from ..hermes import developer as trusted_developer
         return trusted_developer.generate(job, row, messages)
-    messages.append({"role": "user", "content": job["content"]})
+    from .whatsapp_audio import public_messages
+
+    instructions = shared_profile.instructions(published)
+    messages = public_messages(messages, job["content"], instructions, published["knowledge"])
     result = bridge.request(
         "/public-reply",
         {
             "messages": messages,
-            "instructions": shared_profile.instructions(published),
+            "instructions": instructions,
             "knowledge": published["knowledge"],
         },
         timeout=48,
@@ -494,6 +497,11 @@ def tick():
         if not source_verified(job, c):
             raise HTTPException(409, "source_unverified")
         reply = generate(job, row)
+        from . import whatsapp_audio
+
+        if whatsapp_audio.requested(job["content"]):
+            whatsapp_audio.respond(job, row, reply)
+            return
         with connect() as db:
             plan = workflow.prepare_literal_reply(db, job, reply)
         if plan["credential_revision"] != row["credential_revision"]:
