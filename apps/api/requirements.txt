@@ -98,9 +98,9 @@ psycopg-binary==3.3.8 ; implementation_name != 'pypy' \
     --hash=sha256:c3a8420317a3b3910a08b77a952ef8f8051da61622c6a2e03fc51b75761c6acf \
     --hash=sha256:e42c0e37eaed1ff03c24008561bca218eae8ec5ca4405a37897c6245ead8d612
     # via psycopg
-pwdlib==0.3.1 \
-    --hash=sha256:2ffd1955c92190d5bfbdc5071bf7d422568b83f943453ebd3d43d031ccba37b1 \
-    --hash=sha256:944fa439198bed8ac3ea63dac76ea4ae43e2a35f4f21e9e725e82d3c2b97d6a5
+pwdlib==0.4.0 \
+    --hash=sha256:123fd269d0980416f3a2a7b0c3a183f3b2f8580bb44bdadadde93e4bf7582f9d \
+    --hash=sha256:ef34f40b43efd610fce615391027f08bdb1403fcccda9897978f69275b61b2ee
     # via jardines-api
 pycparser==3.12 ; implementation_name != 'PyPy' \
     --hash=sha256:a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e \
