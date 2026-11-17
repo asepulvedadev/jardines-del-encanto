@@ -1,0 +1,225 @@
+.crm-broadcasts {
+  min-width: 0;
+}
+.crm-broadcast-intro {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 0 0 1.5rem;
+}
+.crm-broadcast-intro > div {
+  border-top: 1px solid var(--crm-border, #d9e1d5);
+  padding: 1rem 0;
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+.crm-broadcast-intro strong {
+  color: #507010;
+  font-size: 0.8rem;
+}
+.crm-broadcast-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #526056;
+}
+.crm-broadcast-empty svg {
+  margin: auto;
+  color: #507010;
+}
+.crm-broadcast-empty h3 {
+  color: #062619;
+}
+.crm-broadcast-empty p {
+  max-width: 34rem;
+  margin: 1rem auto 1.5rem;
+}
+.crm-broadcast-modal {
+  margin: auto;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  width: min(880px, calc(100vw - 2rem));
+  max-width: 880px;
+}
+.crm-broadcast-modal .crm-form {
+  gap: 1.25rem;
+}
+.crm-broadcast-modal fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.crm-broadcast-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.crm-broadcast-fields label,
+.crm-broadcast-step > label {
+  display: grid;
+  gap: 0.45rem;
+}
+.crm-broadcast-fields input,
+.crm-broadcast-fields select,
+.crm-broadcast-step select {
+  width: 100%;
+  min-width: 0;
+}
+.crm-broadcast-step {
+  border-top: 1px solid #d9e1d5;
+  padding-top: 1.25rem;
+  margin-top: 1.5rem;
+}
+.crm-broadcast-step h3 {
+  font-size: 1rem;
+  margin: 0 0 1rem;
+}
+.crm-broadcast-step input[type="file"] {
+  padding: 0.8rem;
+  background: #eef3e8;
+  width: 100%;
+  white-space: normal;
+}
+.crm-broadcast-preview {
+  background: #eef3e8;
+  border: 1px solid #d9e1d5;
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin: 1rem 0;
+  overflow-wrap: anywhere;
+}
+.crm-broadcast-preview > span {
+  font-size: 0.75rem;
+  color: #526056;
+}
+.crm-broadcast-preview p {
+  white-space: pre-wrap;
+  color: #062619;
+}
+.crm-broadcast-preview small {
+  color: #526056;
+}
+.crm-broadcast-sample {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid #d9e1d5;
+  border-radius: 8px;
+  margin-top: 1rem;
+}
+.crm-broadcast-sample > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid #d9e1d5;
+  overflow-wrap: anywhere;
+}
+.crm-broadcasts small {
+  display: block;
+}
+.crm-broadcast-step .crm-broadcast-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+.crm-broadcast-check input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  margin-top: 0.2rem;
+  accent-color: #062619;
+}
+.crm-broadcast-link {
+  border: 0;
+  background: none;
+  color: #062619;
+  padding: 0;
+  text-align: left;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.crm-broadcast-count {
+  display: block;
+  font-size: 1.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.crm-lead-cohorts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.crm-lead-cohorts > div {
+  background: #fff;
+  border: 1px solid #d9e1d5;
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+.crm-lead-cohorts span,
+.crm-lead-cohorts small {
+  display: block;
+  color: #526056;
+}
+.crm-lead-cohorts strong {
+  display: block;
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+  margin: 0.5rem 0;
+}
+.crm-broadcast-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.crm-broadcast-filter select {
+  max-width: 100%;
+  border: 1px solid #7b897e;
+  border-radius: 8px;
+  padding: 0.6rem;
+  background: #fff;
+  color: #062619;
+}
+.crm-cold-tag {
+  display: inline-block;
+  color: #526056;
+  background: #eef3e8;
+  border-radius: 5px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.75rem;
+  margin: 0.15rem;
+}
+.crm-broadcasts :focus-visible {
+  outline: 2px solid #507010;
+  outline-offset: 3px;
+}
+@media (max-width: 640px) {
+  .crm-broadcast-fields {
+    grid-template-columns: 1fr;
+  }
+  .crm-broadcast-intro {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .crm-lead-cohorts {
+    grid-template-columns: 1fr;
+  }
+  .crm-broadcast-modal {
+    width: calc(100vw - 1rem);
+  }
+  .crm-broadcast-sample > div {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .crm-broadcasts .crm-page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

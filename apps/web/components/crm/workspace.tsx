@@ -7,6 +7,7 @@ import { AnalyticsPanel } from "./analytics-panel";
 import { VoiceWorkspace } from "./voice-workspace";
 import { WorkflowPanel } from "./workflow-panel";
 import { InboxPanel } from "./inbox-panel";
+import { BroadcastPanel } from "./broadcast-panel";
 import { CampaignPanel } from "./campaign-panel";
 import { SaraPanel } from "./sara-panel";
 import { SettingsModal } from "./settings-modal";
@@ -41,6 +42,7 @@ const navigation = [
   ["workflows", "connections"],
   ["campaigns", "list"],
   ["inbox", "message"],
+  ["broadcasts", "message"],
 ] as const;
 
 export function Workspace({
@@ -64,6 +66,7 @@ export function Workspace({
   >("social");
   const [socialCallback, setSocialCallback] = useState(false);
   const [query, setQuery] = useState("");
+  const [broadcastFilter, setBroadcastFilter] = useState("");
   const [list, setList] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
   const [pending, setPending] = useState(false);
@@ -129,8 +132,47 @@ export function Workspace({
   );
 
   const refresh = useCallback(async () => {
-    setData(await request<WorkspaceData>("workspace"));
-  }, [request]);
+    setData(
+      await request<WorkspaceData>(
+        broadcastFilter ? "broadcasts/filter" : "workspace",
+        broadcastFilter ? "POST" : "GET",
+        broadcastFilter
+          ? {
+              campaign_id: broadcastFilter === "cold" ? null : broadcastFilter,
+              cold_only: broadcastFilter === "cold",
+            }
+          : undefined,
+      ),
+    );
+  }, [request, broadcastFilter]);
+  async function filterBroadcast(value: string) {
+    if (busy.current) return false;
+    busy.current = true;
+    setPending(true);
+    setError("");
+    try {
+      setData(
+        await request<WorkspaceData>(
+          value ? "broadcasts/filter" : "workspace",
+          value ? "POST" : "GET",
+          value
+            ? {
+                campaign_id: value === "cold" ? null : value,
+                cold_only: value === "cold",
+              }
+            : undefined,
+        ),
+      );
+      setBroadcastFilter(value);
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo filtrar.");
+      return false;
+    } finally {
+      busy.current = false;
+      setPending(false);
+    }
+  }
   async function mutate(
     action: () => Promise<unknown>,
     success: string,
@@ -269,7 +311,8 @@ export function Workspace({
       () => formElement.reset(),
     );
   }
-  function changeView(next: View) {
+  async function changeView(next: View) {
+    if (busy.current) return;
     if (
       view === "inbox" &&
       next !== view &&
@@ -297,6 +340,13 @@ export function Workspace({
       )
     )
       return;
+    if (broadcastFilter && next !== "pipeline" && next !== "contacts") {
+      try {
+        if (!(await filterBroadcast(""))) return;
+      } catch {
+        return;
+      }
+    }
     setView(next);
     setQuery("");
     setError("");
@@ -442,7 +492,7 @@ export function Workspace({
             <h1 className="sr-only" ref={heading} tabIndex={-1}>
               Sara IA
             </h1>
-          ) : (
+          ) : view === "broadcasts" ? null : (
             <>
               <div className="crm-page-heading">
                 <div>
@@ -501,6 +551,7 @@ export function Workspace({
             view !== "sara" &&
             view !== "voice" &&
             view !== "campaigns" &&
+            view !== "broadcasts" &&
             view !== "inbox" && (
               <p className="crm-limit-note">
                 Esta vista muestra hasta 500 registros por sección. Los totales
@@ -530,6 +581,8 @@ export function Workspace({
                 setSettingsOpen(true);
               }}
             />
+          ) : view === "broadcasts" ? (
+            <BroadcastPanel csrf={csrf} onChanged={refresh} />
           ) : view === "campaigns" ? (
             <CampaignPanel csrf={csrf} onDirtyChange={setCampaignDirty} />
           ) : view === "workflows" ? (
@@ -562,6 +615,21 @@ export function Workspace({
                   </strong>
                 </div>
               </div>
+              <section
+                className="crm-lead-cohorts"
+                aria-label="Origen de los leads"
+              >
+                <div>
+                  <span>Leads en frío · WhatsApp masivo</span>
+                  <strong>{data.counts.cold_leads ?? 0}</strong>
+                  <small>Nuevos contactos importados por CSV.</small>
+                </div>
+                <div>
+                  <span>Leads de campañas de redes</span>
+                  <strong>{data.counts.campaign_leads ?? 0}</strong>
+                  <small>Origen campaña de redes, sin leads en frío.</small>
+                </div>
+              </section>
               <div className="crm-overview-grid">
                 <AnalyticsPanel />
                 <section className="crm-panel crm-pipeline-summary">
@@ -690,6 +758,28 @@ export function Workspace({
                   )}
                 </div>
               </div>
+              {(view === "pipeline" || view === "contacts") && (
+                <label className="crm-broadcast-filter">
+                  Etiqueta de campaña
+                  <select
+                    value={broadcastFilter}
+                    disabled={pending}
+                    onChange={(event) =>
+                      void filterBroadcast(event.target.value)
+                    }
+                  >
+                    <option value="">Todos los leads</option>
+                    <option value="cold">
+                      Leads en frío · WhatsApp masivo
+                    </option>
+                    {(data.broadcast_labels ?? []).map((label) => (
+                      <option key={label.id} value={label.id}>
+                        {label.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               {view === "pipeline" && !list ? (
                 <>
                   <p className="crm-board-hint">
@@ -789,6 +879,21 @@ export function Workspace({
                                       <span className="crm-source-tag">
                                         {sourceLabel(contact.source)}
                                       </span>
+                                      {contact.cold_lead && (
+                                        <span className="crm-cold-tag">
+                                          Lead en frío
+                                        </span>
+                                      )}
+                                      {(contact.broadcast_tags ?? []).map(
+                                        (tag) => (
+                                          <span
+                                            className="crm-cold-tag"
+                                            key={tag}
+                                          >
+                                            {tag}
+                                          </span>
+                                        ),
+                                      )}
                                     </button>
                                     <div className="crm-card-bottom">
                                       <span
@@ -874,6 +979,16 @@ export function Workspace({
                                   <span className="crm-source-tag">
                                     {sourceLabel(contact.source)}
                                   </span>
+                                  {contact.cold_lead && (
+                                    <span className="crm-cold-tag">
+                                      Lead en frío
+                                    </span>
+                                  )}
+                                  {(contact.broadcast_tags ?? []).map((tag) => (
+                                    <span className="crm-cold-tag" key={tag}>
+                                      {tag}
+                                    </span>
+                                  ))}
                                 </td>
                                 <td>
                                   {deal && (

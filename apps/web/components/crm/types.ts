@@ -21,6 +21,8 @@ export type Contact = {
   version: number;
   created_at: string;
   registration_code?: string | null;
+  cold_lead?: boolean;
+  broadcast_tags?: string[];
 };
 export type Deal = {
   id: string;
@@ -46,12 +48,15 @@ export type Activity = {
   created_at: string;
 };
 export type WorkspaceData = {
+  broadcast_labels?: { id: string; name: string }[];
   contacts: Contact[];
   deals: Deal[];
   tasks: Task[];
   activities: Activity[];
   counts: {
     contacts: number;
+    cold_leads?: number;
+    campaign_leads?: number;
     active: number;
     won: number;
     pending: number;
@@ -64,6 +69,7 @@ export type View =
   | "sara"
   | "voice"
   | "workflows"
+  | "broadcasts"
   | "campaigns"
   | "inbox"
   | "pipeline"
@@ -75,6 +81,7 @@ export const labels: Record<View, string> = {
   voice: "Voz",
   workflows: "Secuencias",
   campaigns: "Plantillas",
+  broadcasts: "Envíos masivos",
   inbox: "Inbox",
   pipeline: "Pipeline",
   contacts: "Clientes",
