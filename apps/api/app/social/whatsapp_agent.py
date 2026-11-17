@@ -25,6 +25,7 @@ from . import config, workflow
 router = APIRouter(prefix="/crm/social/whatsapp-agent")
 Admin = Annotated[dict, Depends(security.session)]
 DAILY_REPLY_LIMIT = 1000
+DEVELOPER_DAILY_REPLY_LIMIT = 500
 _stop = threading.Event()
 _thread = None
 _heartbeat = 0.0
@@ -374,14 +375,24 @@ def claim():
                 (job["id"],),
             )
             return None
-        count = db.execute(
-            "SELECT count(*) AS n FROM crm.whatsapp_agent_jobs WHERE account_id=%s AND conversation_id=%s AND claimed_at>now()-interval '24 hours'",
-            (job["account_id"], job["conversation_id"]),
-        ).fetchone()["n"]
-        if count >= 30:
+        if developer(row["document"], job["participant_id"]) is not None:
+            count = db.execute(
+                """SELECT count(*) AS n FROM crm.whatsapp_agent_jobs
+                WHERE account_id=%s AND profile_id=%s AND participant_id=%s
+                AND claimed_at>now()-interval '24 hours'""",
+                (job["account_id"], job["profile_id"], job["participant_id"]),
+            ).fetchone()["n"]
+            limit, reason = DEVELOPER_DAILY_REPLY_LIMIT, "developer_budget"
+        else:
+            count = db.execute(
+                "SELECT count(*) AS n FROM crm.whatsapp_agent_jobs WHERE account_id=%s AND conversation_id=%s AND claimed_at>now()-interval '24 hours'",
+                (job["account_id"], job["conversation_id"]),
+            ).fetchone()["n"]
+            limit, reason = 30, "conversation_budget"
+        if count >= limit:
             db.execute(
-                "UPDATE crm.whatsapp_agent_jobs SET state='blocked',error='conversation_budget',finished_at=now() WHERE id=%s",
-                (job["id"],),
+                "UPDATE crm.whatsapp_agent_jobs SET state='blocked',error=%s,finished_at=now() WHERE id=%s",
+                (reason, job["id"]),
             )
             return None
         db.execute(

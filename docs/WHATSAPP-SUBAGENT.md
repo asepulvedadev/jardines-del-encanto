@@ -104,11 +104,18 @@ missing; an enabled flag is not reported as verified availability.
   identities are ignored. No campaign, contact-list enrollment, or conversation opener.
 - Durable uniqueness covers both event ID and account/conversation/message identity.
 - Claims serialize across API processes; at most six per minute, one thousand per
-  rolling day and thirty per conversation per day. These are safety/spend ceilings,
+  rolling day and thirty per customer conversation per rolling day. Each configured
+  developer number instead has a 500-claim rolling 24-hour ceiling, scoped to its
+  account/profile/participant across conversations. Only exact configured E.164
+  identities qualify; display names grant nothing. All claimed attempts count,
+  including failed or uncertain sends. These are safety/spend ceilings,
   not promised throughput. The owner raised both rolling daily limits to 1,000
   on November 16, 2026: agent reply claims and new welcome conversations. The six/minute
-  and thirty/conversation limits remain unchanged. Public provider calls also have a
-  separate six/minute cap.
+  and thirty/customer-conversation limits remain unchanged. Developers still share
+  the global six/minute and 1,000/day budgets; the larger personal cap does not
+  guarantee throughput or bypass source verification, revocation, or tool grants.
+  Existing blocked/unknown jobs are not replayed. Public provider calls also have
+  a separate six/minute cap.
 - Before sending, a fresh source read proves exact incoming text and sender. Existing
   reviewed Zernio preparation/dispatch rechecks ownership, connection state and the
   24-hour WhatsApp window. Literal model output is never template-interpolated.

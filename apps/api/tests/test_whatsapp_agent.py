@@ -610,3 +610,60 @@ def test_daily_limit_increase_preserves_short_term_budgets(configured, kind, cou
             "SELECT state,error FROM crm.whatsapp_agent_jobs WHERE event_id='event-1'"
         ).fetchone()
         assert row == (expected, "conversation_budget" if kind == "conversation" else None)
+
+
+@pytest.mark.parametrize(
+    "kind,count,admitted",
+    [("conversation", 30, True), ("day", 499, True), ("day", 500, False)],
+)
+def test_developer_daily_budget_is_500_across_conversations(configured, kind, count, admitted):
+    client, owner, credentials = configured
+    assert send(client, credentials, payload()).status_code == 200
+    seed_claim_budget(owner, count, kind)
+    assert bool(agent.claim()) is admitted
+    with psycopg.connect(owner) as db:
+        assert db.execute(
+            "SELECT state,error FROM crm.whatsapp_agent_jobs WHERE event_id='event-1'"
+        ).fetchone() == (("generating", None) if admitted else ("blocked", "developer_budget"))
+
+
+@pytest.mark.parametrize("other_scope", ["participant", "profile", "account", "expired"])
+def test_developer_budget_is_scoped_and_rolling(configured, other_scope):
+    client, owner, credentials = configured
+    assert send(client, credentials, payload()).status_code == 200
+    seed_claim_budget(owner, 500)
+    with psycopg.connect(owner) as db:
+        assignment = {
+            "participant": "participant_id='573001110002'",
+            "profile": "profile_id='other-profile'",
+            "account": "account_id='other-account'",
+            "expired": "claimed_at=now()-interval '25 hours'",
+        }[other_scope]
+        db.execute(f"UPDATE crm.whatsapp_agent_jobs SET {assignment} WHERE state='completed'")
+    assert agent.claim() is not None
+
+
+@pytest.mark.parametrize("kind,count", [("minute", 6), ("day", 1000)])
+def test_developers_keep_global_spend_limits(configured, kind, count):
+    client, owner, credentials = configured
+    assert send(client, credentials, payload()).status_code == 200
+    seed_claim_budget(owner, count, kind)
+    with psycopg.connect(owner) as db:
+        db.execute(
+            "UPDATE crm.whatsapp_agent_jobs SET participant_id='573001110003' WHERE state='completed'"
+        )
+    assert agent.claim() is None
+    assert next(j for j in jobs(owner) if j['event_id'] == 'event-1')['state'] == 'pending'
+
+
+def test_developer_label_does_not_increase_customer_budget(configured):
+    client, owner, credentials = configured
+    event = payload("573001110003")
+    event["message"]["sender"]["name"] = "Developer One"
+    assert send(client, credentials, event).status_code == 200
+    seed_claim_budget(owner, 30, "conversation")
+    assert agent.claim() is None
+    with psycopg.connect(owner) as db:
+        assert db.execute(
+            "SELECT state,error FROM crm.whatsapp_agent_jobs WHERE event_id='event-1'"
+        ).fetchone() == ("blocked", "conversation_budget")
