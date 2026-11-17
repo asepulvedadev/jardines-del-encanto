@@ -40,7 +40,11 @@ test('the deployed handler preserves redirect headers through Next.js', {
     assert.equal(response.status, 302);
     assert.equal(response.headers.get('location'), destination);
     assert.equal(response.headers.get('cache-control'), 'no-store');
-    assert.equal(response.headers.get('x-robots-tag'), 'noindex, nofollow');
+    // A reverse proxy may repeat the same restrictive crawler directives.
+    assert.deepEqual(
+      new Set((response.headers.get('x-robots-tag') ?? '').split(',').map(value => value.trim().toLowerCase())),
+      new Set(['noindex', 'nofollow']),
+    );
     assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
     assert.equal(await response.text(), '');
   }
