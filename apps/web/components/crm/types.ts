@@ -13,6 +13,16 @@ export const stages = [
 ] as const;
 export type Stage = (typeof stages)[number][0];
 export type Source = (typeof sources)[number][0];
+export type LeadOrigin = "campaign" | "template" | "imported" | "other";
+export const leadOriginLabels: Record<LeadOrigin, string> = {
+  campaign: "Campañas y redes",
+  template: "Respuestas a templates",
+  imported: "Base importada",
+  other: "Otros orígenes",
+};
+export type LeadOriginsData = Record<LeadOrigin, number> & {
+  other_sources: { source: Source; count: number }[];
+};
 export type Contact = {
   id: string;
   name: string;
@@ -25,6 +35,7 @@ export type Contact = {
   template_tags?: string[];
   cold_lead?: boolean;
   broadcast_tags?: string[];
+  lead_origin?: LeadOrigin;
 };
 export type Deal = {
   id: string;
@@ -50,6 +61,7 @@ export type Activity = {
   created_at: string;
 };
 export type WorkspaceData = {
+  lead_origins?: LeadOriginsData;
   broadcast_labels?: { id: string; name: string }[];
   contacts: Contact[];
   deals: Deal[];

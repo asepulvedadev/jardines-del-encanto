@@ -36,4 +36,4 @@ class Confirm(Input):
 class Filter(Input):
     campaign_id: UUID | None = None
     cold_only: bool = False
-    cohort: Literal["campaign", "template"] | None = None
+    cohort: Literal["campaign", "template", "imported", "other"] | None = None

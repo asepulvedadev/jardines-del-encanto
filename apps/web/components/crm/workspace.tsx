@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "./icon";
 import { AnalyticsPanel } from "./analytics-panel";
+import { LeadOrigins } from "./lead-origins";
 import { VoiceWorkspace } from "./voice-workspace";
 import { WorkflowPanel } from "./workflow-panel";
 import { InboxPanel } from "./inbox-panel";
@@ -17,6 +18,7 @@ import {
   errorMessage,
   initials,
   labels,
+  leadOriginLabels,
   phoneLabel,
   shortDate,
   sourceLabel,
@@ -606,26 +608,16 @@ export function Workspace({
                   </strong>
                 </div>
               </div>
-              <section
-                className="crm-lead-cohorts"
-                aria-label="Origen de los leads"
-              >
-                <div>
-                  <span>Base importada · En frío</span>
-                  <strong>{data.counts.cold_leads ?? 0}</strong>
-                  <small>Nuevos contactos importados por CSV.</small>
-                </div>
-                <div>
-                  <span>Campañas · Redes sociales</span>
-                  <strong>{data.counts.campaign_leads ?? 0}</strong>
-                  <small>Sin contactos de templates ni importaciones en frío.</small>
-                </div>
-                <div>
-                  <span>Templates · WhatsApp</span>
-                  <strong>{data.counts.template_leads ?? 0}</strong>
-                  <small>Respuestas verificadas. No cuenta destinatarios del envío.</small>
-                </div>
-              </section>
+              <LeadOrigins
+                total={data.counts.contacts}
+                origins={data.lead_origins}
+                pending={pending}
+                onSelect={(origin) => {
+                  void filterBroadcast(origin).then((loaded) => {
+                    if (loaded) void changeView("contacts");
+                  });
+                }}
+              />
               <div className="crm-overview-grid">
                 <AnalyticsPanel />
                 <section className="crm-panel crm-pipeline-summary">
@@ -765,10 +757,12 @@ export function Workspace({
                     }
                   >
                     <option value="">Todos los leads</option>
-                    <option value="campaign">Campañas · Redes sociales</option>
-                    <option value="template">Templates · WhatsApp</option>
+                    <option value="campaign">Campañas y redes</option>
+                    <option value="template">Respuestas a templates · WhatsApp</option>
+                    <option value="imported">Base importada · Sin respuesta a templates</option>
+                    <option value="other">Otros orígenes</option>
                     <option value="cold">
-                      Leads en frío · WhatsApp masivo
+                      Historial de importaciones (todos)
                     </option>
                     {(data.broadcast_labels ?? []).map((label) => (
                       <option key={label.id} value={label.id}>
@@ -875,11 +869,11 @@ export function Workspace({
                                         {phoneLabel(contact.phone)}
                                       </span>
                                       <span className="crm-source-tag">
-                                        {contact.template_lead ? "Template · WhatsApp" : sourceLabel(contact.source)}
+                                        {contact.lead_origin ? leadOriginLabels[contact.lead_origin] : contact.template_lead ? "Template · WhatsApp" : sourceLabel(contact.source)}
                                       </span>
                                       {contact.cold_lead && (
                                         <span className="crm-cold-tag">
-                                          Lead en frío
+                                          Importado por CSV
                                         </span>
                                       )}
                                       {[...(contact.template_tags ?? []), ...(contact.broadcast_tags ?? [])].map(
@@ -975,11 +969,11 @@ export function Workspace({
                                 </td>
                                 <td>
                                   <span className="crm-source-tag">
-                                    {contact.template_lead ? "Template · WhatsApp" : sourceLabel(contact.source)}
+                                    {contact.lead_origin ? leadOriginLabels[contact.lead_origin] : contact.template_lead ? "Template · WhatsApp" : sourceLabel(contact.source)}
                                   </span>
                                   {contact.cold_lead && (
                                     <span className="crm-cold-tag">
-                                      Lead en frío
+                                      Importado por CSV
                                     </span>
                                   )}
                                   {[...(contact.template_tags ?? []), ...(contact.broadcast_tags ?? [])].map((tag) => (
@@ -1329,9 +1323,17 @@ export function Workspace({
             </div>
             <dl className="crm-detail-facts">
               <div>
-                <dt>Medio de origen</dt>
+                <dt>Origen registrado</dt>
                 <dd>{sourceLabel(selected.source)}</dd>
               </div>
+              {selected.lead_origin && <div>
+                <dt>Grupo en dashboard</dt>
+                <dd>{leadOriginLabels[selected.lead_origin]}</dd>
+              </div>}
+              {!!selected.template_tags?.length && <div>
+                <dt>Envío vinculado</dt>
+                <dd>{selected.template_tags.join(", ")}</dd>
+              </div>}
               <div>
                 <dt>Etapa</dt>
                 <dd>

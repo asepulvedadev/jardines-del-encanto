@@ -97,7 +97,7 @@ export const broadcastErrors: Record<string, string> = {
 
 /** Reserved cohort selectors stay separate from persisted broadcast UUIDs. */
 export function leadCohortFilter(value: string) {
-  if (value === "template" || value === "campaign") return { cohort: value };
+  if (["template", "campaign", "imported", "other"].includes(value)) return { cohort: value };
   if (value === "cold") return { cold_only: true };
   return { campaign_id: value };
 }

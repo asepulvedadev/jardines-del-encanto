@@ -128,9 +128,31 @@ precedence over the social-campaign counter, without rewriting the original
 contact source. The cold CSV-import counter remains separate and is not a count
 of replies. The total-contact counter continues to include all unique leads.
 The existing authenticated, CSRF-protected `POST /crm/broadcasts/filter` accepts
-an optional `cohort` (`campaign` or `template`), alongside its existing
+an optional `cohort` (`campaign`, `template`, `imported` or `other`), alongside its existing
 `campaign_id` and `cold_only` filters. Contact and pipeline filtering runs in SQL,
 not just on the first 500 client-side rows.
+
+### Complete dashboard distribution
+
+`GET /crm/workspace` and the filter response include an additive `lead_origins`
+summary and each returned contact's computed `lead_origin`. Classification is
+read-only and exhaustive, with precedence: verified template reply, imported
+contact, recorded `social_campaign` source, then other sources. The four counts
+sum to the global contact total, even when the current list is filtered or capped
+at 500 records. `other_sources` breaks down the last group by the stored source.
+
+The UI calls the social bucket **Campañas y redes**, not paid-ad attribution:
+the stored source alone does not prove a click on an ad. **Respuestas a templates**
+counts only verified replies, never the audience or all delivered messages.
+An imported contact with such a reply appears only under templates. Legacy
+`cold_only` and `counts.cold_leads` retain raw import membership for existing
+consumers; `cohort=imported` is the disjoint dashboard group. No original sources,
+identities, stages, opt-outs or receipts are rewritten. No provider call or send
+is made by opening or filtering this distribution.
+
+Each dashboard card opens its exact SQL-filtered contact list. The original
+source and dashboard group remain separate in the contact detail. Missing or
+inconsistent distribution data is shown as unavailable, not as zero.
 
 Each minute, the independent repair pass reads at most two recipient pages and
 checks at most ten linked conversations. A 913-recipient snapshot needs at least

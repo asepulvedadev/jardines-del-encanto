@@ -3,9 +3,21 @@
 from fastapi import HTTPException
 
 TEMPLATE_MATCH = "EXISTS (SELECT 1 FROM crm.template_lead_attribution t WHERE t.contact_id=c.id AND t.state='matched' AND c.phone='+' || ltrim(t.participant_id,'+'))"
+COLD_MATCH = "EXISTS (SELECT 1 FROM crm.whatsapp_cold_leads w WHERE w.contact_id=c.id)"
 CAMPAIGN_MATCH = (
     "c.source='social_campaign' AND NOT EXISTS (SELECT 1 FROM crm.whatsapp_cold_leads w WHERE w.contact_id=c.id) AND NOT "
     + TEMPLATE_MATCH
+)
+# Read-time grouping only: keep original sources and legacy import membership intact.
+ORIGIN_MATCHES = {
+    "template": TEMPLATE_MATCH,
+    "imported": f"({COLD_MATCH}) AND NOT ({TEMPLATE_MATCH})",
+    "campaign": CAMPAIGN_MATCH,
+    "other": f"c.source<>'social_campaign' AND NOT ({COLD_MATCH}) AND NOT ({TEMPLATE_MATCH})",
+}
+ORIGIN_CASE = (
+    f"CASE WHEN {TEMPLATE_MATCH} THEN 'template' WHEN {COLD_MATCH} THEN 'imported' "
+    "WHEN c.source='social_campaign' THEN 'campaign' ELSE 'other' END"
 )
 
 STAGES = {"new": "Nuevo", "contacted": "Contactado", "won": "Ganado"}
@@ -42,10 +54,11 @@ def workspace(db, admin, broadcast_filter=None):
     if broadcast_filter and broadcast_filter.cold_only:
         filters.append("EXISTS (SELECT 1 FROM crm.whatsapp_cold_leads w WHERE w.contact_id=c.id)")
     if broadcast_filter and broadcast_filter.cohort:
-        filters.append(TEMPLATE_MATCH if broadcast_filter.cohort == "template" else CAMPAIGN_MATCH)
+        filters.append(ORIGIN_MATCHES[broadcast_filter.cohort])
     clause = " WHERE " + " AND ".join(filters) if filters else ""
     contacts = db.execute(
         f"""SELECT c.*, r.code AS registration_code,
+           {ORIGIN_CASE} AS lead_origin,
            {TEMPLATE_MATCH} AS template_lead,
            ARRAY(SELECT DISTINCT t.label FROM crm.template_lead_attribution t WHERE t.contact_id=c.id AND t.state='matched' AND c.phone='+' || ltrim(t.participant_id,'+') ORDER BY t.label LIMIT 20) AS template_tags,
            EXISTS (SELECT 1 FROM crm.whatsapp_cold_leads w WHERE w.contact_id=c.id) AS cold_lead,
@@ -81,7 +94,18 @@ def workspace(db, admin, broadcast_filter=None):
            (SELECT count(*) FROM crm.tasks WHERE NOT completed
             AND due_date < (now() AT TIME ZONE 'America/Bogota')::date) AS overdue"""
     ).fetchone()
+    origin_rows = db.execute(
+        f"SELECT {ORIGIN_CASE} AS origin, c.source, count(*) AS count "
+        "FROM crm.contacts c GROUP BY origin,c.source ORDER BY c.source"
+    ).fetchall()
+    origins = dict.fromkeys(ORIGIN_MATCHES, 0)
+    other_sources = []
+    for row in origin_rows:
+        origins[row["origin"]] += row["count"]
+        if row["origin"] == "other":
+            other_sources.append({"source": row["source"], "count": row["count"]})
     return {
+        "lead_origins": {**origins, "other_sources": other_sources},
         "broadcast_labels": db.execute(
             "SELECT id,name FROM crm.whatsapp_broadcasts ORDER BY created_at DESC,id LIMIT 100"
         ).fetchall(),

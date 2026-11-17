@@ -149,29 +149,6 @@
   font-size: 1.75rem;
   font-variant-numeric: tabular-nums;
 }
-.crm-lead-cohorts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-.crm-lead-cohorts > div {
-  background: #fff;
-  border: 1px solid #d9e1d5;
-  border-radius: 12px;
-  padding: 1.25rem;
-}
-.crm-lead-cohorts span,
-.crm-lead-cohorts small {
-  display: block;
-  color: #526056;
-}
-.crm-lead-cohorts strong {
-  display: block;
-  font-size: 2rem;
-  font-variant-numeric: tabular-nums;
-  margin: 0.5rem 0;
-}
 .crm-broadcast-filter {
   display: flex;
   align-items: center;
@@ -207,9 +184,6 @@
   .crm-broadcast-intro {
     grid-template-columns: 1fr;
     gap: 0;
-  }
-  .crm-lead-cohorts {
-    grid-template-columns: 1fr;
   }
   .crm-broadcast-modal {
     width: calc(100vw - 1rem);
