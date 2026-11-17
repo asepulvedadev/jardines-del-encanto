@@ -48,6 +48,21 @@ class ExtensionProtocolTests(unittest.TestCase):
                 call_arguments({"action": denied, "arguments": {}}, actions)
 
 
+class AnalyticsProtocolTests(unittest.TestCase):
+    def test_only_existing_read_only_analytics_action_is_allowed(self):
+        self.assertIn("analytics.summary", ACTIONS)
+        self.assertEqual(
+            call_arguments({"action": "analytics.summary", "arguments": {}}, ACTIONS),
+            {"action": "analytics.summary", "arguments": {}},
+        )
+        for denied in ("analytics.export", "analytics.configure", "analytics.*"):
+            self.assertNotIn(denied, ACTIONS)
+            with self.assertRaises(ValueError):
+                call_arguments({"action": denied, "arguments": {}}, ACTIONS)
+        with self.assertRaises(ValueError):
+            call_arguments({"action": "analytics.summary", "arguments": {}}, {"crm.workspace"})
+
+
 class VoiceProtocolTests(unittest.TestCase):
     def test_voice_actions_use_only_the_application_broker(self):
         self.assertTrue({"voice.catalog", "voice.execute"} <= ACTIONS)
