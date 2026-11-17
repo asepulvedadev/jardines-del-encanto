@@ -264,8 +264,6 @@ def execute(operation, identifier):
         if row["state"] != phase + "_reserved":
             raise ValueError("welcome_reservation_changed")
         if row["platform"] == "tiktok":
-            from . import tiktok_intake
-
             if phase not in {"introduction", "question", "confirmation", "website", "group"}:
                 raise ValueError("welcome_tiktok_text_only")
             if not db.execute(
@@ -273,7 +271,11 @@ def execute(operation, identifier):
                 (row["id"], phase, row["source"]["message_id"]),
             ).fetchone():
                 raise ValueError("welcome_tiktok_reservation_required")
-            if phase != "introduction" and row["introduction_receipt"].get("status") != "accepted":
+            if (
+                phase != "introduction"
+                and row["welcome_required"]
+                and row["introduction_receipt"].get("status") != "accepted"
+            ):
                 raise ValueError("welcome_tiktok_introduction_required")
             if phase in {"confirmation", "website", "group"} and not row["contact_id"]:
                 raise ValueError("welcome_tiktok_registration_required")
@@ -300,6 +302,7 @@ def execute(operation, identifier):
             if (
                 phase == "question"
                 and row["welcome_required"]
+                and row["platform"] != "tiktok"
                 and row["audio_receipt"].get("status") != "accepted"
             ):
                 raise ValueError("welcome_audio_required")
@@ -328,9 +331,9 @@ def execute(operation, identifier):
                 "Puedes escribir: Nombre completo: … Celular: …",
             }
             if row["platform"] == "tiktok":
-                messages.update(
-                    introduction=tiktok_intake.INTRODUCTION, confirmation=tiktok_intake.CONFIRMATION
-                )
+                from . import tiktok_conversation
+
+                messages[phase] = tiktok_conversation.draft(db, row, phase)
             if row["registration_first"] and phase == "question":
                 candidate = row["details"]
                 if set(candidate) == {"name", "phone"}:

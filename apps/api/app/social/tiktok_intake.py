@@ -1,20 +1,10 @@
-"""Explicitly activated, inbound-only TikTok text registration; never audio or comments."""
+"""Explicitly activated TikTok conversation sequencing; Sara generates every reply."""
 
+import re
 from datetime import UTC, datetime, timedelta
 
 from . import config, workflow
 
-INTRODUCTION = (
-    "Hola, soy Sara, asistente comercial de Jardines del Encanto, en Acacías, Meta. "
-    "Con gusto te ayudo a conocer el proyecto. Para registrarte, envíame tu nombre "
-    "completo y número de celular así:\nNombre completo: …\nCelular: …"
-)
-CONFIRMATION = (
-    "Tu registro en Jardines del Encanto quedó guardado. A continuación te enviaré "
-    "la página oficial y el enlace del grupo de WhatsApp para que conozcas más del "
-    "proyecto y de la Gran Feria Inmobiliaria del domingo 22 de noviembre en la "
-    "Cámara de Comercio de Bogotá — Sede Soacha."
-)
 RECEIPTS = ("introduction_receipt", "confirmation_receipt", "website_receipt", "group_receipt")
 
 
@@ -93,7 +83,7 @@ def configure(db, *, owner_id, profile_id, account_id, proof_event_id):
 
 def phase(row, incoming):
     if not row["welcome_required"]:
-        return "question" if incoming and not row["contact_id"] else None
+        return "question" if incoming else None
     if row["introduction_receipt"].get("status") != "accepted":
         return "introduction"
     if not row["contact_id"]:
@@ -101,7 +91,41 @@ def phase(row, incoming):
     for step in ("confirmation", "website", "group"):
         if row[step + "_receipt"].get("status") != "accepted":
             return step
-    return None
+    return "question" if incoming else None
+
+
+def identity(row):
+    """Natural self-identification; unlabelled candidate names require confirmation."""
+    from . import onboarding
+
+    text = row["source"]["text"].strip()
+    explicit = onboarding.details(text, {}, {})
+    self_name = re.fullmatch(r"(?:me llamo|mi nombre es)\s+(.+)", text, re.IGNORECASE)
+    if self_name:
+        name = onboarding.valid_name(self_name[1])
+        if name:
+            explicit["name"] = name
+    value = {**row["details"], **explicit}
+    confirmed = (
+        set(explicit) == {"name", "phone"}
+        or (row["asked"] and "name" in explicit)
+        or (
+            row["asked"]
+            and onboarding.folded(text).strip(" .!")
+            in {"si", "confirmo", "correcto", "si confirmo", "si son correctos"}
+        )
+    )
+    # Bare full-name replies are candidates, not automatic CRM writes. Avoid
+    # interpreting project questions/interest as identity; confirmation is required.
+    if (
+        row["asked"]
+        and "name" not in value
+        and not explicit
+        and re.fullmatch(r"[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?: [A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){1,4}", text)
+    ):
+        value["name"] = text
+        confirmed = False
+    return value, confirmed
 
 
 def history(db, row, envelope):

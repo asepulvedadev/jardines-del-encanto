@@ -151,12 +151,32 @@ The separately activated TikTok lane is **text-only** and accepts authenticated
 comment-to-DM, outgoing events, other accounts and generic workflow sends remain
 excluded. It does not change WhatsApp/Facebook activation versions or audio order.
 
-The sequence is introduction/request for `Nombre completo:` and `Celular:` → wait
-for both valid, self-declared fields → canonical CRM contact/deal capture → text
-registration confirmation → website → configured WhatsApp-group invitation.
-Partial identity survives separate messages, but TikTok names must be explicitly
-labeled `Nombre completo:` or `Full name:`. Ordinary interest phrases, display
-names and opaque IDs are not registration identity. No links or registration claim precede persistence.
+Sara/Hermes generates **every customer-facing TikTok reply** through the existing
+public, tool-free bridge. There is no fixed-text fallback, and the WhatsApp admin
+or developer agent is not enabled for TikTok. The application still owns the
+sequence: answer the customer → collect missing identity naturally → canonical
+CRM capture → generated confirmation → generated website/group introductions with
+server-appended approved links. Completed threads continue conversing with Sara
+without replaying onboarding. Repeated webhook deliveries remain deduplicated.
+
+Partial identity survives separate messages. Explicit labeled fields and direct
+self-identification such as `Me llamo Mariana Torres` are accepted; a bare title-case
+full name is only a candidate until the customer confirms. Display names, opaque
+IDs and ordinary interest phrases are never treated as verified identity. No link
+or registration claim precedes persistence.
+
+Migration 034 stores per-input generated drafts, bound to source message, phase
+and the published Sara-profile version. Only accepted reservation receipts enter
+assistant history. Public context is bounded to eight messages, 2,000 characters
+per message, 2,000 instruction characters and 4,000 knowledge characters. Longer
+customer text is truncated only for model context, not for validated intake.
+Generation runs before send reservation and outside the control lock. Final
+sending rechecks scope, consent, live Inbox evidence, reply budget and the draft's
+published-profile version. Failed generation sends nothing, has no canned fallback,
+and waits for a new customer turn; uncertain delivery is never automatically resent.
+This local implementation does not disable any TikTok-native automatic-message
+setting: that requires independent inspection of the authorized production account.
+
 The contact INSERT trigger queues the existing two internal team notices in that
 same transaction, with TikTok shown as origin. Existing phone records and stages
 are preserved without duplicate new-lead notices. Hourly report category contracts

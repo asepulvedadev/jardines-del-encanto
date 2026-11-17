@@ -1117,6 +1117,20 @@ def tiktok_intake(intake, configured, monkeypatch):
     from app.social import tiktok_intake as tiktok
 
     _incoming, deliveries, synthesis, events, owner = intake
+    from app.hermes import bridge
+
+    original_bridge = bridge.request
+
+    def sara_or_voice(path, payload=None, **kwargs):
+        if path == "/public-reply":
+            return {
+                "ok": True,
+                "tools": 0,
+                "response": "Respuesta de Sara: " + payload["messages"][-1]["content"][:80],
+            }
+        return original_bridge(path, payload, **kwargs)
+
+    monkeypatch.setattr(bridge, "request", sara_or_voice)
     client = configured[0]
     original_account = onboarding_transport.service.account
     monkeypatch.setattr(
@@ -1168,7 +1182,7 @@ def test_tiktok_dm_collects_identity_before_confirmation_and_links(tiktok_intake
     onboarding.tick()
     row = state(owner)[0]
     assert [d[0] for d in deliveries] == ["introduction"]
-    assert "Nombre completo:" in deliveries[0][1]["body"]["message"]
+    assert deliveries[0][1]["body"]["message"].startswith("Respuesta de Sara:")
     assert row["details"] == {} and row["contact_id"] is None
     assert row["state"] == "waiting" and not synthesis
     with connect() as db:
@@ -1216,7 +1230,8 @@ def test_tiktok_dm_collects_identity_before_confirmation_and_links(tiktok_intake
         )
     incoming("Nombre completo: Mariana Torres\nCelular: 3001110099", suffix="repeat")
     onboarding.tick()
-    assert len(deliveries) == 5
+    assert len(deliveries) == 6
+    assert deliveries[-1][0] == "question"
 
 
 @pytest.mark.parametrize("event_type", ["comment.received", "message.sent"])
@@ -1497,9 +1512,217 @@ def test_tiktok_interest_text_is_not_a_self_declared_name(tiktok_intake):
         )
     assert [d[0] for d in deliveries] == ["introduction", "question", "question"]
     assert len({d[2] for d in deliveries}) == 3
+    assert len({d[1]["body"]["message"] for d in deliveries}) == 3
     assert not synthesis
     incoming("Nombre completo: Mariana Torres", suffix="self-identified")
     for _ in range(3):
         onboarding.tick()
     assert state(owner)[0]["contact_id"]
     assert [d[0] for d in deliveries][-3:] == ["confirmation", "website", "group"]
+
+
+def test_tiktok_sara_generates_every_reply_and_continues_after_registration(
+    tiktok_intake, monkeypatch
+):
+    from app.hermes import bridge
+
+    calls = []
+
+    def sara(path, payload=None, **kwargs):
+        assert path == "/public-reply"
+        calls.append(copy.deepcopy(payload))
+        return {"ok": True, "tools": 0, "response": "Respuesta de Sara desde Hermes."}
+
+    monkeypatch.setattr(bridge, "request", sara)
+    incoming, deliveries, synthesis, _events, owner = tiktok_intake
+    incoming("¿Dónde queda el proyecto?")
+    onboarding.tick()
+    assert deliveries[0][1]["body"]["message"] == "Respuesta de Sara desde Hermes."
+    assert len(calls) == 1 and not synthesis
+    incoming("Nombre completo: Mariana Torres\nCelular: 3001110099", suffix="identity")
+    for _ in range(3):
+        onboarding.tick()
+    assert state(owner)[0]["state"] == "completed"
+    assert [d[0] for d in deliveries] == ["introduction", "confirmation", "website", "group"]
+    assert deliveries[-2][1]["body"]["message"].endswith(onboarding.WEBSITE)
+    assert deliveries[-1][1]["body"]["message"].endswith("https://chat.whatsapp.com/FixtureOnly")
+    incoming("¿Cómo puedo agendar una visita?", suffix="followup")
+    onboarding.tick()
+    assert deliveries[-1][0] == "question"
+    assert deliveries[-1][1]["body"]["message"] == "Respuesta de Sara desde Hermes."
+    assert len(calls) == len(deliveries) == 5
+    assert len(calls[-1]["messages"]) <= 8
+    assert any(m["role"] == "assistant" for m in calls[-1]["messages"])
+    assert calls[-1]["messages"][-1]["content"] == "¿Cómo puedo agendar una visita?"
+    with connect() as db:
+        assert db.execute("SELECT count(*) AS n FROM crm.contacts").fetchone()["n"] == 1
+    onboarding.tick()
+    assert len(calls) == len(deliveries) == 5
+
+
+def test_tiktok_sara_failure_has_no_canned_fallback(tiktok_intake, monkeypatch):
+    from app.hermes import bridge
+
+    incoming, deliveries, synthesis, _events, owner = tiktok_intake
+
+    def unavailable(*args, **kwargs):
+        raise RuntimeError("synthetic unavailable")
+
+    monkeypatch.setattr(bridge, "request", unavailable)
+    incoming("Quiero información")
+    onboarding.tick()
+    onboarding.tick()
+    assert not deliveries and not synthesis
+    assert state(owner)[0]["error"] == "tiktok_generation_unavailable"
+
+
+def test_tiktok_natural_name_requires_confirmation_without_duplicate_lead(tiktok_intake):
+    incoming, deliveries, _synthesis, _events, owner = tiktok_intake
+    incoming()
+    onboarding.tick()
+    incoming("3001110099", suffix="phone-natural")
+    onboarding.tick()
+    incoming("Mariana Torres", suffix="name-natural")
+    onboarding.tick()
+    assert state(owner)[0]["contact_id"] is None
+    assert state(owner)[0]["details"] == {"name": "Mariana Torres", "phone": "+573001110099"}
+    incoming("Confirmo", suffix="confirm-natural")
+    for _ in range(3):
+        onboarding.tick()
+    assert state(owner)[0]["state"] == "completed"
+    assert [item[0] for item in deliveries][-3:] == ["confirmation", "website", "group"]
+    with connect() as db:
+        assert db.execute("SELECT count(*) AS n FROM crm.contacts").fetchone()["n"] == 1
+
+
+def test_tiktok_sara_cannot_send_after_profile_changes_during_generation(
+    tiktok_intake, monkeypatch
+):
+    from app.hermes import bridge
+
+    incoming, deliveries, _synthesis, _events, owner = tiktok_intake
+
+    def changed(*args, **kwargs):
+        from app.sara import profile
+        from app.sara.profile_models import ProfileUpdate
+
+        with connect() as db:
+            admin = db.execute("SELECT * FROM crm.users WHERE username='testadmin'").fetchone()
+            published = profile.get(db)
+            profile.update(
+                db,
+                ProfileUpdate(
+                    version=published["version"], instructions="Nueva instrucción aprobada."
+                ),
+                admin,
+            )
+        return {"ok": True, "tools": 0, "response": "Respuesta antigua."}
+
+    monkeypatch.setattr(bridge, "request", changed)
+    incoming()
+    onboarding.tick()
+    assert not deliveries
+    assert state(owner)[0]["state"] == "blocked"
+
+
+def test_tiktok_sara_stop_during_generation_prevents_any_delivery(tiktok_intake, monkeypatch):
+    from app.hermes import bridge
+
+    incoming, deliveries, _synthesis, _events, owner = tiktok_intake
+
+    def stopped(*args, **kwargs):
+        incoming("SALIR", suffix="stop-model")
+        return {"ok": True, "tools": 0, "response": "No debe salir."}
+
+    monkeypatch.setattr(bridge, "request", stopped)
+    incoming()
+    onboarding.tick()
+    assert not deliveries
+    assert state(owner)[0]["suppressed"] is True
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"ok": True, "tools": 1, "response": "No debe salir."},
+        {"ok": True, "tools": 0, "response": "Entra en https://malicious.invalid"},
+        {"ok": False, "tools": 0, "response": "No debe salir."},
+    ],
+)
+def test_tiktok_untrusted_generation_never_gets_a_fixed_reply(tiktok_intake, monkeypatch, response):
+    from app.hermes import bridge
+
+    incoming, deliveries, _synthesis, _events, owner = tiktok_intake
+    calls = []
+
+    def untrusted(*args, **kwargs):
+        calls.append(args)
+        return response
+
+    monkeypatch.setattr(bridge, "request", untrusted)
+    incoming()
+    onboarding.tick()
+    onboarding.tick()
+    assert not deliveries and len(calls) == 1
+    assert state(owner)[0]["error"] == "tiktok_generation_unavailable"
+
+
+def test_tiktok_sara_payload_respects_public_byte_limits():
+    import json
+
+    from app.social.tiktok_conversation import bounded_payload
+
+    payload = bounded_payload(
+        [{"role": "user", "content": "🌱" * 2000} for _ in range(8)],
+        "🌱" * 2000,
+        "🌱" * 4000,
+    )
+    assert set(payload) == {"messages", "instructions", "knowledge"}
+    assert 1 <= len(payload["messages"]) <= 8
+    assert payload["messages"][-1]["role"] == "user"
+    assert len(json.dumps(payload).encode()) < 24 * 1024
+
+
+@pytest.mark.parametrize("statement", ["Soy de Bogotá", "Soy inversionista en Bogotá"])
+def test_tiktok_location_and_occupation_are_not_registered_names(tiktok_intake, statement):
+    incoming, _deliveries, _synthesis, _events, owner = tiktok_intake
+    incoming()
+    onboarding.tick()
+    incoming("3001110099", suffix="phone-before-statement")
+    onboarding.tick()
+    incoming(statement, suffix="non-name")
+    onboarding.tick()
+    row = state(owner)[0]
+    assert row["details"] == {"phone": "+573001110099"}
+    assert row["contact_id"] is None
+    with connect() as db:
+        assert db.execute("SELECT count(*) AS n FROM crm.contacts").fetchone()["n"] == 0
+        assert db.execute("SELECT count(*) AS n FROM crm.deals").fetchone()["n"] == 0
+        assert (
+            db.execute("SELECT count(*) AS n FROM crm.lead_notice_deliveries").fetchone()["n"] == 0
+        )
+
+
+def test_tiktok_sara_history_keeps_actual_delivery_order(tiktok_intake, monkeypatch):
+    import re
+
+    from app.hermes import bridge
+
+    calls = []
+
+    def sara(path, payload=None, **kwargs):
+        calls.append(copy.deepcopy(payload))
+        phase = re.search(r'"phase":"([a-z]+)"', payload["instructions"])[1]
+        return {"ok": True, "tools": 0, "response": "Sara " + phase}
+
+    monkeypatch.setattr(bridge, "request", sara)
+    incoming, _deliveries, _synthesis, _events, _owner = tiktok_intake
+    incoming("Nombre completo: Mariana Torres\nCelular: 3001110099")
+    for _ in range(4):
+        onboarding.tick()
+    incoming("¿Puedo visitarlos?", suffix="history-order")
+    onboarding.tick()
+    assistant = [
+        m["content"].split("\n")[0] for m in calls[-1]["messages"] if m["role"] == "assistant"
+    ]
+    assert assistant == ["Sara introduction", "Sara confirmation", "Sara website", "Sara group"]

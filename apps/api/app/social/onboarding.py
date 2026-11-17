@@ -13,6 +13,7 @@ from ..crm.database import connect
 from ..crm.models import ContactInput
 from ..crm.services import capture_contact
 from . import config, media, whatsapp_agent, whatsapp_audio, workflow
+from .tiktok_conversation import GenerationUnavailable
 
 SCRIPT = (
     "Hola, soy Sara, asistente comercial del proyecto Jardines del Encanto, ubicado en "
@@ -394,7 +395,12 @@ def _enqueue(db, payload, profile_id, *, earliest):
         "SELECT state,contact_id FROM crm.social_onboarding WHERE profile_id=%s AND account_id=%s AND conversation_id=%s",
         key,
     ).fetchone()
-    if completed and completed["state"] == "completed" and completed["contact_id"]:
+    if (
+        completed
+        and completed["state"] == "completed"
+        and completed["contact_id"]
+        and event["platform"] != "tiktok"
+    ):
         return event["platform"] == "facebook"
     # Serialize participant claims across distinct conversations, including STOP.
     db.execute("SELECT pg_advisory_xact_lock(9142041)")
@@ -420,7 +426,7 @@ def _enqueue(db, payload, profile_id, *, earliest):
     if old:
         if suppressed or old["suppressed"]:
             return True
-        if old["state"] == "completed" and old["contact_id"]:
+        if old["state"] == "completed" and old["contact_id"] and event["platform"] != "tiktok":
             return True
     elif (
         db.execute(
@@ -617,11 +623,12 @@ def tick():
                 row["registration_first"] and not row["identity_confirmed"]
             ):
                 try:
-                    value = details(
-                        row["source"]["text"],
-                        {} if row["platform"] == "tiktok" else source["sender"],
-                        row["details"],
-                    )
+                    if row["platform"] == "tiktok":
+                        from . import tiktok_intake
+
+                        value, tiktok_confirmed = tiktok_intake.identity(row)
+                    else:
+                        value = details(row["source"]["text"], source["sender"], row["details"])
                 except ValueError:
                     value = None  # Ask for corrected identity after the welcome; never guess.
                 if value is not None:
@@ -651,6 +658,8 @@ def tick():
                             in {"si", "confirmo", "correcto", "si confirmo", "si son correctos"}
                         )
                     )
+                    if row["platform"] == "tiktok":
+                        confirmed = tiktok_confirmed
                     if confirmed and set(value) == {"name", "phone"}:
                         db.execute(
                             "UPDATE crm.social_onboarding SET identity_confirmed=true WHERE id=%s",
@@ -658,7 +667,8 @@ def tick():
                         )
                         row["identity_confirmed"] = True
                     if set(value) == {"name", "phone"} and (
-                        not row["registration_first"] or row["identity_confirmed"]
+                        (not row["registration_first"] and row["platform"] != "tiktok")
+                        or row["identity_confirmed"]
                     ):
                         record, deal = capture_contact(
                             db,
@@ -681,7 +691,19 @@ def tick():
                 )
             db.commit()  # Real identity capture never waits for a media delivery.
             if row["state"] in {"unknown", "blocked"}:
-                return
+                if not (
+                    row["platform"] == "tiktok"
+                    and incoming
+                    and row["state"] == "blocked"
+                    and row["error"] == "welcome_not_confirmed"
+                ):
+                    return
+                db.execute(
+                    "UPDATE crm.social_onboarding SET state='waiting',error=NULL WHERE id=%s",
+                    (row["id"],),
+                )
+                row["state"] = "waiting"
+                db.commit()
             if row["platform"] == "tiktok":
                 from . import tiktok_intake
 
@@ -731,6 +753,19 @@ def tick():
                     db.commit()
                     return
                 phase = "question"
+            if row["platform"] == "tiktok":
+                from . import tiktok_conversation
+
+                # Model latency must not block published-profile edits or human takeover.
+                # Keep the worker ordering lock, release only the control session lock.
+                db.execute("SELECT pg_advisory_unlock(2026111105)")
+                db.commit()
+                try:
+                    tiktok_conversation.generate(db, row, phase)
+                finally:
+                    db.rollback()
+                    db.execute("SELECT pg_advisory_lock(2026111105)")
+                    db.commit()
             if phase == "audio":
                 data = cached_audio(db)
                 db.execute(
@@ -765,7 +800,17 @@ def tick():
                     group_receipt=CASE WHEN %s THEN %s ELSE group_receipt END,updated_at=now()
                     WHERE id=%s""",
                     (
-                        "completed" if phase == "group" else target,
+                        "completed"
+                        if phase == "group"
+                        or (
+                            phase == "question"
+                            and row["contact_id"]
+                            and (
+                                row["group_receipt"].get("status") == "accepted"
+                                or not row["welcome_required"]
+                            )
+                        )
+                        else target,
                         phase == "introduction",
                         Jsonb(result.get("receipt", {})),
                         phase == "confirmation",
@@ -810,6 +855,14 @@ def tick():
                 ),
             )
             db.commit()
+        except GenerationUnavailable:
+            db.rollback()
+            if row:
+                db.execute(
+                    "UPDATE crm.social_onboarding SET state='waiting',asked=true,error='tiktok_generation_unavailable' WHERE id=%s",
+                    (row["id"],),
+                )
+                db.commit()
         except Exception:  # noqa: BLE001 - no provider errors, PII or credentials in logs
             db.rollback()
             if row:
