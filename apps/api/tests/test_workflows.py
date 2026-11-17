@@ -565,3 +565,37 @@ def test_multichannel_review_freezes_each_explicit_account_binding(fake_social, 
         ).status_code
         == 422
     )
+
+
+def test_explicit_refusal_stops_a_run_even_when_normal_replies_do_not(fake_social):
+    from app.crm.database import connect
+
+    client, _owner, calls, _changed = fake_social
+    doc = social_doc()
+    doc["stop_on_reply"] = False
+    _person, _, review = prepare_run(client, doc)
+    run = activate(client, review)
+    incoming = {
+        "account_id": "acct",
+        "conversation_id": "conv",
+        "participant_id": "participant",
+        "profile_id": "profile",
+        "platform": "whatsapp",
+        "sent_at": service.now().isoformat(),
+    }
+    with connect() as db:
+        db.execute(
+            "UPDATE crm.workflow_runs SET started_at=%s WHERE id=%s", (service.now(), run["id"])
+        )
+        worker.verified_reply(db, incoming)
+    assert (
+        client.get(f"/crm/workflows/runs/{run['id']}").json()["recipients"][0]["status"] == "active"
+    )
+    with connect() as db:
+        worker.verified_reply(db, incoming, force_stop=True)
+    assert (
+        client.get(f"/crm/workflows/runs/{run['id']}").json()["recipients"][0]["status"]
+        == "stopped"
+    )
+    worker.tick()
+    assert calls == []

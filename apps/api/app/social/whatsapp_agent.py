@@ -175,10 +175,15 @@ def save(db, data, author, owner_id=None):
     old = current(db)
     if data.version != (old["version"] if old else 0):
         raise HTTPException(409, "record_changed")
-    document = data.model_dump(exclude={"version", "enabled", "consent_confirmed", "shared_profile_version"})
+    document = data.model_dump(
+        exclude={"version", "enabled", "consent_confirmed", "shared_profile_version"}
+    )
     published = shared_profile.get(db)
     changed = any(document[key] != published[key] for key in ("instructions", "knowledge"))
-    if data.shared_profile_version is not None and data.shared_profile_version != published["version"]:
+    if (
+        data.shared_profile_version is not None
+        and data.shared_profile_version != published["version"]
+    ):
         raise HTTPException(409, "record_changed")
     if changed:
         initial = old is None and owner_id is not None and published["version"] == 1
@@ -186,9 +191,15 @@ def save(db, data, author, owner_id=None):
             raise HTTPException(409, "shared_configuration_version_required")
         if owner_id is None:
             raise HTTPException(409, "developer_owner_required")
-        shared_profile.update(db, ProfileUpdate(version=published["version"],
-            instructions=document["instructions"], knowledge=document["knowledge"]),
-            {"id": owner_id, "username": author})
+        shared_profile.update(
+            db,
+            ProfileUpdate(
+                version=published["version"],
+                instructions=document["instructions"],
+                knowledge=document["knowledge"],
+            ),
+            {"id": owner_id, "username": author},
+        )
     revision = None
     if data.enabled:
         if not data.consent_confirmed:
@@ -208,7 +219,14 @@ def save(db, data, author, owner_id=None):
         version=excluded.version,enabled=excluded.enabled,enabled_at=excluded.enabled_at,
         document=excluded.document,credential_revision=excluded.credential_revision,
         owner_id=coalesce(excluded.owner_id,crm.whatsapp_agent.owner_id),updated_at=now()""",
-        (version, data.enabled, now() if data.enabled else None, Jsonb(document), revision, owner_id),
+        (
+            version,
+            data.enabled,
+            now() if data.enabled else None,
+            Jsonb(document),
+            revision,
+            owner_id,
+        ),
     )
     db.execute(
         "INSERT INTO crm.whatsapp_agent_revisions(version,document,author) VALUES(%s,%s,%s)",
@@ -251,8 +269,17 @@ def resolve_lesson(lesson_id: UUID, decision: str, data: Resolve, admin: Admin):
             if len(document["knowledge"]) > 4000:
                 raise HTTPException(409, "knowledge_limit")
             # Publishing knowledge pauses the agent; renewed explicit activation follows review.
-            save(db, Update(**document, version=row["version"], enabled=False,
-                shared_profile_version=published["version"]), admin["username"], admin["id"])
+            save(
+                db,
+                Update(
+                    **document,
+                    version=row["version"],
+                    enabled=False,
+                    shared_profile_version=published["version"],
+                ),
+                admin["username"],
+                admin["id"],
+            )
         db.execute(
             "UPDATE crm.whatsapp_agent_lessons SET state=%s,resolved_at=now() WHERE id=%s",
             ("approved" if decision == "approve" else "rejected", lesson_id),
@@ -301,6 +328,10 @@ def normalize(payload, profile):
 def enqueue(db, payload, profile):
     event = normalize(payload, profile)
     if not event:
+        return
+    from . import consent
+
+    if consent.suppressed(db, event):
         return
     lock(db)
     row = current(db)
@@ -368,8 +399,19 @@ def claim():
         ).fetchone()
         if not job:
             return None
-        if (job["agent_version"] != row["version"] or job["sent_at"] < now() - timedelta(minutes=15)
-                or job["shared_profile_version"] != shared_profile.get(db)["version"]):
+        from . import consent
+
+        if consent.suppressed(db, {**job, "platform": "whatsapp"}):
+            db.execute(
+                "UPDATE crm.whatsapp_agent_jobs SET state='blocked',error='recipient_opted_out',finished_at=now() WHERE id=%s",
+                (job["id"],),
+            )
+            return None
+        if (
+            job["agent_version"] != row["version"]
+            or job["sent_at"] < now() - timedelta(minutes=15)
+            or job["shared_profile_version"] != shared_profile.get(db)["version"]
+        ):
             db.execute(
                 "UPDATE crm.whatsapp_agent_jobs SET state='blocked',error='agent_changed_or_expired',finished_at=now() WHERE id=%s",
                 (job["id"],),
@@ -403,18 +445,42 @@ def claim():
 
 
 def source_verified(job, credentials):
+    from . import onboarding
+
     data = workflow._request(
         credentials,
         "messages",
         account_id=job["account_id"],
         conversation_id=job["conversation_id"],
     )
+    matched = False
     for message in workflow._list(data, "messages"):
         # Inbox REST uses `message`; webhook deliveries use `text`. Retain the
         # legacy REST spelling only when it cannot contradict canonical content.
         content = message.get("message", message.get("text"))
         if not isinstance(content, str) or ("text" in message and message["text"] != content):
             continue
+        if (
+            message.get("conversationId") == job["conversation_id"]
+            and message.get("accountId") == job["account_id"]
+            and message.get("platform") == "whatsapp"
+            and message.get("direction") == "incoming"
+            and message.get("senderId") == job["participant_id"]
+            and message.get("isDeleted") is not True
+            and onboarding.opted_out(content)
+        ):
+            from . import consent
+
+            with connect() as db:
+                consent.remember(
+                    db,
+                    {
+                        **job,
+                        "platform": "whatsapp",
+                        "event_id": "history:" + str(message.get("id")),
+                    },
+                )
+            return False
         if (
             message.get("id") == job["message_id"]
             and message.get("conversationId") == job["conversation_id"]
@@ -427,8 +493,8 @@ def source_verified(job, credentials):
             and isinstance(message.get("metadata", {}), dict)
             and not message.get("metadata", {}).get("standby")
         ):
-            return True
-    return False
+            matched = True
+    return matched
 
 
 def generate(job, row):
@@ -457,7 +523,13 @@ def generate(job, row):
             """SELECT content,reply FROM crm.whatsapp_agent_jobs WHERE account_id=%s
             AND conversation_id=%s AND participant_id=%s AND agent_version=%s AND state='completed'
             AND shared_profile_version=%s AND created_at>now()-interval '24 hours' ORDER BY created_at DESC LIMIT 3""",
-            (job["account_id"], job["conversation_id"], job["participant_id"], row["version"], published["version"]),
+            (
+                job["account_id"],
+                job["conversation_id"],
+                job["participant_id"],
+                row["version"],
+                published["version"],
+            ),
         ).fetchall()
     messages = []
     for previous in reversed(history):
@@ -466,10 +538,20 @@ def generate(job, row):
             messages.append({"role": "assistant", "content": previous["reply"]})
     if author:
         from ..hermes import developer as trusted_developer
+
         return trusted_developer.generate(job, row, messages)
     from .whatsapp_audio import public_messages
 
     instructions = shared_profile.instructions(published)
+    instructions += (
+        "\nPuedes recibir respuestas a la campaña jardines_db36df695b5e19dabfbe7ca17b628228_v4. "
+        "Conocer opciones expresa interés; No recibir información, SALIR o un rechazo explícito "
+        "solicitan detener el contacto. La aplicación gestiona las bajas y el flujo inicial: "
+        "audio de bienvenida, solicitud o confirmación de nombre completo y celular, registro "
+        "sin duplicados y después página oficial y grupo del proyecto. No repitas la bienvenida "
+        "ni afirmes que registraste datos, enviaste audio o diste de baja a alguien sin resultado "
+        "confirmado de la aplicación. No inventes enlaces ni condiciones comerciales."
+    )
     messages = public_messages(messages, job["content"], instructions, published["knowledge"])
     result = bridge.request(
         "/public-reply",
@@ -525,10 +607,15 @@ def tick():
             guard.commit()
             try:
                 with connect() as db:
+                    from . import consent
+
+                    if consent.suppressed(db, {**job, "platform": "whatsapp"}):
+                        raise HTTPException(409, "recipient_opted_out")
                     require_connections(db, "hermes", "zernio", "whatsapp")
                     fresh = current(db)
                     state = db.execute(
-                        "SELECT state,shared_profile_version FROM crm.whatsapp_agent_jobs WHERE id=%s", (job["id"],)
+                        "SELECT state,shared_profile_version FROM crm.whatsapp_agent_jobs WHERE id=%s",
+                        (job["id"],),
                     ).fetchone()
                     if (
                         not fresh
@@ -563,10 +650,11 @@ def _loop():
     global _heartbeat
     while not _stop.is_set():
         try:
-            from . import onboarding
+            from . import consent, onboarding
 
             onboarding.tick()
             tick()
+            consent.sync()
             _heartbeat = monotonic()
         except Exception:  # noqa: BLE001 - recover without logging private data
             _heartbeat = 0.0

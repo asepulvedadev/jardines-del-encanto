@@ -7,19 +7,31 @@ retain their existing privileged routing; form names and phone fields grant no a
 
 ## Order and identity
 
+New WhatsApp enrollments, including replies to
+`jardines_db36df695b5e19dabfbe7ca17b628228_v4`, use **audio → identity request or
+confirmation → canonical registration → website → project WhatsApp group**.
+The two links are separate, ordered messages. No template-name claim is inferred
+from a bare “sí”: this safer identity-first rule applies to all new WhatsApp
+enrollments on the configured project account. Developers retain their routing.
+
 1. Authenticate and deduplicate the incoming Zernio webhook.
 2. Re-read the exact original conversation and incoming message from Zernio.
 3. Extract the actual named ad-form fields, regardless of field order. Use verified
-   sender contact details only when the form omits them. Opaque platform identifiers
-   are routing identifiers, never phone numbers. Missing fields produce one concise
-   request for the full name and mobile number; conflicting fields stop intake.
-4. Commit the contact and pipeline record before generating or sending audio.
+   sender details as confirmation candidates, not silent WhatsApp registration.
+   Opaque platform identifiers are routing identifiers, never phone numbers.
+4. Send the existing fixed MP3 welcome with the configured, pinned voice. Then ask
+   for full name and mobile, or show both verified candidates and ask “Confirmo”.
+   Self-declared labeled details may already establish identity. Partial fields
+   survive separate messages. Conflicting details never create a contact.
+5. Commit the canonical contact/deal before sending either link.
    New contacts enter Nuevo. Existing contacts, source and won/contacted stages are
    not overwritten; a normalized phone deduplicates contacts across channels.
-5. Send the owner's fixed welcome as an MP3 attachment using the pinned verified
-   Sofía voice. Synthesize once per immutable script/provider identity and reuse it.
-6. Only after provider acceptance of the audio, send the website and privately
-   configured project-group invitation together in a separate text message.
+6. Send the official website, then the privately configured project-group link.
+   Synthesize audio once per immutable script/provider identity and reuse it.
+
+Migration032 preserves historical enrollment mode and receipts: it does not replay
+old welcomes. Facebook keeps its existing audio → website → group → missing-identity
+question order. The separately configured TikTok text-only flow is unchanged.
 
 WhatsApp source is `whatsapp`; Facebook source is `social_campaign`. The private
 ledger retains the exact account, original thread, participant and event provenance.
@@ -47,8 +59,13 @@ MP3 acceptance is not a delivery/read receipt or a native WhatsApp voice-note gu
 - Reservations commit BEFORE external I/O. An interrupted or ambiguous submission is
   `unknown` and is never automatically replayed. `audio_accepted` resumes with links
   only. `blocked` and `unknown` require operator inspection, not blind resets.
-- Explicit SALIR/STOP and Spanish no-contact requests suppress the thread. This does
-  not constitute a global marketing-consent database or authorize broadcasts.
+- Explicit SALIR/STOP, “No recibir información”, “No gracias”, bare “No” and clear
+  disinterest persist a participant/account/profile/platform refusal. There is no
+  acknowledgement or automatic opt-in. Ordinary negative questions such as “No
+  entiendo el precio” do not unsubscribe the customer. Refusal recording is independent
+  of welcome activation, expiry and public-agent readiness. Refusals commit without waiting behind a network send. Final text, audio and
+  workflow submissions recheck the durable ledger; queued jobs cannot bypass it.
+  A submission already in flight or accepted externally cannot be recalled.
 - At most 1,000 new threads are admitted per rolling 24 hours, with at most10 immutable
   audio cache entries. Raw content and MP3 bytes remain private; no public media URL.
 - This specific fair welcome expires at the end of November22,2026 in Bogotá. It
@@ -58,11 +75,39 @@ MP3 acceptance is not a delivery/read receipt or a native WhatsApp voice-note gu
 
 ## Verification
 
-Run `apps/api/tests/test_social_onboarding.py`, landing registration, WhatsApp agent
+Run `apps/api/tests/test_template_followup.py`, `apps/api/tests/test_social_onboarding.py`, landing registration, WhatsApp agent
 and audio regressions in the isolated disposable PostgreSQL test database, serially.
 The tests cover contact capture, shuffled form fields, opaque identifiers, cross-channel
 phone deduplication, existing won leads, ordered delivery, missing fields, uncertain
 outcomes, source/revocation/handover/window checks and unchanged developer routing.
+
+### Native Zernio broadcast opt-outs
+
+Migration032 adds the private `crm.social_opt_outs` ledger. The existing worker
+attempts one bounded subscription sync at a time. It resolves the original Inbox
+conversation's `contactId`, verifies the exact account/participant channel and only
+PATCHes `isSubscribed: false`. A read-back must confirm it. There is no message,
+opt-in, guessed phone search, extra credential or arbitrary provider route.
+
+Because subscription is contact-wide, contacts with channels belonging to another
+brand/account are blocked for operator review rather than changed globally. Missing
+contact IDs and credential changes also require review. Transient failures retry
+this idempotent unsubscribe at most five times, five minutes apart. Local suppression
+does not wait for remote synchronization and survives later incoming messages.
+Operators must inspect pending/blocked rows and exclude those people manually
+before a native Zernio campaign; do not claim a successful remote unsubscribe from
+the local flag alone. Importing a spreadsheet does not establish commercial opt-in.
+
+Implementation and tests do not deploy, modify an approved template, import the
+owner's real audience or send a live broadcast. Apply migration032 through the
+existing authorized release gate before restarting the application. Before rolling
+back to an older image without these consent guards, pause the WhatsApp worker and
+reconcile pending refusals; an additive schema alone does not preserve old-code safety.
+
+Provider contracts checked 2026-11-17:
+[Contacts lookup](https://docs.zernio.com/contacts/list-contacts),
+[Contact channels and subscription](https://docs.zernio.com/contacts/get-contact),
+[Subscription update](https://docs.zernio.com/platforms/whatsapp/contacts).
 
 Official contracts: [inbox message send](https://docs.zernio.com/messages/send-inbox-message),
 [Facebook inbox](https://docs.zernio.com/platforms/facebook/inbox),

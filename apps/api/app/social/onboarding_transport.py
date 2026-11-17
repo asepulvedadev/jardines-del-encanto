@@ -8,7 +8,7 @@ from uuid import UUID
 from ..crm.database import connect
 from ..inbox import provider, service
 from ..inbox.models import Execute, validate
-from . import audio_media, config, media, onboarding, workflow
+from . import audio_media, config, consent, media, onboarding, workflow
 from .transport import https_connection
 
 
@@ -104,7 +104,7 @@ def _verified_source(db, row, cfg, credentials):
             raise ValueError("welcome_recovery_history_incomplete")
         accepted = {
             row[column].get("message_id")
-            for column in ("audio_receipt", "website_receipt", "group_receipt")
+            for column in ("audio_receipt", "website_receipt", "group_receipt", "question_receipt")
             if row[column].get("status") == "accepted"
         }
         if any(
@@ -148,6 +148,9 @@ def _verified_source(db, row, cfg, credentials):
         if not isinstance(metadata, dict) or metadata.get("standby"):
             raise ValueError("welcome_message_standby")
         if onboarding.opted_out(message.get("message") or ""):
+            from . import consent
+
+            consent.remember(db, {**row["source"], "event_id": "history:" + str(message.get("id"))})
             if row["id"] is not None:
                 db.execute(
                     "UPDATE crm.social_onboarding SET suppressed=true WHERE id=%s", (row["id"],)
@@ -247,7 +250,8 @@ def execute(operation, identifier):
     }:
         raise ValueError("invalid_welcome_operation")
     with connect() as db, config.locked():
-        # Serialize the final source check and bounded send with authenticated opt-outs.
+        # Serialize welcome submissions; refusal intake deliberately never waits on this lock.
+        db.execute("SELECT pg_advisory_xact_lock(9142041)")
         row = db.execute(
             "SELECT * FROM crm.social_onboarding WHERE id=%s FOR UPDATE", (identifier,)
         ).fetchone()
@@ -288,9 +292,21 @@ def execute(operation, identifier):
             raise ValueError("welcome_audio_required")
         if phase == "group" and row["website_receipt"].get("status") != "accepted":
             raise ValueError("welcome_website_required")
+        if row["registration_first"]:
+            if phase in {"website", "group"} and (
+                not row["contact_id"] or not row["identity_confirmed"]
+            ):
+                raise ValueError("welcome_registration_required")
+            if (
+                phase == "question"
+                and row["welcome_required"]
+                and row["audio_receipt"].get("status") != "accepted"
+            ):
+                raise ValueError("welcome_audio_required")
         if (
             phase == "question"
             and row["platform"] != "tiktok"
+            and not row["registration_first"]
             and row["welcome_required"]
             and not any(
                 row[column].get("status") == "accepted"
@@ -298,6 +314,8 @@ def execute(operation, identifier):
             )
         ):
             raise ValueError("welcome_group_required")
+        if consent.suppressed(db, row):
+            raise ValueError("welcome_suppressed")
         if phase == "audio":
             accepted = transmit_audio(row, credentials)
         else:
@@ -313,6 +331,18 @@ def execute(operation, identifier):
                 messages.update(
                     introduction=tiktok_intake.INTRODUCTION, confirmation=tiktok_intake.CONFIRMATION
                 )
+            if row["registration_first"] and phase == "question":
+                candidate = row["details"]
+                if set(candidate) == {"name", "phone"}:
+                    messages["question"] = (
+                        f"Para registrarte, ¿confirmas que tu nombre completo es {candidate['name']} "
+                        f"y tu celular es {candidate['phone']}? Responde Confirmo o corrige los datos: "
+                        "Nombre completo: … Celular: …"
+                    )
+                else:
+                    messages["question"] = (
+                        "Para registrarte, envíame tu nombre completo y número de celular. Puedes escribir: Nombre completo: … Celular: …"
+                    )
             message = messages[phase]
             command = Execute(
                 operation="sendInboxMessage",
@@ -324,6 +354,8 @@ def execute(operation, identifier):
             key = "sara-welcome-" + identifier
             if row["platform"] == "tiktok" and phase == "question":
                 key += "-" + workflow._digest(row["source"]["message_id"])[:16]
+            if consent.suppressed(db, row):
+                raise ValueError("welcome_suppressed")
             result = provider.request(credentials, spec, args, key=key + "-" + phase)
             accepted = receipt(result, row["conversation_id"])
         return {"state": "completed", "receipt": accepted}

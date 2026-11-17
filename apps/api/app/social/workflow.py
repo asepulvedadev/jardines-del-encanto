@@ -619,7 +619,9 @@ def check(plan):
 def dispatch(plan, request_id):
     """Exactly one attempt after caller's committed reservation; NEVER retry unknown."""
     _identifier(request_id, 200)
-    with config.locked():
+    from . import consent
+
+    with config.locked(), consent.sending(plan):
         credentials = config.required()
         _check(plan, credentials)
         try:

@@ -437,6 +437,14 @@ async def webhook(request: Request):
             (event_id, event, profile, platform, Jsonb(payload), body_hash),
         ).fetchone()
         if record:
+            from . import onboarding
+
+            # Commit the refusal independently before any workflow/control lock.
+            # A pending opt-out must not wait behind a sequence about to submit.
+            with connect() as consent_db:
+                refused = onboarding.record_refusal(
+                    consent_db, onboarding.normalize(payload, profile)
+                )
             from . import lead_capture, lead_capture_worker
 
             # Intake does not depend on an LLM or the outgoing agent queue.
@@ -451,7 +459,7 @@ async def webhook(request: Request):
             from ..workflows.worker import verified_reply
             from .workflow import normalize_event
 
-            verified_reply(db, normalize_event(payload))
+            verified_reply(db, normalize_event(payload), force_stop=refused)
             from .onboarding import enqueue as onboard
             from .whatsapp_agent import enqueue
 

@@ -52,7 +52,11 @@ def public_messages(history, text, instructions, knowledge):
 
 
 def _source(db, job, row, expected_state):
+    from . import consent
     from . import whatsapp_agent as agent
+
+    if consent.suppressed(db, {**job, "platform": "whatsapp"}):
+        raise HTTPException(409, "recipient_opted_out")
 
     control.require_connections(db, "hermes", "zernio", "whatsapp", "elevenlabs")
     control.require_capability(db, "voice.execute")

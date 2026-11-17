@@ -110,8 +110,10 @@ def multipart(plan, data):
 
 
 def submit(plan, data, request_id):
+    from . import consent
+
     workflow._identifier(request_id, 200)
-    with config.locked():
+    with config.locked(), consent.sending(plan["reply"]):
         credentials = config.required()
         check(plan, data, credentials, remote=False)
         try:

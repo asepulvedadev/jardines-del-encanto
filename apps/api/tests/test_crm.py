@@ -36,7 +36,7 @@ def authenticated(monkeypatch):
     migrate(owner_url)
     password = secrets.token_urlsafe(24)
     with psycopg.connect(owner_url) as db:
-        db.execute("TRUNCATE crm.users, crm.login_limits, crm.contacts CASCADE")
+        db.execute("TRUNCATE crm.users, crm.login_limits, crm.contacts, crm.social_opt_outs CASCADE")
         db.execute(
             "INSERT INTO crm.users (username, password_hash) VALUES (%s, %s)",
             ("testadmin", password_hash.hash(password)),

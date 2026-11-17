@@ -360,13 +360,14 @@ def tick():
     return True
 
 
-def verified_reply(db, normalized):
+def verified_reply(db, normalized, *, force_stop=False):
     """Only called after existing webhook authentication and first deduplicated insert."""
     if not normalized:
         return
     control.lock(db)
     rows = db.execute(
-        "SELECT * FROM crm.workflow_runs WHERE status IN ('active','paused') AND snapshot->'document'->>'stop_on_reply'='true' FOR UPDATE"
+        "SELECT * FROM crm.workflow_runs WHERE status IN ('active','paused') AND (snapshot->'document'->>'stop_on_reply'='true' OR %s) FOR UPDATE",
+        (force_stop,),
     ).fetchall()
     for row in rows:
         if not row["started_at"]:

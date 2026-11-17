@@ -36,12 +36,23 @@ def folded(text):
 
 
 def opted_out(text):
+    value = folded(text).strip()
+    if re.fullmatch(
+        r"(?:no(?:,?\s+gracias)?|no me interesa|no estoy interesad[oa]|cancelar|cancel|unsubscribe|salir|stop|baja)[.!\s]*",
+        value,
+    ):
+        return True
+    if re.search(
+        r"\b(?:no (?:me interesa|estoy interesad[oa])|(?:borra|elimina)me de (?:la |tu )?lista|deja de escribirme)\b",
+        value,
+    ):
+        return True
     return bool(
         re.search(
-            r"(?:^\s*(?:salir|stop|baja)\s*[.!]?\s*$|\bno (?:recibir mas|me contacten|"
+            r"(?:^\s*(?:salir|stop|baja)\s*[.!]?\s*$|\bno (?:recibir (?:mas|informacion)|me contacten|"
             r"quiero (?:mas mensajes|informacion|que me contacten)|"
-            r"deseo recibir (?:mas )?mensajes|me (?:escriban|escribas|vuelvas a escribir)|mas mensajes)\b)",
-            folded(text),
+            r"deseo (?:(?:recibir )?(?:mas )?(?:mensajes|informacion))|me (?:escriban|escribas|vuelvas a escribir)|mas mensajes)\b)",
+            value,
         )
     )
 
@@ -54,6 +65,14 @@ def valid_name(value):
         "quiero informacion",
         "buenos dias",
         "buenas tardes",
+        "conocer opciones",
+        "muchas gracias",
+        "por favor",
+        "si me interesa",
+        "me interesa",
+        "quiero conocer",
+        "quiero conocer opciones",
+        "mas informacion",
     }:
         return None
     return value
@@ -283,6 +302,7 @@ def recover_unanswered(db, event_id, *, actor_id):
             "audio_receipt": {},
             "website_receipt": {},
             "group_receipt": {},
+            "question_receipt": {},
         }
         # Upstream reads must never hold the shared enrollment lock: fresh public
         # webhooks continue enrolling while the operator checks this candidate.
@@ -310,11 +330,42 @@ def recover_unanswered(db, event_id, *, actor_id):
         return {"state": "queued", "id": str(row["id"]), "platform": row["platform"]}
 
 
+def record_refusal(db, event):
+    """Persist a verified, owned-channel refusal even when welcome delivery is disabled."""
+    if not event or not opted_out(event["text"]):
+        return False
+    from . import consent
+
+    cfg = settings(db, event["platform"])
+    current = whatsapp_agent.current(db)
+    owned = bool(
+        cfg
+        and cfg["profile_id"] == event["profile_id"]
+        and cfg["accounts"].get(event["account_id"]) == event["platform"]
+    )
+    owned = owned or bool(
+        event["platform"] == "whatsapp"
+        and current
+        and current["document"]["account_id"] == event["account_id"]
+    )
+    if not owned:
+        return False
+    consent.remember(db, event)
+    return True
+
+
 def _enqueue(db, payload, profile_id, *, earliest):
     event = normalize(payload, profile_id)
     if not event:
         return False
     cfg = settings(db, event["platform"])
+    from . import consent
+
+    current = whatsapp_agent.current(db)
+    if record_refusal(db, event):
+        return True  # No acknowledgement, welcome, LLM fallback or automatic re-subscribe.
+    if consent.suppressed(db, event):
+        return True
     if (
         not cfg
         or not cfg["enabled"]
@@ -324,7 +375,6 @@ def _enqueue(db, payload, profile_id, *, earliest):
         return False
     if cfg["accounts"].get(event["account_id"]) != event["platform"]:
         return False
-    current = whatsapp_agent.current(db)
     if (
         event["platform"] == "whatsapp"
         and current
@@ -338,6 +388,14 @@ def _enqueue(db, payload, profile_id, *, earliest):
     if not max(cfg["enabled_at"], earliest) < sent <= datetime.now(UTC):
         return True
     key = (profile_id, event["account_id"], event["conversation_id"])
+    # A completed thread falls back without retaining the enrollment lock while
+    # acquiring the public-worker lock; final sends still recheck durable consent.
+    completed = db.execute(
+        "SELECT state,contact_id FROM crm.social_onboarding WHERE profile_id=%s AND account_id=%s AND conversation_id=%s",
+        key,
+    ).fetchone()
+    if completed and completed["state"] == "completed" and completed["contact_id"]:
+        return event["platform"] == "facebook"
     # Serialize participant claims across distinct conversations, including STOP.
     db.execute("SELECT pg_advisory_xact_lock(9142041)")
     old = db.execute(
@@ -363,7 +421,7 @@ def _enqueue(db, payload, profile_id, *, earliest):
         if suppressed or old["suppressed"]:
             return True
         if old["state"] == "completed" and old["contact_id"]:
-            return event["platform"] == "facebook"
+            return True
     elif (
         db.execute(
             "SELECT count(*) AS n FROM crm.social_onboarding WHERE created_at>now()-interval '24 hours'"
@@ -374,8 +432,8 @@ def _enqueue(db, payload, profile_id, *, earliest):
     if not old:
         old = db.execute(
             """INSERT INTO crm.social_onboarding(profile_id,account_id,conversation_id,participant_id,
-            platform,config_version,source,suppressed,welcome_required)
-            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
+            platform,config_version,source,suppressed,welcome_required,registration_first)
+            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *""",
             (
                 *key,
                 event["participant_id"],
@@ -384,6 +442,7 @@ def _enqueue(db, payload, profile_id, *, earliest):
                 Jsonb(event),
                 suppressed,
                 not bool(claim),
+                event["platform"] == "whatsapp",
             ),
         ).fetchone()
         if not claim:
@@ -407,6 +466,17 @@ def _enqueue(db, payload, profile_id, *, earliest):
 
 
 def participant_suppressed(db, participant):
+    from . import consent
+
+    if consent.suppressed(
+        db,
+        dict(
+            zip(
+                ("profile_id", "account_id", "platform", "participant_id"), participant, strict=True
+            )
+        ),
+    ):
+        return True
     return bool(
         db.execute(
             "SELECT 1 FROM crm.social_onboarding WHERE (profile_id,account_id,platform,participant_id)=(%s,%s,%s,%s) AND suppressed LIMIT 1",
@@ -543,7 +613,9 @@ def tick():
                 db.commit()
             guard(db, row)
             source = check(row)
-            if not row["contact_id"]:
+            if not row["contact_id"] or (
+                row["registration_first"] and not row["identity_confirmed"]
+            ):
                 try:
                     value = details(
                         row["source"]["text"],
@@ -553,19 +625,41 @@ def tick():
                 except ValueError:
                     value = None  # Ask for corrected identity after the welcome; never guess.
                 if value is not None:
-                    # Existing channels retain their prompted plain-name fallback; TikTok requires a labeled name.
+                    # A prompted plain name is customer-supplied evidence, unlike sender metadata.
+                    provided_name = None
                     if (
                         row["platform"] != "tiktok"
                         and row["asked"]
                         and "name" not in value
                         and valid_name(row["source"]["text"])
                     ):
-                        value["name"] = valid_name(row["source"]["text"])
+                        provided_name = valid_name(row["source"]["text"])
+                        value["name"] = provided_name
                     db.execute(
                         "UPDATE crm.social_onboarding SET details=%s WHERE id=%s",
                         (Jsonb(value), row["id"]),
                     )
-                    if set(value) == {"name", "phone"}:
+                    row["details"] = value
+                    explicit = details(row["source"]["text"], {}, {})
+                    confirmed = (
+                        set(explicit) == {"name", "phone"}
+                        or bool(provided_name)
+                        or (row["asked"] and bool(explicit))
+                        or (
+                            row["asked"]
+                            and folded(row["source"]["text"]).strip(" .!")
+                            in {"si", "confirmo", "correcto", "si confirmo", "si son correctos"}
+                        )
+                    )
+                    if confirmed and set(value) == {"name", "phone"}:
+                        db.execute(
+                            "UPDATE crm.social_onboarding SET identity_confirmed=true WHERE id=%s",
+                            (row["id"],),
+                        )
+                        row["identity_confirmed"] = True
+                    if set(value) == {"name", "phone"} and (
+                        not row["registration_first"] or row["identity_confirmed"]
+                    ):
                         record, deal = capture_contact(
                             db,
                             ContactInput(
@@ -596,6 +690,29 @@ def tick():
                     db.execute(
                         "UPDATE crm.social_onboarding SET state=%s WHERE id=%s",
                         ("completed" if row["contact_id"] else "waiting", row["id"]),
+                    )
+                    db.commit()
+                    return
+            elif row["registration_first"]:
+                if row["welcome_required"] and row["audio_receipt"].get("status") != "accepted":
+                    phase = "audio"
+                elif not row["identity_confirmed"] or not row["contact_id"]:
+                    phase = None if row["asked"] else "question"
+                elif row["welcome_required"] and row["website_receipt"].get("status") != "accepted":
+                    phase = "website"
+                elif row["welcome_required"] and row["group_receipt"].get("status") != "accepted":
+                    phase = "group"
+                else:
+                    phase = None
+                if phase is None:
+                    db.execute(
+                        "UPDATE crm.social_onboarding SET state=%s WHERE id=%s",
+                        (
+                            "completed"
+                            if row["contact_id"] and row["identity_confirmed"]
+                            else "waiting",
+                            row["id"],
+                        ),
                     )
                     db.commit()
                     return
@@ -676,6 +793,7 @@ def tick():
                 audio_receipt=CASE WHEN %s THEN %s ELSE audio_receipt END,
                 website_receipt=CASE WHEN %s THEN %s ELSE website_receipt END,
                 group_receipt=CASE WHEN %s THEN %s ELSE group_receipt END,
+                question_receipt=CASE WHEN %s THEN %s ELSE question_receipt END,
                 audio=NULL,updated_at=now() WHERE id=%s""",
                 (
                     target,
@@ -685,6 +803,8 @@ def tick():
                     phase == "website",
                     Jsonb(result.get("receipt", {})),
                     phase == "group",
+                    Jsonb(result.get("receipt", {})),
+                    phase == "question",
                     Jsonb(result.get("receipt", {})),
                     row["id"],
                 ),

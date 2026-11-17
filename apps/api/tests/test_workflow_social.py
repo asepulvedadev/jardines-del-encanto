@@ -26,6 +26,11 @@ NODE = {
 
 @pytest.fixture
 def vendor(monkeypatch):
+    from app.social import consent
+
+    # Pure transport-contract tests have no database. Durable consent is exercised
+    # separately through signed webhooks and a disposable PostgreSQL database.
+    monkeypatch.setattr(consent,'sending',lambda row:nullcontext())
     state = {
         "credentials": {
             "api_key": "private-key-never-return",

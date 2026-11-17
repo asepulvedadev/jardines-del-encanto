@@ -220,18 +220,21 @@ def state(owner):
 
 
 @pytest.mark.parametrize("platform", ["whatsapp", "facebook"])
-def test_first_hello_gets_audio_website_group_before_registration_question(intake, platform):
+def test_first_hello_respects_channel_registration_order(intake, platform):
     incoming, deliveries, synthesis, _events, owner = intake
     incoming(platform, text="Hola")
     for _ in range(3):
         onboarding.tick()
-    assert [item[0] for item in deliveries] == ["audio", "website", "group"]
+    expected = ["audio", "question"] if platform == "whatsapp" else ["audio", "website", "group"]
+    assert [item[0] for item in deliveries] == expected
     assert state(owner)[0]["state"] == "waiting"
     with psycopg.connect(owner) as db:
         assert db.execute("SELECT count(*) FROM crm.contacts").fetchone()[0] == 0
     assert len(synthesis) == 1
     onboarding.tick()
-    assert [item[0] for item in deliveries] == ["audio", "website", "group", "question"]
+    assert [item[0] for item in deliveries] == (
+        expected if platform == "whatsapp" else [*expected, "question"]
+    )
 
 
 def test_same_participant_in_a_new_thread_never_repeats_welcome(intake):
@@ -506,9 +509,9 @@ def test_missing_identity_is_requested_after_welcome_and_captured_without_replay
     for _ in range(4):
         onboarding.tick()
     assert state(owner)[0]["state"] == "waiting"
-    assert [d[0] for d in deliveries] == ["audio", "website", "group", "question"]
-    assert deliveries[3][1]["body"]["message"] == (
-        "Hola, soy Sara. Para registrarte, envíame tu nombre completo y número de celular. "
+    assert [d[0] for d in deliveries] == ["audio", "question"]
+    assert deliveries[1][1]["body"]["message"] == (
+        "Para registrarte, envíame tu nombre completo y número de celular. "
         "Puedes escribir: Nombre completo: … Celular: …"
     )
     assert len(synthesis) == 1
@@ -522,7 +525,7 @@ def test_missing_identity_is_requested_after_welcome_and_captured_without_replay
     onboarding.tick()
     onboarding.tick()
     assert state(owner)[0]["state"] == "completed"
-    assert [d[0] for d in deliveries] == ["audio", "website", "group", "question"]
+    assert [d[0] for d in deliveries] == ["audio", "question", "website", "group"]
 
 
 def test_unknown_audio_never_retries_or_sends_links(intake, monkeypatch):
@@ -695,38 +698,33 @@ def test_final_submission_and_opt_out_share_the_same_row_lock(intake, monkeypatc
 
 def test_simultaneous_first_contact_cannot_discard_a_stop(intake):
     from concurrent.futures import ThreadPoolExecutor
-    from threading import Event
 
-    _incoming, _deliveries, _synthesis, _events, owner = intake
+    _incoming, deliveries, _synthesis, _events, owner = intake
     first = payload("573001110099")
     first["message"]["text"] = "Full name: Mariana Torres Phone number: 3001110099"
     stop = copy.deepcopy(first)
     stop["id"] = "concurrent-stop"
     stop["message"]["platformMessageId"] = "concurrent-stop-source"
     stop["message"]["text"] = "No quiero que me contacten"
-    awaiting_quota = Event()
-
-    class ObservedConnection:
-        def __init__(self, db):
-            self.db = db
-
-        def execute(self, sql, *args):
-            if "pg_advisory_xact_lock(9142041)" in sql:
-                awaiting_quota.set()
-            return self.db.execute(sql, *args)
 
     def suppress():
         with connect() as db:
-            return onboarding.enqueue(ObservedConnection(db), stop, "a" * 24)
+            return onboarding.enqueue(db, stop, "a" * 24)
 
     with connect() as db, ThreadPoolExecutor(max_workers=1) as pool:
         assert onboarding.enqueue(db, first, "a" * 24)
-        future = pool.submit(suppress)
-        assert awaiting_quota.wait(timeout=3)
+        # Refusal commits before enrollment releases its lock, not after a retry.
+        assert pool.submit(suppress).result(timeout=2)
         db.commit()
-        assert future.result(timeout=5)
     rows = state(owner)
-    assert len(rows) == 1 and rows[0]["suppressed"]
+    assert len(rows) == 1
+    with connect() as db:
+        assert onboarding.participant_suppressed(
+            db,
+            tuple(rows[0][k] for k in ("profile_id", "account_id", "platform", "participant_id")),
+        )
+    onboarding.tick()
+    assert deliveries == []
 
 
 def test_elapsed_fair_does_not_take_over_future_customer_conversations(intake, monkeypatch):
@@ -893,7 +891,9 @@ def test_operator_recovers_only_signed_unanswered_welcome_once(intake, configure
         onboarding.recover_unanswered(db, event["id"], actor_id=actor)
     for _ in range(3):
         onboarding.tick()
-    assert [d[0] for d in deliveries] == ["audio", "website", "group"]
+    assert [d[0] for d in deliveries] == (
+        ["audio", "question"] if platform == "whatsapp" else ["audio", "website", "group"]
+    )
     assert state(owner)[0]["recovery_event_id"] == event["id"]
 
 
@@ -986,8 +986,8 @@ def test_recovery_rechecks_manual_reply_before_each_remaining_phase(
         onboarding.tick()
     manual = True
     onboarding.tick()
-    assert [d[0] for d in deliveries] == ["audio", "website"][:phase_count]
-    assert state(owner)[0]["state"] == "blocked"
+    assert [d[0] for d in deliveries] == ["audio", "question"][:phase_count]
+    assert state(owner)[0]["state"] == ("waiting" if phase_count == 2 else "blocked")
 
 
 def test_recovery_requires_an_actual_signed_receipt(intake, configured):
@@ -1079,7 +1079,11 @@ def test_ambiguous_identity_never_blocks_welcome_or_creates_a_contact(intake, pl
     )
     for _ in range(4):
         onboarding.tick()
-    assert [d[0] for d in deliveries] == ["audio", "website", "group", "question"]
+    assert [d[0] for d in deliveries] == (
+        ["audio", "question"]
+        if platform == "whatsapp"
+        else ["audio", "website", "group", "question"]
+    )
     row = state(owner)[0]
     assert row["contact_id"] is None and row["details"] == {}
     with psycopg.connect(owner) as db:
@@ -1099,13 +1103,13 @@ def test_operator_recovers_proven_pre_send_blocked_row_without_replaying_a_recei
         assert onboarding.recover_unanswered(db, event["id"], actor_id=actor)["state"] == "queued"
     for _ in range(3):
         onboarding.tick()
-    assert [d[0] for d in deliveries] == ["audio", "website", "group"]
+    assert [d[0] for d in deliveries] == ["audio", "question"]
     assert len(state(owner)) == 1
     with connect() as db:
         db.execute("UPDATE crm.social_onboarding SET state='blocked'")
     with connect() as db, pytest.raises(ValueError, match="recovery_existing_history"):
         onboarding.recover_unanswered(db, event["id"], actor_id=actor)
-    assert len(deliveries) == 3
+    assert len(deliveries) == 2
 
 
 @pytest.fixture
@@ -1352,6 +1356,12 @@ def test_tiktok_live_guards_prevent_sends(tiktok_intake, monkeypatch, kind):
     monkeypatch.setattr(onboarding_transport.provider, "request", altered)
     onboarding.tick()
     assert not deliveries and not synthesis
+    if kind == "stop":
+        with connect() as db:
+            assert db.execute(
+                "SELECT 1 FROM crm.social_opt_outs WHERE platform='tiktok'"
+            ).fetchone()
+        return
     assert state(owner)[0]["state"] in {"blocked", "unknown", "pending"}
 
 

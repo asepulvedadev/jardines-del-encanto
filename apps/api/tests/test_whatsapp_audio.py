@@ -143,6 +143,8 @@ def audio_setup(configured, monkeypatch):
             "kind": "social_message",
             "platform": "whatsapp",
             "account_id": source["account_id"],
+            'profile_id': c['profile_id'],
+            'participant_id': source['participant_id'],
             "conversation_id": source["conversation_id"],
             "credential_revision": workflow._digest(c),
             "payload": {"accountId": source["account_id"], "message": text},
