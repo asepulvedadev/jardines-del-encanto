@@ -135,6 +135,14 @@ production provider-secret location. Compose parsing does not read the key or
 activate services. Do not bring this stack up or copy credentials to a destination
 without explicit owner authorization for that destination and operation.
 
+## Read-only analytics compatibility
+
+The strict operator protocol accepts the existing `analytics.summary` broker action
+for read-only landing metrics. This keeps API capability manifests compatible with
+both operator services; it does not grant analytics configuration/export or bypass
+the broker's per-run action list, connection checks, or developer authorization.
+Roll out `operator_protocol.py` to both provider and bridge together with the API.
+
 ## Shared ElevenLabs voice actions
 
 The local voice integration adds only `voice.catalog` and `voice.execute` to the

@@ -10,7 +10,7 @@ MAX_TEXT = 20000
 MAX_CALLS = 12
 # Leave room for a final summary after a multi-step extension lifecycle.
 MAX_ITERATIONS = 8
-ACTIONS = frozenset({'crm.workspace', 'crm.activities', 'crm.contact.create', 'crm.contact.update',
+ACTIONS = frozenset({'analytics.summary', 'crm.workspace', 'crm.activities', 'crm.contact.create', 'crm.contact.update',
     'crm.deal.update', 'crm.note.create', 'crm.task.create', 'crm.task.update', 'control.catalog',
     'control.item.create', 'control.item.update', 'control.connection.update', 'social.status',
     'social.sync', 'social.connect', 'control.extension.create', 'control.extension.update',
