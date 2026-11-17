@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test, beforeEach, afterEach } from "node:test";
 import { GET, POST } from "../apps/web/app/api/crm/[...path]/route.ts";
-import { csvHeaders } from "../apps/web/components/crm/broadcast-model.ts";
+import { csvHeaders, leadCohortFilter } from "../apps/web/components/crm/broadcast-model.ts";
 const originalFetch = globalThis.fetch,
   originalBase = process.env.API_BASE_URL,
   originalOrigin = process.env.CRM_ORIGIN;
@@ -121,4 +121,11 @@ test("shared workspace and existing campaigns routes remain unchanged", async ()
     calls[2].url,
     "http://private-api:8000/crm/analytics/summary?days=7",
   );
+});
+
+test("lead cohort filters never pass reserved labels as campaign UUIDs", () => {
+  assert.deepEqual(leadCohortFilter("template"), {cohort:"template"});
+  assert.deepEqual(leadCohortFilter("campaign"), {cohort:"campaign"});
+  assert.deepEqual(leadCohortFilter("cold"), {cold_only:true});
+  assert.deepEqual(leadCohortFilter("fixture-uuid"), {campaign_id:"fixture-uuid"});
 });

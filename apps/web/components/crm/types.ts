@@ -21,6 +21,8 @@ export type Contact = {
   version: number;
   created_at: string;
   registration_code?: string | null;
+  template_lead?: boolean;
+  template_tags?: string[];
   cold_lead?: boolean;
   broadcast_tags?: string[];
 };
@@ -57,6 +59,7 @@ export type WorkspaceData = {
     contacts: number;
     cold_leads?: number;
     campaign_leads?: number;
+    template_leads?: number;
     active: number;
     won: number;
     pending: number;

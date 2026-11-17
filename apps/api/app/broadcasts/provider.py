@@ -12,9 +12,13 @@ _ALLOWED = re.compile(
     r"^/v1/(?:whatsapp/templates\?accountId=[a-zA-Z0-9_-]{1,160}&status=APPROVED|contacts/bulk|broadcasts(?:/[a-f0-9]{24}(?:/recipients(?:\?limit=100&skip=[0-9]{1,4})?|/send)?)?)$"
 )
 
+# Additive list pagination is GET-only; existing mutation routes are unchanged.
+_READ_LIST = re.compile(r"^/v1/broadcasts\?limit=100&skip=[0-9]{1,4}$")
+
 
 def request(credentials, method, path, payload=None):
-    if not _ALLOWED.fullmatch(path) or method not in {"GET", "POST"}:
+    paginated_read = method == "GET" and payload is None and _READ_LIST.fullmatch(path)
+    if not paginated_read and (not _ALLOWED.fullmatch(path) or method not in {"GET", "POST"}):
         raise HTTPException(422, "broadcast_invalid_route")
     connection = None
     try:

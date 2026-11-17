@@ -7,6 +7,7 @@ import { AnalyticsPanel } from "./analytics-panel";
 import { VoiceWorkspace } from "./voice-workspace";
 import { WorkflowPanel } from "./workflow-panel";
 import { InboxPanel } from "./inbox-panel";
+import { leadCohortFilter } from "./broadcast-model";
 import { BroadcastPanel } from "./broadcast-panel";
 import { CampaignPanel } from "./campaign-panel";
 import { SaraPanel } from "./sara-panel";
@@ -98,7 +99,7 @@ export function Workspace({
       const value = query.toLocaleLowerCase("es").trim();
       return (
         !value ||
-        `${contact.name} ${contact.phone} ${sourceLabel(contact.source)}`
+        `${contact.name} ${contact.phone} ${contact.template_lead ? "Template · WhatsApp" : sourceLabel(contact.source)}`
           .toLocaleLowerCase("es")
           .includes(value)
       );
@@ -136,12 +137,7 @@ export function Workspace({
       await request<WorkspaceData>(
         broadcastFilter ? "broadcasts/filter" : "workspace",
         broadcastFilter ? "POST" : "GET",
-        broadcastFilter
-          ? {
-              campaign_id: broadcastFilter === "cold" ? null : broadcastFilter,
-              cold_only: broadcastFilter === "cold",
-            }
-          : undefined,
+        broadcastFilter ? leadCohortFilter(broadcastFilter) : undefined,
       ),
     );
   }, [request, broadcastFilter]);
@@ -155,12 +151,7 @@ export function Workspace({
         await request<WorkspaceData>(
           value ? "broadcasts/filter" : "workspace",
           value ? "POST" : "GET",
-          value
-            ? {
-                campaign_id: value === "cold" ? null : value,
-                cold_only: value === "cold",
-              }
-            : undefined,
+          value ? leadCohortFilter(value) : undefined,
         ),
       );
       setBroadcastFilter(value);
@@ -620,14 +611,19 @@ export function Workspace({
                 aria-label="Origen de los leads"
               >
                 <div>
-                  <span>Leads en frío · WhatsApp masivo</span>
+                  <span>Base importada · En frío</span>
                   <strong>{data.counts.cold_leads ?? 0}</strong>
                   <small>Nuevos contactos importados por CSV.</small>
                 </div>
                 <div>
-                  <span>Leads de campañas de redes</span>
+                  <span>Campañas · Redes sociales</span>
                   <strong>{data.counts.campaign_leads ?? 0}</strong>
-                  <small>Origen campaña de redes, sin leads en frío.</small>
+                  <small>Sin contactos de templates ni importaciones en frío.</small>
+                </div>
+                <div>
+                  <span>Templates · WhatsApp</span>
+                  <strong>{data.counts.template_leads ?? 0}</strong>
+                  <small>Respuestas verificadas. No cuenta destinatarios del envío.</small>
                 </div>
               </section>
               <div className="crm-overview-grid">
@@ -760,7 +756,7 @@ export function Workspace({
               </div>
               {(view === "pipeline" || view === "contacts") && (
                 <label className="crm-broadcast-filter">
-                  Etiqueta de campaña
+                  Origen o etiqueta
                   <select
                     value={broadcastFilter}
                     disabled={pending}
@@ -769,6 +765,8 @@ export function Workspace({
                     }
                   >
                     <option value="">Todos los leads</option>
+                    <option value="campaign">Campañas · Redes sociales</option>
+                    <option value="template">Templates · WhatsApp</option>
                     <option value="cold">
                       Leads en frío · WhatsApp masivo
                     </option>
@@ -877,14 +875,14 @@ export function Workspace({
                                         {phoneLabel(contact.phone)}
                                       </span>
                                       <span className="crm-source-tag">
-                                        {sourceLabel(contact.source)}
+                                        {contact.template_lead ? "Template · WhatsApp" : sourceLabel(contact.source)}
                                       </span>
                                       {contact.cold_lead && (
                                         <span className="crm-cold-tag">
                                           Lead en frío
                                         </span>
                                       )}
-                                      {(contact.broadcast_tags ?? []).map(
+                                      {[...(contact.template_tags ?? []), ...(contact.broadcast_tags ?? [])].map(
                                         (tag) => (
                                           <span
                                             className="crm-cold-tag"
@@ -977,14 +975,14 @@ export function Workspace({
                                 </td>
                                 <td>
                                   <span className="crm-source-tag">
-                                    {sourceLabel(contact.source)}
+                                    {contact.template_lead ? "Template · WhatsApp" : sourceLabel(contact.source)}
                                   </span>
                                   {contact.cold_lead && (
                                     <span className="crm-cold-tag">
                                       Lead en frío
                                     </span>
                                   )}
-                                  {(contact.broadcast_tags ?? []).map((tag) => (
+                                  {[...(contact.template_tags ?? []), ...(contact.broadcast_tags ?? [])].map((tag) => (
                                     <span className="crm-cold-tag" key={tag}>
                                       {tag}
                                     </span>

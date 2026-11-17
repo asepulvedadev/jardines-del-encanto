@@ -94,3 +94,10 @@ export const broadcastErrors: Record<string, string> = {
   zernio_not_configured: "Conecta Zernio en Configuraciones → Conexiones.",
   connection_disabled: "Activa Zernio y WhatsApp en Configuraciones.",
 };
+
+/** Reserved cohort selectors stay separate from persisted broadcast UUIDs. */
+export function leadCohortFilter(value: string) {
+  if (value === "template" || value === "campaign") return { cohort: value };
+  if (value === "cold") return { cold_only: true };
+  return { campaign_id: value };
+}

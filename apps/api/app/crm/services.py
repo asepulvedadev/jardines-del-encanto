@@ -2,6 +2,12 @@
 
 from fastapi import HTTPException
 
+TEMPLATE_MATCH = "EXISTS (SELECT 1 FROM crm.template_lead_attribution t WHERE t.contact_id=c.id AND t.state='matched' AND c.phone='+' || ltrim(t.participant_id,'+'))"
+CAMPAIGN_MATCH = (
+    "c.source='social_campaign' AND NOT EXISTS (SELECT 1 FROM crm.whatsapp_cold_leads w WHERE w.contact_id=c.id) AND NOT "
+    + TEMPLATE_MATCH
+)
+
 STAGES = {"new": "Nuevo", "contacted": "Contactado", "won": "Ganado"}
 
 
@@ -35,9 +41,13 @@ def workspace(db, admin, broadcast_filter=None):
         params.append(broadcast_filter.campaign_id)
     if broadcast_filter and broadcast_filter.cold_only:
         filters.append("EXISTS (SELECT 1 FROM crm.whatsapp_cold_leads w WHERE w.contact_id=c.id)")
+    if broadcast_filter and broadcast_filter.cohort:
+        filters.append(TEMPLATE_MATCH if broadcast_filter.cohort == "template" else CAMPAIGN_MATCH)
     clause = " WHERE " + " AND ".join(filters) if filters else ""
     contacts = db.execute(
         f"""SELECT c.*, r.code AS registration_code,
+           {TEMPLATE_MATCH} AS template_lead,
+           ARRAY(SELECT DISTINCT t.label FROM crm.template_lead_attribution t WHERE t.contact_id=c.id AND t.state='matched' AND c.phone='+' || ltrim(t.participant_id,'+') ORDER BY t.label LIMIT 20) AS template_tags,
            EXISTS (SELECT 1 FROM crm.whatsapp_cold_leads w WHERE w.contact_id=c.id) AS cold_lead,
            ARRAY(SELECT b.name FROM crm.whatsapp_broadcast_recipients m JOIN crm.whatsapp_broadcasts b ON b.id=m.campaign_id WHERE m.contact_id=c.id ORDER BY b.created_at DESC LIMIT 20) AS broadcast_tags
            FROM crm.contacts c
@@ -61,9 +71,10 @@ def workspace(db, admin, broadcast_filter=None):
         "SELECT * FROM crm.activities ORDER BY created_at DESC, id LIMIT 100"
     ).fetchall()
     counts = db.execute(
-        """SELECT (SELECT count(*) FROM crm.contacts) AS contacts,
+        f"""SELECT (SELECT count(*) FROM crm.contacts) AS contacts,
            (SELECT count(*) FROM crm.whatsapp_cold_leads) AS cold_leads,
-           (SELECT count(*) FROM crm.contacts c WHERE c.source='social_campaign' AND NOT EXISTS (SELECT 1 FROM crm.whatsapp_cold_leads w WHERE w.contact_id=c.id)) AS campaign_leads,
+           (SELECT count(*) FROM crm.contacts c WHERE {CAMPAIGN_MATCH}) AS campaign_leads,
+           (SELECT count(*) FROM crm.contacts c WHERE {TEMPLATE_MATCH}) AS template_leads,
            (SELECT count(*) FROM crm.deals WHERE stage IN ('new','contacted')) AS active,
            (SELECT count(*) FROM crm.deals WHERE stage = 'won') AS won,
            (SELECT count(*) FROM crm.tasks WHERE NOT completed) AS pending,

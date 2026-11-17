@@ -223,6 +223,12 @@ def _loop():
             due = monotonic() - last_sweep >= 60
             tick(sweep_accounts=due)
             if due:
+                from . import template_cohorts
+
+                try:
+                    template_cohorts.tick()
+                except Exception:  # noqa: BLE001, S110 - independent GET-only attribution repair
+                    pass
                 last_sweep = monotonic()
         except Exception:  # noqa: BLE001 - retry reads only; never log contacts or credentials
             _error = "capture_unavailable"

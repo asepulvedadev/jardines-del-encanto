@@ -104,3 +104,44 @@ unsolicited autonomous Sara send permission or production credential change is a
 Documentation checked 2026-11-16. Context7 quota was unavailable; official Zernio
 references were used directly. Actual live-template compatibility and subscriber
 exclusion require an authorized controlled recipient test after deployment.
+
+## Native Zernio broadcasts and lead cohorts
+
+Migration `033_template_lead_cohorts.sql` adds an independent attribution ledger.
+The GET-only repair pass in the lead-capture worker recognizes the owner's native
+**Jardines · Base 1 · Feria 22 nov 2026** broadcast on the existing Jardines WhatsApp
+account. It verifies the exact approved `..._v4` template and the
+`jardines-base1-20261117` segment tag before reading recipient delivery receipts.
+It does not create a CRM broadcast or fabricate an import/send result.
+
+A recipient is counted under **Templates · WhatsApp** only when a CRM lead already
+exists and a verified incoming message in its account/conversation/participant
+namespace is later than that recipient's successful `sentAt`. Failed sends,
+outgoing messages, old conversations and CSV membership alone are not conversions.
+The persistent badge is **Templates · Base 1**. Names, original source, pipeline
+stage, subscription and consent remain unchanged; contact uniqueness still uses
+the existing normalized-phone constraint. Edited phone identities do not inherit
+the previous number's cohort.
+
+Dashboard campaign and template counts are disjoint: template provenance takes
+precedence over the social-campaign counter, without rewriting the original
+contact source. The cold CSV-import counter remains separate and is not a count
+of replies. The total-contact counter continues to include all unique leads.
+The existing authenticated, CSRF-protected `POST /crm/broadcasts/filter` accepts
+an optional `cohort` (`campaign` or `template`), alongside its existing
+`campaign_id` and `cold_only` filters. Contact and pipeline filtering runs in SQL,
+not just on the first 500 client-side rows.
+
+Each minute, the independent repair pass reads at most two recipient pages and
+checks at most ten linked conversations. A 913-recipient snapshot needs at least
+five passes; unanswered/failed reads are retried as **reads** after five minutes.
+It reads the latest 100 messages per conversation and never infers a reply from
+an incomplete history. An older response absent from that window remains
+unattributed. No message, template, import, opt-in, retry-send or resend is executed.
+Webhook lead capture stays network-free. Attribution failures do not roll back
+lead creation or replay welcome messages. Applying the migration and deploying
+this code are required before production counts change.
+
+Provider contract references: [broadcast detail](https://docs.zernio.com/broadcasts/get-broadcast),
+[recipient receipts](https://docs.zernio.com/broadcasts/list-broadcast-recipients),
+[conversation messages](https://docs.zernio.com/messages/get-inbox-conversation-messages).
