@@ -21,6 +21,10 @@ const config: NextConfig = {
         ],
       },
       {
+        source: "/grupo",
+        headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+      },
+      {
         source: "/crm/:path*",
         headers: [
           {
