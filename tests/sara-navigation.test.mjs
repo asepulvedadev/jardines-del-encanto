@@ -28,6 +28,7 @@ test("sales navigation follows Sara IA without removing other sections", () => {
       ["workflows", "connections"],
       ["campaigns", "list"],
       ["inbox", "message"],
+      ["broadcasts", "message"],
     ],
   );
 });

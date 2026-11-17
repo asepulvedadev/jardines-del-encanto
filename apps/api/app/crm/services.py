@@ -25,14 +25,35 @@ def updated_or_conflict(db, record, table, record_id):
     raise HTTPException(409 if exists else 404, "record_changed" if exists else "not_found")
 
 
-def workspace(db, admin):
+def workspace(db, admin, broadcast_filter=None):
     # A consistent snapshot avoids mixing counts and rows from concurrent writes.
+    filters, params = [], []
+    if broadcast_filter and broadcast_filter.campaign_id:
+        filters.append(
+            "EXISTS (SELECT 1 FROM crm.whatsapp_broadcast_recipients m WHERE m.contact_id=c.id AND m.campaign_id=%s)"
+        )
+        params.append(broadcast_filter.campaign_id)
+    if broadcast_filter and broadcast_filter.cold_only:
+        filters.append("EXISTS (SELECT 1 FROM crm.whatsapp_cold_leads w WHERE w.contact_id=c.id)")
+    clause = " WHERE " + " AND ".join(filters) if filters else ""
     contacts = db.execute(
-        """SELECT c.*, r.code AS registration_code FROM crm.contacts c
+        f"""SELECT c.*, r.code AS registration_code,
+           EXISTS (SELECT 1 FROM crm.whatsapp_cold_leads w WHERE w.contact_id=c.id) AS cold_lead,
+           ARRAY(SELECT b.name FROM crm.whatsapp_broadcast_recipients m JOIN crm.whatsapp_broadcasts b ON b.id=m.campaign_id WHERE m.contact_id=c.id ORDER BY b.created_at DESC LIMIT 20) AS broadcast_tags
+           FROM crm.contacts c
            LEFT JOIN crm.landing_registrations r ON r.contact_id=c.id
-           ORDER BY c.created_at DESC, c.id LIMIT 501"""
+           {clause} ORDER BY c.created_at DESC, c.id LIMIT 501""",
+        params,
     ).fetchall()
-    deals = db.execute("SELECT * FROM crm.deals ORDER BY created_at DESC, id LIMIT 501").fetchall()
+    if filters:
+        deals = db.execute(
+            f"SELECT d.* FROM crm.deals d JOIN crm.contacts c ON c.id=d.contact_id {clause} ORDER BY d.created_at DESC,d.id LIMIT 501",
+            params,
+        ).fetchall()
+    else:
+        deals = db.execute(
+            "SELECT * FROM crm.deals ORDER BY created_at DESC, id LIMIT 501"
+        ).fetchall()
     tasks = db.execute(
         "SELECT * FROM crm.tasks ORDER BY completed, due_date, id LIMIT 501"
     ).fetchall()
@@ -41,6 +62,8 @@ def workspace(db, admin):
     ).fetchall()
     counts = db.execute(
         """SELECT (SELECT count(*) FROM crm.contacts) AS contacts,
+           (SELECT count(*) FROM crm.whatsapp_cold_leads) AS cold_leads,
+           (SELECT count(*) FROM crm.contacts c WHERE c.source='social_campaign' AND NOT EXISTS (SELECT 1 FROM crm.whatsapp_cold_leads w WHERE w.contact_id=c.id)) AS campaign_leads,
            (SELECT count(*) FROM crm.deals WHERE stage IN ('new','contacted')) AS active,
            (SELECT count(*) FROM crm.deals WHERE stage = 'won') AS won,
            (SELECT count(*) FROM crm.tasks WHERE NOT completed) AS pending,
@@ -48,6 +71,9 @@ def workspace(db, admin):
             AND due_date < (now() AT TIME ZONE 'America/Bogota')::date) AS overdue"""
     ).fetchone()
     return {
+        "broadcast_labels": db.execute(
+            "SELECT id,name FROM crm.whatsapp_broadcasts ORDER BY created_at DESC,id LIMIT 100"
+        ).fetchall(),
         "contacts": contacts[:500],
         "deals": deals[:500],
         "tasks": tasks[:500],

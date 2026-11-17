@@ -3,7 +3,15 @@ import type { NextRequest } from "next/server";
 const workflowId =
   "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const rules: [RegExp, string[]][] = [
-  [/^inbox\/(catalog|accounts|actions|lead-capture|comment-moderation)$/, ["GET"]],
+  [/^broadcasts$/, ["GET", "POST"]],
+  [/^broadcasts\/catalog$/, ["GET"]],
+  [/^broadcasts\/(preview|templates|filter)$/, ["POST"]],
+  [new RegExp(`^broadcasts/${workflowId}$`), ["GET"]],
+  [new RegExp(`^broadcasts/${workflowId}/(send|refresh)$`), ["POST"]],
+  [
+    /^inbox\/(catalog|accounts|actions|lead-capture|comment-moderation)$/,
+    ["GET"],
+  ],
   [/^inbox\/(read|prepare|templates)$/, ["POST"]],
   [/^inbox\/actions\/[0-9a-f-]{36}$/, ["GET"]],
   [/^inbox\/actions\/[0-9a-f-]{36}\/confirm$/, ["POST"]],
@@ -147,7 +155,12 @@ async function proxy(
   const analytics = endpoint === "analytics/summary";
   if (analytics) {
     const params = new URL(request.url).searchParams;
-    if ([...params.keys()].some(key => key !== "days") || params.getAll("days").length > 1 || (params.has("days") && !["1", "7", "30"].includes(params.get("days")!))) return fail(422, "invalid_input");
+    if (
+      [...params.keys()].some((key) => key !== "days") ||
+      params.getAll("days").length > 1 ||
+      (params.has("days") && !["1", "7", "30"].includes(params.get("days")!))
+    )
+      return fail(422, "invalid_input");
     query = `?days=${params.get("days") || "7"}`;
   }
   const sara = endpoint.startsWith("sara/");
@@ -157,6 +170,10 @@ async function proxy(
   const workflows = endpoint.startsWith("workflows/");
   const inbox = endpoint.startsWith("inbox/");
   if (inbox && new URL(request.url).searchParams.size)
+    return fail(422, "invalid_input");
+  const broadcasts =
+    endpoint === "broadcasts" || endpoint.startsWith("broadcasts/");
+  if (broadcasts && new URL(request.url).searchParams.size)
     return fail(422, "invalid_input");
   const campaigns =
     endpoint === "campaigns" || endpoint.startsWith("campaigns/");
@@ -213,13 +230,13 @@ async function proxy(
         /^workflows\/definitions(?:\/[^/]+(?:\/prepare)?)?$/.test(endpoint)) ||
       (request.method === "PATCH" &&
         /^control\/items\/[0-9a-f-]{36}$/.test(endpoint));
-    const bodyLimit = ["sara/attachments", "voice/attachments"].includes(
-      endpoint,
-    )
-      ? 768 * 1024
-      : definitionWrite || inbox
-        ? 65536
-        : 16384;
+    const bodyLimit = ["broadcasts", "broadcasts/preview"].includes(endpoint)
+      ? 1024 * 1024
+      : ["sara/attachments", "voice/attachments"].includes(endpoint)
+        ? 768 * 1024
+        : definitionWrite || inbox
+          ? 65536
+          : 16384;
     if (!request.headers.get("content-type")?.startsWith("application/json"))
       return fail(415, "invalid_content_type");
     const reader = request.body?.getReader();
@@ -253,29 +270,32 @@ async function proxy(
     request.cookies.get("__Host-jardines_session") ??
     request.cookies.get("jardines_session");
   if (session) headers.set("cookie", `${session.name}=${session.value}`);
-  const timeout = analytics ? 20000 :
-    /^campaigns\/.*\/(?:reviews(?:\/.*\/refresh)?|review-preview)$/.test(
-      endpoint,
-    ) ||
-    endpoint.startsWith("voice/") ||
-    endpoint.startsWith("retell/") ||
-    workflows ||
-    inbox ||
-    /^hermes\/proposals\/[0-9a-f-]{36}\/approve$/.test(endpoint)
-      ? 95000
-      : /^sara\/conversations\/[0-9a-f-]{36}\/messages$/.test(endpoint) &&
-          mutation
+  const timeout = broadcasts
+    ? 95000
+    : analytics
+      ? 20000
+      : /^campaigns\/.*\/(?:reviews(?:\/.*\/refresh)?|review-preview)$/.test(
+            endpoint,
+          ) ||
+          endpoint.startsWith("voice/") ||
+          endpoint.startsWith("retell/") ||
+          workflows ||
+          inbox ||
+          /^hermes\/proposals\/[0-9a-f-]{36}\/approve$/.test(endpoint)
         ? 95000
-        : ["sara/attachments", "voice/attachments"].includes(endpoint)
-          ? 35000
-          : endpoint === "hermes/chat"
-            ? 90000
-            : endpoint.startsWith("hermes/") ||
-                /^control\/items\/[0-9a-f-]{36}\/run$/.test(endpoint)
-              ? 30000
-              : endpoint.startsWith("social/mcp/")
-                ? 20000
-                : 8000;
+        : /^sara\/conversations\/[0-9a-f-]{36}\/messages$/.test(endpoint) &&
+            mutation
+          ? 95000
+          : ["sara/attachments", "voice/attachments"].includes(endpoint)
+            ? 35000
+            : endpoint === "hermes/chat"
+              ? 90000
+              : endpoint.startsWith("hermes/") ||
+                  /^control\/items\/[0-9a-f-]{36}\/run$/.test(endpoint)
+                ? 30000
+                : endpoint.startsWith("social/mcp/")
+                  ? 20000
+                  : 8000;
   try {
     const upstream = await fetch(`${base}/crm/${endpoint}${query}`, {
       method: request.method,
@@ -293,12 +313,41 @@ async function proxy(
       resultHeaders.append("Set-Cookie", cookie);
     const retry = upstream.headers.get("retry-after");
     if (retry) resultHeaders.set("Retry-After", retry);
+    if (broadcasts) {
+      const bytes = await boundedResult(upstream, 2 * 1024 * 1024);
+      if (
+        !bytes ||
+        !upstream.headers.get("content-type")?.startsWith("application/json")
+      )
+        return fail(502, "broadcast_unavailable");
+      return new Response(bytes, {
+        status: upstream.status,
+        headers: { ...privateHeaders, "Content-Type": "application/json" },
+      });
+    }
     if (analytics) {
       const bytes = await boundedResult(upstream, 65536);
-      if (!bytes || !upstream.headers.get("content-type")?.startsWith("application/json")) return fail(502, "invalid_analytics_response");
-      if (!upstream.ok) return fail([401, 403, 422].includes(upstream.status) ? upstream.status : 503, upstream.status === 401 ? "authentication_required" : "analytics_unavailable");
-      try { JSON.parse(new TextDecoder().decode(bytes)); } catch { return fail(502, "invalid_analytics_response"); }
-      return new Response(bytes, {status: 200, headers: { ...privateHeaders, "Content-Type": "application/json" }});
+      if (
+        !bytes ||
+        !upstream.headers.get("content-type")?.startsWith("application/json")
+      )
+        return fail(502, "invalid_analytics_response");
+      if (!upstream.ok)
+        return fail(
+          [401, 403, 422].includes(upstream.status) ? upstream.status : 503,
+          upstream.status === 401
+            ? "authentication_required"
+            : "analytics_unavailable",
+        );
+      try {
+        JSON.parse(new TextDecoder().decode(bytes));
+      } catch {
+        return fail(502, "invalid_analytics_response");
+      }
+      return new Response(bytes, {
+        status: 200,
+        headers: { ...privateHeaders, "Content-Type": "application/json" },
+      });
     }
     if (campaigns) {
       const media =

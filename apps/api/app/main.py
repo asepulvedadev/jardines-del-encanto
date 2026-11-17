@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from .analytics.routes import router as analytics_router
+from .broadcasts.routes import router as broadcasts_router
 from .campaigns.routes import router as campaigns_router
 from .control.routes import router as control_router
 from .crm.landing import router as landing_router
@@ -66,6 +67,7 @@ app = FastAPI(
 
 app.include_router(crm_router)
 app.include_router(analytics_router)
+app.include_router(broadcasts_router)
 app.include_router(campaigns_router)
 app.include_router(inbox_router)
 app.include_router(workflows_router)
@@ -86,9 +88,13 @@ app.include_router(whatsapp_agent.router)
 
 @app.middleware("http")
 async def private_response_headers(request: Request, call_next):
-    if request.url.path.startswith(("/crm/campaigns", "/crm/inbox")) and request.url.query:
+    if (
+        request.url.path.startswith(("/crm/campaigns", "/crm/inbox", "/crm/broadcasts"))
+        and request.url.query
+    ):
         return JSONResponse(
-            {"detail": "invalid_input"}, status_code=422,
+            {"detail": "invalid_input"},
+            status_code=422,
             headers={"Cache-Control": "no-store, private"},
         )
     if request.url.path.startswith("/crm/workflows/") and request.url.query:
@@ -101,6 +107,7 @@ async def private_response_headers(request: Request, call_next):
         (
             "/crm/social/whatsapp-agent",
             "/crm/campaigns",
+            "/crm/broadcasts",
             "/crm/inbox/",
             "/crm/workflows/",
             "/crm/control/",
@@ -123,7 +130,9 @@ async def private_response_headers(request: Request, call_next):
             )
         )
         maximum = (
-            768 * 1024
+            1024 * 1024
+            if request.url.path in ("/crm/broadcasts", "/crm/broadcasts/preview")
+            else 768 * 1024
             if request.url.path in ("/crm/sara/attachments", "/crm/voice/attachments")
             else 65536
             if large or request.url.path.startswith("/crm/inbox/")
