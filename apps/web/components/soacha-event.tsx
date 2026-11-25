@@ -1,13 +1,8 @@
 import type { ReactNode } from "react";
 import { whatsappLink } from "../lib/project";
+import { soachaEvent } from "../lib/soacha-event";
 
-export const soachaEvent = {
-  date: "2026-11-22",
-  dateLabel: "Domingo 22 de noviembre de 2026",
-  venue: "Cámara de Comercio de Bogotá en Soacha",
-  message:
-    "Hola, quiero información para asistir al evento de Jardines del Encanto el domingo 22 de noviembre de 2026 en la Cámara de Comercio de Bogotá en Soacha. ¿Me comparten el horario, la dirección exacta y cómo coordinar mi asistencia?",
-} as const;
+export { soachaEvent };
 
 export function EventContactLink({
   children = "Quiero asistir · WhatsApp",
@@ -44,7 +39,7 @@ export function SoachaEvent() {
         <div className="event-copy">
           <p className="eyebrow">BOGOTÁ Y SOACHA, ESTÁN INVITADOS</p>
           <h2 id="soacha-event-title">
-            <span>Domingo 22</span>
+            <span>Domingo {soachaEvent.day}</span>
             <br />
             de noviembre.
           </h2>
@@ -64,7 +59,7 @@ export function SoachaEvent() {
           <p className="event-date-label">LA CITA ES ESTE DOMINGO</p>
           <time dateTime={soachaEvent.date} aria-label={soachaEvent.dateLabel}>
             <span className="event-weekday">Domingo</span>
-            <strong>22</strong>
+            <strong>{soachaEvent.day}</strong>
             <span className="event-month">noviembre · 2026</span>
           </time>
           <p className="event-venue">{soachaEvent.venue}</p>

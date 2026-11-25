@@ -134,7 +134,7 @@ export default function Home() {
                 Habla con un asesor. Sin pagos ni reservas automáticas.
               </p>
               <a className="hero-event-link" href="#encuentro-soacha">
-                Bogotá y Soacha: la cita es el domingo 22{" "}
+                Bogotá y Soacha: la cita es el domingo {soachaEvent.day}{" "}
                 <span aria-hidden="true">↗</span>
               </a>
             </div>

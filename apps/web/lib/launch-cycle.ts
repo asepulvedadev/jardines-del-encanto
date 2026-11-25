@@ -17,3 +17,14 @@ export function formatCycle(seconds: number): string {
     .map((value) => String(value).padStart(2, "0"))
     .join(":");
 }
+
+/** Fixed event deadline; unlike the legacy daily cycle it never restarts. */
+export function eventCountdownSeconds(now: number, target: number): number {
+  return Math.max(0, Math.ceil((target - now) / 1000));
+}
+
+export function formatEventCountdown(seconds: number): string {
+  const days = Math.floor(seconds / CYCLE_SECONDS);
+  const clock = formatCycle(seconds % CYCLE_SECONDS);
+  return days ? `${days} d · ${clock}` : clock;
+}

@@ -140,11 +140,15 @@ Copy should be specific and helpful: “Ver disponibilidad”, “Agendar una vi
 Avoid inflated claims, fake scarcity, invented testimonials, unverifiable time-to-city
 claims, meaningless “AI-powered” slogans and financial promises.
 
-The owner requested a launch-price banner, “Quiero mi cupo” CTA and repeating 24-hour
-clock. Use the supplied COP 13 million starting price. Per the owner's follow-up,
-show neither the daily-cycle label nor the explanatory reset/expiration paragraph;
-keep an accessible name on the timer. Omit the location/sales eyebrow above the hero
-headline. Never label this repeating cycle as a price-expiry or stock deadline.
+The owner requested a launch-price banner and “Quiero mi cupo” CTA. Use the
+supplied COP 13 million starting price. On 2026-11-25 the owner replaced the daily
+cycle with a fixed countdown to the November 29, 2026 fair at 08:00 in Colombia
+(UTC−05:00), retaining the previously approved time and Soacha venue. Share the
+event details through `apps/web/lib/soacha-event.ts`; show days when needed,
+stop at zero and display “La feria ya comenzó” rather than restarting. Keep the
+accessible timer name tied to that date and time. Do not represent it as price
+expiry, stock scarcity or an automatic reservation. Omit the location/sales eyebrow
+above the hero headline and the former daily-cycle/reset explanation.
 “Quiero mi cupo” opens an information/visit request, never an automatic booking.
 All “Quiero mi cupo” buttons (launch banner, hero, amenities, final CTA and mobile
 bar) open the same registration modal, never an immediate WhatsApp redirect. The

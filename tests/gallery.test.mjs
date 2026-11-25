@@ -35,11 +35,11 @@ test("optimized gallery files exist within the web delivery budget", async () =>
   }
 });
 
-test("the corrected venue is shared by the event, contact draft and Sara welcome", async () => {
-  const event = await source("apps/web/components/soacha-event.tsx");
+test("the event and contact draft retain the corrected venue and Sara welcomes the new campaign", async () => {
+  const event = await source("apps/web/lib/soacha-event.ts");
   const welcome = await source("apps/api/app/social/onboarding.py");
   assert.equal((event.match(/Cámara de Comercio de Bogotá en Soacha/g) ?? []).length, 2);
-  assert.match(welcome, /Cámara de Comercio de Bogotá en Soacha/);
+  assert.match(welcome, /domingo veintinueve de noviembre/);
   for (const content of [event, welcome]) assert.doesNotMatch(content, /Cámara de Comercio de Soacha/);
 });
 

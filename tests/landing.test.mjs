@@ -12,7 +12,7 @@ test("the Bogotá and Soacha invitation is a standalone full-width section", asy
   assert.ok(invitation, "invitation is outside the buyer guide's two-column layout");
   assert.match(invitation, /<h2[^>]*id="event-buyer-title"/);
   assert.match(invitation, /Bogotá y Soacha, nos vemos este domingo/);
-  assert.match(invitation, /dateTime="2026-11-22"/i);
+  assert.match(invitation, /dateTime="2026-11-29"/i);
   assert.match(invitation, /Cámara de Comercio de Bogotá en Soacha/);
   assert.match(invitation, /Consultar el evento por WhatsApp/);
   assert.match(invitation, /data-soacha-event-contact="true"/);
@@ -38,6 +38,8 @@ test("the public landing renders the supplied offer and correct WhatsApp destina
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /lang="es-CO"/);
+  assert.doesNotMatch(html, /domingo 22|Domingo 22|2026-11-22/);
+  assert.match(html, /data-event-start="2026-11-29T08:00:00-05:00"/);
   assert.match(html, /13 millones/);
   assert.match(html, /7 × 14/);
   assert.match(html, /24 meses/);
@@ -73,7 +75,7 @@ test("existing infrastructure health contract and security headers remain intact
   assert.equal(page.headers.get("x-content-type-options"), "nosniff");
 });
 
-test("redesigned landing exposes hero film, transparent daily cycle and an inline lot explorer", async () => {
+test("redesigned landing exposes hero film, event countdown and an inline lot explorer", async () => {
   const html = await (await fetch(base)).text();
   assert.match(html, /Precio de lanzamiento/);
   assert.match(html, /Quiero mi cupo/);
@@ -81,7 +83,7 @@ test("redesigned landing exposes hero film, transparent daily cycle and an inlin
   assert.match(html, /data-launch-cycle/);
   assert.doesNotMatch(html, /Ciclo diario/);
   assert.doesNotMatch(html, /ACACÍAS, META/);
-  assert.match(html, /aria-label="Contador de 24 horas"/);
+  assert.match(html, /aria-label="Tiempo restante para la feria: Domingo 29 de noviembre de 2026, 8:00 a\. m\., hora de Colombia"/);
   assert.doesNotMatch(html, /El contador se reinicia|No indica el vencimiento/);
   assert.match(html, /data-plan-explorer/);
   assert.match(html, /<svg[^>]+data-masterplan/);
@@ -104,7 +106,7 @@ test("the Soacha event follows the hero and distinguishes the venue from the pro
   assert.match(main, /<\/section><section[^>]*id="encuentro-soacha"/);
   assert.ok(main.indexOf('id="encuentro-soacha"') < main.indexOf('class="facts-section"'));
   const event = main.match(/<section[^>]*id="encuentro-soacha"[\s\S]*?<\/section>/)?.[0] ?? "";
-  assert.match(event, /dateTime="2026-11-22"/i);
+  assert.match(event, /dateTime="2026-11-29"/i);
   assert.match(event, /Domingo/);
   assert.match(event, /Cámara de Comercio de Bogotá en Soacha/);
   assert.match(event, /Acacías, Meta/);
@@ -120,7 +122,7 @@ test("event calls to action use the existing WhatsApp with an accurate prefilled
     const url = new URL(anchor.match(/href="([^"]+)"/)[1].replaceAll("&amp;", "&"));
     assert.equal(url.origin, "https://wa.me");
     assert.equal(url.pathname, "/573008348478");
-    assert.match(url.searchParams.get("text"), /domingo 22 de noviembre de 2026/);
+    assert.match(url.searchParams.get("text"), /domingo 29 de noviembre de 2026/);
     assert.match(url.searchParams.get("text"), /Cámara de Comercio de Bogotá en Soacha/);
     assert.match(url.searchParams.get("text"), /horario.*dirección exacta/);
     assert.match(anchor, /target="_blank"/);
@@ -169,8 +171,8 @@ test("the event reflows, navigates and opens only the intended WhatsApp draft", 
       await page.locator(".hero-event-link").click();
       await page.waitForURL("**/#encuentro-soacha");
       const event = page.locator("#encuentro-soacha");
-      assert.equal(await event.locator("time").getAttribute("datetime"), "2026-11-22");
-      assert.ok((await event.locator("h2").innerText()).includes("Domingo 22"));
+      assert.equal(await event.locator("time").getAttribute("datetime"), "2026-11-29");
+      assert.ok((await event.locator("h2").innerText()).includes("Domingo 29"));
       assert.equal(await event.locator(".event-main-venue").innerText(), "Cámara de Comercio de Bogotá en Soacha");
       assert.ok((await event.innerText()).includes("BOGOTÁ Y SOACHA"));
       const contact = event.locator("[data-soacha-event-contact]");
@@ -189,7 +191,7 @@ test("the event reflows, navigates and opens only the intended WhatsApp draft", 
       const destination = new URL(popup.url());
       assert.equal(destination.hostname, "wa.me");
       assert.equal(destination.pathname, "/573008348478");
-      assert.match(destination.searchParams.get("text"), /domingo 22 de noviembre de 2026/);
+      assert.match(destination.searchParams.get("text"), /domingo 29 de noviembre de 2026/);
       await popup.close();
       const invitation = page.locator("#invitacion-bogota-soacha");
       const invitationBox = await invitation.boundingBox();

@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { dailyCycleSeconds, formatCycle } from "../lib/launch-cycle";
+import { eventCountdownSeconds, formatEventCountdown } from "../lib/launch-cycle";
+import { soachaEvent } from "../lib/soacha-event";
 import { LeadCaptureButton } from "./lead-capture";
 
 export function LaunchBanner() {
   const [remaining, setRemaining] = useState<number | null>(null);
   useEffect(() => {
-    const update = () => setRemaining(dailyCycleSeconds());
+    const target = Date.parse(soachaEvent.startsAt);
+    const update = () => setRemaining(eventCountdownSeconds(Date.now(), target));
     update();
     const interval = window.setInterval(update, 1000);
     document.addEventListener("visibilitychange", update);
@@ -25,14 +27,14 @@ export function LaunchBanner() {
             Lotes desde $13 millones <small>COP</small>
           </strong>
         </p>
-        <div className="launch-cycle" data-launch-cycle>
+        <div className="launch-cycle" data-launch-cycle data-event-start={soachaEvent.startsAt}>
           <span
             className="launch-clock"
             role="timer"
             aria-live="off"
-            aria-label="Contador de 24 horas"
+            aria-label={`Tiempo restante para la feria: ${soachaEvent.dateLabel}, 8:00 a. m., hora de Colombia`}
           >
-            {remaining === null ? "— : — : —" : formatCycle(remaining)}
+            {remaining === null ? "— : — : —" : remaining === 0 ? "La feria ya comenzó" : formatEventCountdown(remaining)}
           </span>
         </div>
         <LeadCaptureButton className="button button-lime" />
