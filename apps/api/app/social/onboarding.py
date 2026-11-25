@@ -17,14 +17,13 @@ from .tiktok_conversation import GenerationUnavailable
 
 SCRIPT = (
     "Hola, soy Sara, asistente comercial del proyecto Jardines del Encanto, ubicado en "
-    "Acacías, Meta. Es un gusto poder registrarte. A continuación te enviaré un enlace a "
-    "nuestra página web y a nuestro grupo de WhatsApp para que puedas tener más información "
-    "del proyecto y de la Gran Feria Inmobiliaria Jardines del Encanto, que se realizará el "
-    "domingo veintidós de noviembre en la Cámara de Comercio de Bogotá en Soacha."
+    "Acacías, Meta. Es un gusto saludarte. A continuación te enviaré nuestra página web y "
+    "el enlace a nuestro grupo de WhatsApp para que conozcas más del proyecto y de nuestra "
+    "feria inmobiliaria del domingo veintinueve de noviembre."
 )
 WEBSITE = "https://jardinesdelencanto.site/"
 DAILY_WELCOME_LIMIT = 1000
-WELCOME_UNTIL = datetime(2026, 11, 23, 5, tzinfo=UTC)  # End of fair date, Bogotá.
+WELCOME_UNTIL = datetime(2026, 11, 30, 5, tzinfo=UTC)  # End of fair date, Bogotá.
 FIELDS = re.compile(
     r"(?P<label>full name|nombre completo|phone number|n[uú]mero de (?:tel[eé]fono|celular)|"
     r"celular|tel[eé]fono|city|ciudad|email|¿[^:\n]{1,120}\?)\s*:\s*",

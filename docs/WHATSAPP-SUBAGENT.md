@@ -264,3 +264,19 @@ Only that absent-key WhatsApp case is supported alongside explicit `app` control
 Explicit null/external/AI-agent control and standby messages still block replies,
 and every dispatch rechecks current ownership. Facebook/Instagram rules are
 unchanged. No thread-control takeover request is issued.
+
+
+## November 29 inbound campaign
+
+The welcome campaign remains open through November 29, 2026 in America/Bogota
+(until November 30 at 05:00 UTC). The welcome audio uses the existing Sara voice
+and announces November 29 without carrying over the previous fair's venue or time.
+The production shared Sara profile must be updated separately through its versioned
+operator interface. The official website and configured WhatsApp group stay unchanged.
+
+This is inbound-only activation: it does not start broadcasts, replay historical
+webhooks, reset opt-outs, or resend previously confirmed welcome deliveries. Existing
+phone-based CRM deduplication and channel delivery guards remain unchanged. WhatsApp
+and Facebook retain the audio flow. TikTok retains Sara's text-only registration
+and link delivery because Zernio's TikTok Inbox supports text and images, not audio:
+https://docs.zernio.com/platforms/tiktok/inbox
